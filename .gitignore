@@ -39,10 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# Plantilla de variables de entorno (sin valores reales)
-!.env.example
 /.swc
 
 # Artefactos generados por el build de Workflow
 /src/app/.well-known/workflow/
+.vercel
+
+# Plantilla de variables de entorno (sin valores reales)
+!.env.example
