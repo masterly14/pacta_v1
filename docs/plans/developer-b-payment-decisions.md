@@ -7,11 +7,11 @@
 
 - [x] **`feature/b-db-schema`**: tablas de B en `schema.prisma` + una migración (ver §4).
 - [x] **`feature/b-engine`**: Vitest + `decide()` puro + fixtures de casos trampa (sin BD ni IA). Código en `src/features/decisions/engine/`.
-- [x] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (datos demo + UI mínima). Código en `src/features/policies/` y `/dashboard/policies`.
+- [x] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (datos demo + UI mínima). Código en `src/features/policies/` y `/platform/policies`.
 - [ ] **`feature/b-decisions`**: `evaluateInvoice()`, `POST /api/invoices/[id]/evaluate`, decisiones persistidas, auditoría, idempotencia.
 - [ ] **`feature/b-approvals`**: bandeja, resolución con reevaluación, autorización recurrente explícita, bloqueo transaccional.
 - [ ] **`feature/b-payment-history`**: importación CSV + sugerencias de recurrencia.
-- [ ] Páginas de B: `/dashboard/policies`, `/dashboard/approvals`, `/dashboard/payment-history`, `/dashboard/audit`.
+- [ ] Páginas de B: `/platform/policies`, `/platform/approvals`, `/platform/payment-history`, `/platform/audit`.
 
 ## 2. Motor determinístico (sin IA, 10 reglas)
 
@@ -51,7 +51,7 @@ La IA solo interviene antes (vertical A) para leer documentos. El motor compara 
 | CSV | Columnas `date` (YYYY-MM-DD), `description`, `amount` (texto decimal, negativo = salida), `currency`, `reference`. Parseo a unidades menores sin floats. Filas inválidas se rechazan con error por fila; repetidas se omiten. |
 | Recurrencia | ≥ 3 salidas al mismo proveedor, intervalos de 25–35 días, montos ±10 % → solo sugerencia, nunca autorización. |
 | Gestión de políticas | Rol `admin` (Clerk) → editar permisos de pago y cargar datos demo. `canManagePolicies` → proveedores, versiones de política y autorizaciones. Crear una autorización exige además `canApprove` con límite ≥ monto máximo: nadie autoriza más de lo que podría aprobar. |
-| Datos demo | Botón solo para admin en `/dashboard/policies` (idempotente). Proveedores = los del CSV demo (Nube Hosting LLC, Diseño Studio, Papelería Central). Solo Papelería Central queda autorizada; Nube Hosting tiene historial recurrente sin autorización y debe escalar. El admin recibe permisos explícitos (límite 10,000.00 USD). |
+| Datos demo | Botón solo para admin en `/platform/policies` (idempotente). Proveedores = los del CSV demo (Nube Hosting LLC, Diseño Studio, Papelería Central). Solo Papelería Central queda autorizada; Nube Hosting tiene historial recurrente sin autorización y debe escalar. El admin recibe permisos explícitos (límite 10,000.00 USD). |
 | Normalización de proveedores | `normalizeSupplierName` (policies) debe producir lo mismo que `normalizeName` (payment-history); un test lo verifica. Al integrar, payment-history debería importar la de policies. |
 | Tests | Vitest. `npm test` ejecuta Vitest y luego el test de A con `node --test` (`test:node`) hasta que A decida migrarlo. |
 

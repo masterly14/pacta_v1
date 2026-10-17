@@ -227,9 +227,9 @@ Los esquemas se implementarán en los archivos indicados abajo **antes de inicia
 
 ### Rutas de aplicación
 
-- `GET /dashboard/invoices` — inbox (A).
-- `GET /dashboard/invoices/[id]` — factura y contexto (A; el estado de decisión se muestra consumiendo el resultado de B).
-- `GET /dashboard/contracts` — contratos (A).
+- `GET /platform/invoices` — inbox (A).
+- `GET /platform/invoices/[id]` — factura y contexto (A; el estado de decisión se muestra consumiendo el resultado de B).
+- `GET /platform/contracts` — contratos (A).
 - `POST /api/webhooks/resend` — recepción de eventos firmados (A).
 - `POST /api/invoices` — carga manual/autorizada (A).
 - `GET /api/invoices/[id]` — factura estructurada (A).
@@ -267,10 +267,10 @@ Depende de Clerk/organización, esquema base de BD, almacenamiento privado, prov
 
 ### Rutas de aplicación
 
-- `GET /dashboard/payment-history` — CSV e historial (B).
-- `GET /dashboard/policies` — políticas y autorizaciones (B).
-- `GET /dashboard/approvals` — bandeja de aprobación (B).
-- `GET /dashboard/audit` — historial de decisiones (B).
+- `GET /platform/payment-history` — CSV e historial (B).
+- `GET /platform/policies` — políticas y autorizaciones (B).
+- `GET /platform/approvals` — bandeja de aprobación (B).
+- `GET /platform/audit` — historial de decisiones (B).
 - `POST /api/payment-history/import` — cargar CSV (B).
 - `POST /api/invoices/[id]/evaluate` — evaluar factura ya validada (coordinación A/B, implementación de reglas B).
 - `GET /api/decisions` — consultar resultados (B).
