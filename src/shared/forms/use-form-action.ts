@@ -35,7 +35,9 @@ export function useFormAction(
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    // Incluye el botón pulsado (name/value), p. ej. "Aprobar" vs "Rechazar" en el mismo formulario.
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const formData = new FormData(event.currentTarget, submitter);
     startTransition(() => dispatch(formData));
   }
 
