@@ -185,8 +185,9 @@ model PaymentAuthorization {
   revokedAt               DateTime?                  @map("revoked_at") @db.Timestamptz(6)
   revokedBy               String?                    @map("revoked_by")
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  supplier     Supplier          @relation(fields: [supplierId], references: [id])
+  decisions    PaymentDecision[]
 
   @@index([organizationId, supplierId, status])
   @@map("payment_authorizations")
@@ -218,6 +219,8 @@ model ApprovalPermission {
 /// @db-guarantee UNIQUE parcial payment_decisions_one_approved_per_invoice: (organizationId, invoiceId)
 ///   WHERE decision = 'approved' — una factura se aprueba y reserva presupuesto a lo sumo una vez.
 /// @db-guarantee TRIGGER payment_decisions_append_only: rechaza UPDATE y DELETE.
+/// @db-guarantee CHECK payment_decisions_authorization_check: authorizationId solo en decisiones approved
+///   (migración 20261017195842_add_decision_invoice_date_and_authorization).
 model PaymentDecision {
   id                String                 @id @default(cuid())
   organizationId    String                 @map("organization_id")
@@ -234,17 +237,21 @@ model PaymentDecision {
   policyVersion     Int?                   @map("policy_version")
   actorId           String?                @map("actor_id")
   approvalRequestId String?                @map("approval_request_id") // solicitud que resuelve (decisión humana)
+  invoiceDate       DateTime?              @map("invoice_date") @db.Date // para duplicados sospechosos
+  authorizationId   String?                @map("authorization_id") // autorización que cubrió una aprobación
   evaluatedAt       DateTime               @map("evaluated_at") @db.Timestamptz(6)
   createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization      Organization     @relation(fields: [organizationId], references: [id])
-  supplier          Supplier?        @relation(fields: [supplierId], references: [id])
-  resolvesRequest   ApprovalRequest? @relation("ApprovalResolution", fields: [approvalRequestId], references: [id])
-  triggeredApproval ApprovalRequest? @relation("ApprovalTrigger")
+  organization      Organization          @relation(fields: [organizationId], references: [id])
+  supplier          Supplier?             @relation(fields: [supplierId], references: [id])
+  authorization     PaymentAuthorization? @relation(fields: [authorizationId], references: [id])
+  resolvesRequest   ApprovalRequest?      @relation("ApprovalResolution", fields: [approvalRequestId], references: [id])
+  triggeredApproval ApprovalRequest?      @relation("ApprovalTrigger")
 
   @@index([organizationId, invoiceId])
   @@index([organizationId, supplierId, invoiceNumber])
   @@index([organizationId, decision, evaluatedAt])
+  @@index([authorizationId, decision, invoiceDate])
   @@map("payment_decisions")
 }
 
