@@ -7,7 +7,7 @@
 
 - [x] **`feature/b-db-schema`**: tablas de B en `schema.prisma` + una migración (ver §4).
 - [x] **`feature/b-engine`**: Vitest + `decide()` puro + fixtures de casos trampa (sin BD ni IA). Código en `src/features/decisions/engine/`.
-- [ ] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (seed + UI mínima).
+- [x] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (datos demo + UI mínima). Código en `src/features/policies/` y `/dashboard/policies`.
 - [ ] **`feature/b-decisions`**: `evaluateInvoice()`, `POST /api/invoices/[id]/evaluate`, decisiones persistidas, auditoría, idempotencia.
 - [ ] **`feature/b-approvals`**: bandeja, resolución con reevaluación, autorización recurrente explícita, bloqueo transaccional.
 - [ ] **`feature/b-payment-history`**: importación CSV + sugerencias de recurrencia.
@@ -50,6 +50,9 @@ La IA solo interviene antes (vertical A) para leer documentos. El motor compara 
 | Concurrencia | Verificación de presupuesto + inserción de `approved` dentro de una transacción que bloquea la fila de política de la organización (`SELECT … FOR UPDATE`). Una factura no se aprueba dos veces (índice único parcial). |
 | CSV | Columnas `date` (YYYY-MM-DD), `description`, `amount` (texto decimal, negativo = salida), `currency`, `reference`. Parseo a unidades menores sin floats. Filas inválidas se rechazan con error por fila; repetidas se omiten. |
 | Recurrencia | ≥ 3 salidas al mismo proveedor, intervalos de 25–35 días, montos ±10 % → solo sugerencia, nunca autorización. |
+| Gestión de políticas | Rol `admin` (Clerk) → editar permisos de pago y cargar datos demo. `canManagePolicies` → proveedores, versiones de política y autorizaciones. Crear una autorización exige además `canApprove` con límite ≥ monto máximo: nadie autoriza más de lo que podría aprobar. |
+| Datos demo | Botón solo para admin en `/dashboard/policies` (idempotente). Proveedores = los del CSV demo (Nube Hosting LLC, Diseño Studio, Papelería Central). Solo Papelería Central queda autorizada; Nube Hosting tiene historial recurrente sin autorización y debe escalar. El admin recibe permisos explícitos (límite 10,000.00 USD). |
+| Normalización de proveedores | `normalizeSupplierName` (policies) debe producir lo mismo que `normalizeName` (payment-history); un test lo verifica. Al integrar, payment-history debería importar la de policies. |
 | Tests | Vitest. `npm test` ejecuta Vitest y luego el test de A con `node --test` (`test:node`) hasta que A decida migrarlo. |
 
 ## 4. Tablas de B
@@ -78,5 +81,6 @@ Todas con `organization_id` → `organizations` e índices por organización.
 
 - 2026-10-17: plan acordado en sesión de diseño. Orden elegido: tablas primero, luego motor.
 - 2026-10-17: tablas de B aplicadas en Neon (`20261017163245_add_payment_autopilot_tables`).
+- 2026-10-17: políticas: CRUD con auditoría, permisos, datos demo y página. 38 tests unitarios + 10 de integración opcionales (`TEST_DATABASE_URL`, base desechable). Build local requiere que `.env.local` no sobrescriba `DATABASE_URL` con vacío.
 - 2026-10-17: revisión de código del PR #5: se añadieron uso por periodo de autorizaciones, vigencia por fecha de factura, normalización de número, última decisión por factura, regla de advertencias de extracción y escalado de reenvíos bloqueados (48 tests).
 - 2026-10-17: motor `decide(invoice, facts)` con 38 tests de casos trampa. Entradas validadas con Zod (`EngineFactsSchema`); la salida pasa por `PaymentDecisionSchema.parse` como última barrera. Explicaciones por plantilla, sin IA. Próximo: `feature/b-policies`.
