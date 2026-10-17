@@ -12,7 +12,7 @@ Priorizar siempre un flujo **end-to-end desplegado y verificable** sobre funcion
 
 - **Aplicación:** Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui.
 - **Autenticación:** Clerk (usuarios autenticados y organizaciones).
-- **Datos:** Neon PostgreSQL + Drizzle ORM.
+- **Datos:** Neon PostgreSQL + Prisma ORM.
 - **Correo entrante:** Resend (webhook; adjuntos PDF/imagen y cuerpo de email).
 - **IA:** Vercel AI SDK + modelo multimodal para extracción y contexto, **no para autorizar**.
 - **Contratos y validación:** Zod.
