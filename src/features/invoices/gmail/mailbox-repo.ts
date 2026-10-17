@@ -1,4 +1,5 @@
-import type { Document, GmailConnection, GmailInboundMessage } from "@prisma/client";
+import type { Document, GmailConnection, GmailInboundMessage, IgnoredInboundItem } from "@prisma/client";
+import { nanoid } from "nanoid";
 import { db } from "../../../lib/db.ts";
 
 export type CreatePendingMailboxInput = {
@@ -37,6 +38,21 @@ export type CreateDocumentInput = {
   receivedAt: Date;
 };
 
+export type IgnoredItemInput = {
+  kind: "attachment" | "message";
+  gmailAttachmentId: string | null;
+  filename: string | null;
+  mimeType: string | null;
+  byteSize: number | null;
+  reason: IgnoredInboundItem["reason"];
+};
+
+export type DocumentGroupInput = {
+  id: string;
+  kind: "invoice_candidate" | "message_context";
+  members: Array<{ documentId: string; role: "primary" | "supporting" }>;
+};
+
 export type MailboxRepo = {
   createPending(input: CreatePendingMailboxInput): Promise<GmailConnection>;
   getById(id: string): Promise<GmailConnection | null>;
@@ -56,6 +72,20 @@ export type MailboxRepo = {
   setInboundStatus(id: string, status: GmailInboundMessage["processingStatus"]): Promise<void>;
   createDocument(input: CreateDocumentInput): Promise<Document>;
   getDocument(id: string): Promise<Document | null>;
+  listDocumentsByInbound(inboundId: string): Promise<Document[]>;
+  /** Sustituye lo ignorado del correo: cada intento deja el resultado vigente. */
+  replaceIgnoredItems(input: {
+    organizationId: string;
+    inboundId: string;
+    items: IgnoredItemInput[];
+  }): Promise<void>;
+  listIgnoredItems(input: { organizationId: string; inboundId: string }): Promise<IgnoredInboundItem[]>;
+  /** Sustituye los grupos del correo y reasigna sus documentos en una sola transacción. */
+  replaceDocumentGroups(input: {
+    organizationId: string;
+    inboundId: string;
+    groups: DocumentGroupInput[];
+  }): Promise<void>;
 };
 
 function isUniqueViolation(error: unknown): boolean {
@@ -188,6 +218,61 @@ export function createPrismaMailboxRepo(): MailboxRepo {
 
     getDocument(id) {
       return db.document.findUnique({ where: { id } });
+    },
+
+    listDocumentsByInbound(inboundId) {
+      return db.document.findMany({
+        where: { gmailInboundMessageId: inboundId },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
+    },
+
+    async replaceIgnoredItems({ organizationId, inboundId, items }) {
+      await db.$transaction([
+        db.ignoredInboundItem.deleteMany({
+          where: { organizationId, gmailInboundMessageId: inboundId },
+        }),
+        db.ignoredInboundItem.createMany({
+          data: items.map((item) => ({
+            ...item,
+            id: `ign_${nanoid()}`,
+            organizationId,
+            gmailInboundMessageId: inboundId,
+          })),
+        }),
+      ]);
+    },
+
+    listIgnoredItems({ organizationId, inboundId }) {
+      return db.ignoredInboundItem.findMany({
+        where: { organizationId, gmailInboundMessageId: inboundId },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
+    },
+
+    async replaceDocumentGroups({ organizationId, inboundId, groups }) {
+      await db.$transaction(async (tx) => {
+        // onDelete: SetNull suelta los documentos antes de reasignarlos.
+        await tx.documentGroup.deleteMany({
+          where: { organizationId, gmailInboundMessageId: inboundId },
+        });
+        for (const group of groups) {
+          await tx.documentGroup.create({
+            data: {
+              id: group.id,
+              organizationId,
+              gmailInboundMessageId: inboundId,
+              kind: group.kind,
+            },
+          });
+          for (const member of group.members) {
+            await tx.document.updateMany({
+              where: { id: member.documentId, organizationId, gmailInboundMessageId: inboundId },
+              data: { groupId: group.id, groupRole: member.role },
+            });
+          }
+        }
+      });
     },
   };
 }

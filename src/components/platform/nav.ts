@@ -2,6 +2,7 @@ import {
   FileText,
   History,
   Landmark,
+  Plug,
   ScrollText,
   Shield,
   UserCheck,
@@ -16,6 +17,7 @@ export type PlatformNavItem = {
 
 export const platformNav: PlatformNavItem[] = [
   { href: "/platform/invoices", label: "Facturas", icon: FileText },
+  { href: "/platform/integrations", label: "Integraciones", icon: Plug },
   { href: "/platform/contracts", label: "Contratos", icon: ScrollText },
   { href: "/platform/payment-history", label: "Historial", icon: Landmark },
   { href: "/platform/policies", label: "Políticas", icon: Shield },

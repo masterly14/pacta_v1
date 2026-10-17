@@ -28,6 +28,8 @@ model Organization {
   gmailConnections GmailConnection[]
   gmailMessages    GmailInboundMessage[]
   documents        Document[]
+  documentGroups   DocumentGroup[]
+  ignoredItems     IgnoredInboundItem[]
 
   // Vertical B
   suppliers             Supplier[]
@@ -397,6 +399,8 @@ model GmailInboundMessage {
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   connection   GmailConnection @relation(fields: [gmailConnectionId], references: [id], onDelete: Restrict)
   documents    Document[]
+  groups       DocumentGroup[]
+  ignoredItems IgnoredInboundItem[]
 
   @@unique([gmailConnectionId, gmailMessageId])
   @@index([organizationId, receivedAt])
@@ -421,14 +425,83 @@ model Document {
   source                DocumentSource
   byteSize              Int            @map("byte_size")
   receivedAt            DateTime       @map("received_at") @db.Timestamptz(6)
+  groupId               String?        @map("group_id")
+  groupRole             DocumentRole?  @map("group_role")
   createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  inboundMessage GmailInboundMessage @relation(fields: [gmailInboundMessageId], references: [id], onDelete: Restrict)
+  group          DocumentGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([gmailInboundMessageId])
+  @@index([groupId])
+  @@map("documents")
+}
+
+enum DocumentGroupKind {
+  /// Una posible factura: su documento principal y la evidencia de apoyo.
+  invoice_candidate
+  /// Cuerpo de un correo con varios adjuntos: no se puede atribuir a una sola factura.
+  message_context
+}
+
+enum DocumentRole {
+  primary
+  supporting
+}
+
+/// Agrupación determinística de los documentos de un correo. No es una autorización.
+model DocumentGroup {
+  id                    String            @id
+  organizationId        String            @map("organization_id")
+  gmailInboundMessageId String            @map("gmail_inbound_message_id")
+  kind                  DocumentGroupKind
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  inboundMessage GmailInboundMessage @relation(fields: [gmailInboundMessageId], references: [id], onDelete: Restrict)
+  documents      Document[]
+
+  @@index([organizationId])
+  @@index([gmailInboundMessageId])
+  @@map("document_groups")
+}
+
+enum IgnoredItemKind {
+  attachment
+  message
+}
+
+enum IgnoredItemReason {
+  unsupported_mime_type
+  empty_file
+  file_too_large
+  missing_content
+  duplicate_content
+  fetch_failed
+  no_usable_content
+}
+
+/// Qué se descartó de un correo y por qué. Se regenera en cada intento de descarga.
+model IgnoredInboundItem {
+  id                    String            @id
+  organizationId        String            @map("organization_id")
+  gmailInboundMessageId String            @map("gmail_inbound_message_id")
+  kind                  IgnoredItemKind
+  gmailAttachmentId     String?           @map("gmail_attachment_id")
+  filename              String?
+  mimeType              String?           @map("mime_type")
+  byteSize              Int?              @map("byte_size")
+  reason                IgnoredItemReason
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   inboundMessage GmailInboundMessage @relation(fields: [gmailInboundMessageId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
   @@index([gmailInboundMessageId])
-  @@map("documents")
+  @@map("ignored_inbound_items")
 }
 
 // ---------------------------------------------------------------------------
