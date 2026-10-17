@@ -114,5 +114,7 @@ Tabla `contracts` (migración `20261017174628_add_contracts_table`): proveedor, 
 
 ## 6. Registro
 
+- 2026-10-17: A-02 en curso (no marcada). `src/features/invoices/extraction/`: lectura (unpdf; visión OpenAI para imágenes y PDF escaneado), extracción DeepSeek con `RawExtractionSchema`, conversión determinística a `InvoiceContext` con los campos `name/email/subject/body`. Verificado: 18 tests de Vitest en verde y lint limpio; **no** probado contra OpenAI/DeepSeek reales ni con Langfuse. Pendiente: `buildInvoiceContext()` (A-04) para `supplierId`/`contractMatch`, y cablear el pipeline (A-03). Dependencias añadidas: `@ai-sdk/openai`, `unpdf`. Requiere `OPENAI_API_KEY`.
+
 - 2026-10-17: masterly14 traspasa contratos a Brayan. Se entrega `feature/a-contracts`: registro manual, comparación pura y página. Migración aplicada en la BD de desarrollo de Neon.
 - 2026-10-17: masterly14 entrega `feature/gmail-composio` (Gmail + R2) y la plataforma protegida. Se crean los issues #11–#35 (etiqueta `vertical-a`). Próximo: A-01 y decidir D-1/D-2.
