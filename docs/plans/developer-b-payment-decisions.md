@@ -88,3 +88,11 @@ Todas con `organization_id` → `organizations` e índices por organización.
 - 2026-10-17: políticas: CRUD con auditoría, permisos, datos demo y página. 38 tests unitarios + 10 de integración opcionales (`TEST_DATABASE_URL`, base desechable). Build local requiere que `.env.local` no sobrescriba `DATABASE_URL` con vacío.
 - 2026-10-17: revisión de código del PR #5: se añadieron uso por periodo de autorizaciones, vigencia por fecha de factura, normalización de número, última decisión por factura, regla de advertencias de extracción y escalado de reenvíos bloqueados (48 tests).
 - 2026-10-17: motor `decide(invoice, facts)` con 38 tests de casos trampa. Entradas validadas con Zod (`EngineFactsSchema`); la salida pasa por `PaymentDecisionSchema.parse` como última barrera. Explicaciones por plantilla, sin IA. Próximo: `feature/b-policies`.
+
+## Notificaciones multicanal (contratos, WhatsApp primero)
+
+- [x] **`feature/b-notification-contracts`**: solo contratos, sin lógica de envío ni migración.
+  - `src/shared/schemas/notification.ts` (intención/destinatario/resultado/eventos entrantes, agnóstico de canal) y `whatsapp-webhook.ts` (GET handshake, POST → eventos canónicos).
+  - `src/features/notifications/ports.ts` (`NotificationChannelAdapter`) y `channels/whatsapp/{types,templates,adapter}.ts` (adaptador esqueleto, `verifyWebhook` fail-closed).
+- Decisiones: WhatsApp solo **notifica**; una respuesta entrante es evidencia no confiable y nunca aprueba (aprobar sigue en dashboard con usuario Clerk). El teléfono del admin irá en una tabla propia `notification_recipients` (migración coordinada, fase 2), no en `PaymentPolicy`.
+- Pendiente fase 2: envío Graph API, HMAC `X-Hub-Signature-256` con `WHATSAPP_APP_SECRET`, dedupe persistente (`inboundEventKey`), plantillas aprobadas en Meta, disparo desde `ApprovalRequest`, auditoría. Decidir si se envuelve `@chat-adapter/whatsapp` o se llama a la Graph API.
