@@ -3,6 +3,7 @@
  *   Amounts become integer minor units without floats, the account is masked, dates are checked,
  *   missingFields is computed from the nulls and evidence is kept only when its excerpt really
  *   appears in the source text. Anything unparseable becomes null plus a warning, never a guess.
+ *   Account-like numbers in stored free text (excerpts, subject, body, description) are masked.
  * Runs in: server and tests (pure, no I/O).
  * Triggered by: extractInvoice() after the LLM call.
  * Receives → Returns: (RawExtraction, transcripts, meta) → { ok: true, context } | { ok: false, error }.
@@ -70,6 +71,15 @@ const clean = (value: string | null): string | null => {
   return trimmed === "" ? null : trimmed;
 };
 
+// Secuencias de 10+ dígitos (con espacios o guiones): cuentas, IBAN, tarjetas. Las fechas
+// (8 dígitos) y los montos normales no coinciden.
+const ACCOUNT_LIKE = /\d(?:[ -]?\d){9,}/g;
+
+// El InvoiceContext se guarda con cada decisión: el texto libre nunca lleva una cuenta completa.
+export function redactAccountNumbers(text: string): string {
+  return text.replace(ACCOUNT_LIKE, (match) => `****${match.replace(/\D/g, "").slice(-4)}`);
+}
+
 // Busca el fragmento en los textos fuente (ignorando espacios y mayúsculas) y devuelve dónde.
 function locateExcerpt(excerpt: string, transcripts: DocumentTranscript[]) {
   const needle = squash(excerpt);
@@ -132,7 +142,7 @@ export function toInvoiceContext(
       documentId: found.transcript.documentId,
       field,
       page: found.page,
-      excerpt: excerpt.slice(0, 1000),
+      excerpt: redactAccountNumbers(excerpt).slice(0, 1000),
     });
   };
 
@@ -161,18 +171,21 @@ export function toInvoiceContext(
     email = null;
   }
 
-  const subject = clean(metadata.subject)?.slice(0, 998) ?? null;
+  const rawSubject = clean(metadata.subject);
+  const subject = rawSubject === null ? null : redactAccountNumbers(rawSubject).slice(0, 998);
 
   let body: string | null = null;
   const bodyTranscript = transcripts.find((t) => t.sourceType === "email_body");
   if (bodyTranscript) {
-    body = clean(bodyTranscript.text);
+    const rawBody = clean(bodyTranscript.text);
+    body = rawBody === null ? null : redactAccountNumbers(rawBody);
     if (body !== null && body.length > 100_000) {
       body = body.slice(0, 100_000);
       warn("BODY_TRUNCATED", "El cuerpo del correo se truncó a 100000 caracteres", "body");
     }
   }
-  const description = text("description", raw.description);
+  const rawDescription = text("description", raw.description);
+  const description = rawDescription === null ? null : redactAccountNumbers(rawDescription);
 
   // Cuenta: se enmascara aquí; el valor completo no sale de esta función.
   let beneficiaryAccountReference: string | null = null;

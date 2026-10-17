@@ -3,7 +3,7 @@ import { extractInvoice, type ExtractDeps } from "./extract-invoice";
 import { buildExtractionPrompt } from "./prompt";
 import type { RawExtraction } from "./raw-extraction.schema";
 import type { SourceDocument } from "./read-document";
-import type { ContextMeta } from "./to-invoice-context";
+import { redactAccountNumbers, type ContextMeta } from "./to-invoice-context";
 
 const none = { value: null, excerpt: null };
 const claim = (value: string, excerpt: string | null = value) => ({ value, excerpt });
@@ -228,5 +228,37 @@ describe("buildExtractionPrompt", () => {
     const prompt = buildExtractionPrompt(metadata, [{ documentId: "doc_1", sourceType: "email_body", text: evil }]);
     expect(prompt.match(/<\/document>/g)).toHaveLength(1);
     expect(prompt.match(/<document /g)).toHaveLength(1);
+  });
+});
+
+describe("redactAccountNumbers", () => {
+  it.each([
+    ["Pagar a la cuenta 1234567890", "Pagar a la cuenta ****7890"],
+    ["IBAN ES91 2100 0418 4502 0005 1332", "IBAN ES****1332"],
+    ["Tarjeta 4111-1111-1111-1111", "Tarjeta ****1111"],
+  ])("enmascara %j", (input, expected) => {
+    expect(redactAccountNumbers(input)).toBe(expected);
+  });
+
+  it.each(["Fecha: 2026-10-01", "Total: 1500.50 USD", "Factura F-2041", "Tel. 300 123 45"])("no altera %j", (input) => {
+    expect(redactAccountNumbers(input)).toBe(input);
+  });
+});
+
+describe("extractInvoice · texto libre guardado", () => {
+  it("enmascara una cuenta completa escrita en el cuerpo del correo", async () => {
+    const body: SourceDocument = {
+      documentId: "doc_body",
+      kind: "email_body",
+      mediaType: "text/plain",
+      bytes: null,
+      text: "Hola, cambiamos de banco: paguen a la cuenta 9876543210 desde este mes.",
+    };
+    const result = await run(fullRaw(), {}, [pdfDoc, body]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.context.body).toBe("Hola, cambiamos de banco: paguen a la cuenta ****3210 desde este mes.");
+    expect(JSON.stringify(result.context)).not.toContain("9876543210");
+    expect(JSON.stringify(result.context)).not.toContain("1234567890");
   });
 });
