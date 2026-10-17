@@ -37,7 +37,6 @@ prisma/schema.prisma    esquema de base de datos
 
 ```bash
 npm install
-cp .env.example .env.local   # o: vercel env pull .env.local
 npm run dev
 ```
 
@@ -49,8 +48,8 @@ npm run build
 npx prisma generate   # también corre solo en postinstall
 ```
 
-Las variables de entorno están listadas en `.env.example`. Nunca hagas commit de `.env*`
-(salvo `.env.example`).
+Las variables de entorno compartidas están en `.env` (versionado). `.env.example`
+documenta las claves. `.env.local` sigue ignorado para overrides personales.
 
 ## Estado
 

@@ -56,7 +56,7 @@ WhatsApp, Slack, integración con bancos, extractos bancarios PDF, dinero real, 
 | Aplicación | Next.js App Router + TypeScript | Frontend y API en el mismo repositorio |
 | UI | Tailwind CSS + shadcn/ui | Componentes rápidos y consistentes |
 | Auth | Clerk | Proteger rutas y acciones por usuario/organización |
-| Datos | Neon PostgreSQL + Drizzle ORM | Una única base de datos y migraciones coordinadas |
+| Datos | Neon PostgreSQL + Prisma ORM | Una única base de datos y migraciones coordinadas |
 | Email | Resend Receiving | Verificar webhook, evitar reprocesamiento |
 | Extracción | Vercel AI SDK + modelo multimodal | Datos estructurados, **sin permiso para aprobar** |
 | Contratos | Zod | Validación en límites de confianza entre módulos |
@@ -321,7 +321,7 @@ CLAUDE.md
 PLAN.md
 ```
 
-Cada desarrollador es dueño de **frontend + backend + persistencia + pruebas** dentro de su vertical. La navegación/layout global, auth, contratos, esquema Drizzle, migraciones, configuración y coordinador A → B son compartidos. **No modificar estos archivos sin acuerdo.**
+Cada desarrollador es dueño de **frontend + backend + persistencia + pruebas** dentro de su vertical. La navegación/layout global, auth, contratos, esquema Prisma, migraciones, configuración y coordinador A → B son compartidos. **No modificar estos archivos sin acuerdo.**
 
 ## 12. Plan de trabajo independiente e integración
 
@@ -330,7 +330,7 @@ Cada desarrollador es dueño de **frontend + backend + persistencia + pruebas** 
 1. Crear scaffold, repositorio, proyecto Neon y despliegue mínimo en Vercel.
 2. Decidir `organizationId`, roles, formato de CSV, moneda P0 (USD) y reglas duras frente a excepciones autorizables.
 3. Aprobar `InvoiceContextSchema` y `PaymentDecisionSchema` y crear fixtures válidos/inválidos.
-4. Aprobar esquema Drizzle y ejecutar **una única migración base**. Definir responsable de integrarla.
+4. Aprobar esquema Prisma y ejecutar **una única migración base**. Definir responsable de integrarla.
 5. Establecer rama `feature/invoices` para A y `feature/payment-decisions` para B; ambos parten del mismo commit.
 6. Definir el punto de integración: `InvoiceContext` persistido/validado → llamada server-side `evaluateInvoice` → `PaymentDecision` persistido.
 
