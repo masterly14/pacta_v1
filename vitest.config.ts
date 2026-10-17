@@ -7,7 +7,14 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts"],
-    // Usa node:test; se ejecuta con su propio comando en `npm test`.
-    exclude: ["src/shared/auth/membership-role.test.ts", "node_modules/**"],
+    // Usan node:test, no Vitest; se ejecutan con `npm run test:node`.
+    exclude: [
+      "node_modules/**",
+      "src/shared/auth/membership-role.test.ts",
+      "src/shared/schemas/gmail-contracts.test.ts",
+      "src/features/invoices/gmail/gmail-backend.test.ts",
+      "src/lib/r2.test.ts",
+      "src/features/payment-history/**/*.test.ts",
+    ],
   },
 });
