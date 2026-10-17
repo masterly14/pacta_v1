@@ -15,9 +15,12 @@ import {
 } from "@/shared/schemas/invoice-context";
 import { parseAmountToMinor, SUPPORTED_CURRENCIES } from "./money";
 
-// Campo opcional: cadena vacía → null.
+// Campo opcional: vacío o ausente → null (el JSON de POST /api/contracts puede omitirlo).
 function optional<T extends z.ZodType>(schema: T) {
-  return z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? null : value), schema.nullable());
+  return z.preprocess(
+    (value) => (value === undefined || (typeof value === "string" && value.trim() === "") ? null : value),
+    schema.nullable(),
+  );
 }
 
 // Referencia enmascarada de cuenta (p. ej. "****1234"), nunca el número completo.

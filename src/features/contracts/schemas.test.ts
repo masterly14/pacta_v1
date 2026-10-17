@@ -37,6 +37,11 @@ describe("ContractInputSchema", () => {
     });
   });
 
+  it("treats optional fields omitted from a JSON body (POST /api/contracts) as null", () => {
+    const onlyRequired = { supplierId: "sup_vercel", agreedAmount: "20.00", currency: "USD", frequency: "monthly", validFrom: "2026-01-01" };
+    expect(ContractInputSchema.parse(onlyRequired)).toMatchObject({ validTo: null, beneficiaryAccountRef: null, description: null });
+  });
+
   it("uses the currency scale for the amount", () => {
     expect(ContractInputSchema.parse(raw({ agreedAmount: "1500", currency: "JPY" })).agreedAmountMinor).toBe(1500);
     expect(ContractInputSchema.safeParse(raw({ agreedAmount: "15.5", currency: "JPY" })).success).toBe(false);

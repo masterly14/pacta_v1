@@ -74,6 +74,7 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
         payload: decision as Prisma.InputJsonValue,
         policyVersion: decision.policyVersion,
         authorizationId: coveringAuthorizationId(decision),
+        invoiceContext: invoice as Prisma.InputJsonValue,
         evaluatedAt: new Date(decision.evaluatedAt),
       },
     });
@@ -151,6 +152,9 @@ export async function listPendingApprovals(organizationId: string) {
   });
   return rows.map((row) => {
     const payload = PaymentDecisionSchema.parse(row.decision.payload);
+    // Solicitudes anteriores a guardar el contexto no se pueden revalidar al aprobar.
+    const context = row.decision.invoiceContext === null ? null : InvoiceContextSchema.safeParse(row.decision.invoiceContext);
+    const invoice = context?.success ? context.data : null;
     return {
       approvalRequestId: row.id,
       invoiceId: row.invoiceId,
@@ -161,6 +165,9 @@ export async function listPendingApprovals(organizationId: string) {
       requestedAt: row.requestedAt.toISOString(),
       reasonCodes: payload.reasonCodes,
       explanation: payload.explanation,
+      hasInvoiceContext: invoice !== null,
+      beneficiaryAccountReference: invoice?.beneficiaryAccountReference ?? null,
+      invoiceDate: invoice?.invoiceDate ?? null,
     };
   });
 }
