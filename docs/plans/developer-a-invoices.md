@@ -23,11 +23,14 @@ Hoy la ingesta se detiene en `gmail_inbound_messages.processing_status = receive
 
 ### Recepción y procesamiento (masterly14)
 
-- [ ] **A-01 · `feature/a-invoices-db`** ([#16](https://github.com/masterly14/pacta_v1/issues/16)): tabla `invoices` (proveedor nullable, nombre extraído, número, `amount_minor`, moneda, fechas, `document_id`, `gmail_inbound_message_id`, `source`, `extraction_status` `pending | processing | extracted | failed`, `extraction_error`, `context_json`) + una migración. `documents.gmail_inbound_message_id` nullable para la carga manual. FK de `invoice_id` en las tablas de B, coordinada.
+> **2026-10-17 · `feature/a-invoice-pipeline` (Brayan, a pedido de B, construido sobre #51):** A-01, A-03, A-04, A-05, A-08, A-09 y A-12 implementados. Tabla `invoices` (una por grupo `invoice_candidate`, migración `20261017212437_add_invoices`); `processInvoice()` (extracción → `resolveIdentity()` → `invoices` → `evaluateInvoice()`), llamado desde el webhook de Composio tras la descarga, desde el reintento y desde la carga manual en `/platform/invoices` (PDF, imagen o texto, sin guardar el archivo). Proveedor: solo coincidencia exacta (ignorando sufijos legales) confirma; similar (≥ 0.8, mismo criterio que payment-history) es `ambiguous`. Fallos de extracción quedan en la factura (reintento solo para correo); el correo pasa a `processed`. Original por ruta autenticada `GET /api/invoices/[id]/document` (no expone `public_url`). Verificado: 38 tests de integración (6 del pipeline), prueba real con IA en Chrome (aprobada, proveedor no reconocido, inyección → escala) y ninguna cuenta completa guardada. Pendiente: probar un correo real de Gmail extremo a extremo; A-10 (vista de errores/ignorados) e incluir la carga manual en `documents`.
+
+
+- [x] **A-01 · `feature/a-invoices-db`** ([#16](https://github.com/masterly14/pacta_v1/issues/16)): tabla `invoices` (proveedor nullable, nombre extraído, número, `amount_minor`, moneda, fechas, `document_id`, `gmail_inbound_message_id`, `source`, `extraction_status` `pending | processing | extracted | failed`, `extraction_error`, `context_json`) + una migración. `documents.gmail_inbound_message_id` nullable para la carga manual. FK de `invoice_id` en las tablas de B, coordinada.
 - [ ] **A-02 · `feature/a-extraction`** ([#17](https://github.com/masterly14/pacta_v1/issues/17)): esquema Zod de salida del LLM, prompt que trate el documento como dato no confiable, conversión determinística a `InvoiceContext` (`amountMinor` sin floats reusando `contracts/money.ts`, `missingFields` calculado por código, evidencia solo si el fragmento existe en la fuente) y `InvoiceContextSchema.parse` como última barrera.
-- [ ] **A-03 · `feature/a-pipeline`** ([#18](https://github.com/masterly14/pacta_v1/issues/18)): `received → processing → processed | failed`; crea `invoices`, extrae y llama a `buildInvoiceContext()`. Idempotente y con errores registrados sin datos sensibles.
-- [ ] **A-04 · `feature/a-supplier-match`** ([#19](https://github.com/masterly14/pacta_v1/issues/19)): `buildInvoiceContext()`: proveedor normalizado contra `suppliers` (solo lectura) → `matched | ambiguous | not_found`, `findContractMatch()` y `beneficiaryAccountReference` enmascarada como `****1234`.
-- [ ] **A-05 · `feature/a-manual-upload`** ([#20](https://github.com/masterly14/pacta_v1/issues/20)): `POST /api/invoices` (PDF, imagen o texto) con el mismo pipeline, `source = dashboard`.
+- [x] **A-03 · `feature/a-pipeline`** ([#18](https://github.com/masterly14/pacta_v1/issues/18)): `received → processing → processed | failed`; crea `invoices`, extrae y llama a `buildInvoiceContext()`. Idempotente y con errores registrados sin datos sensibles.
+- [x] **A-04 · `feature/a-supplier-match`** ([#19](https://github.com/masterly14/pacta_v1/issues/19)): `buildInvoiceContext()`: proveedor normalizado contra `suppliers` (solo lectura) → `matched | ambiguous | not_found`, `findContractMatch()` y `beneficiaryAccountReference` enmascarada como `****1234`.
+- [x] **A-05 · `feature/a-manual-upload`** ([#20](https://github.com/masterly14/pacta_v1/issues/20)): `POST /api/invoices` (PDF, imagen o texto) con el mismo pipeline, `source = dashboard`.
 
 ### Contratos (Brayan)
 
@@ -35,13 +38,13 @@ Hoy la ingesta se detiene en `gmail_inbound_messages.processing_status = receive
 
 ### Interfaz de facturas (masterly14)
 
-- [ ] **A-08 · `feature/a-invoices-ui`** ([#23](https://github.com/masterly14/pacta_v1/issues/23)): inbox con recepción, proveedor, número, monto, estado de extracción, contrato y decisión de B (badge «simulado» mientras no exista).
-- [ ] **A-09 · `feature/a-invoice-detail`** ([#24](https://github.com/masterly14/pacta_v1/issues/24)): detalle + `GET /api/invoices/[id]`: original por ruta autenticada, datos extraídos con evidencia, `missingFields`, advertencias, comparación contractual y decisión.
+- [x] **A-08 · `feature/a-invoices-ui`** ([#23](https://github.com/masterly14/pacta_v1/issues/23)): inbox con recepción, proveedor, número, monto, estado de extracción, contrato y decisión de B (badge «simulado» mientras no exista).
+- [x] **A-09 · `feature/a-invoice-detail`** ([#24](https://github.com/masterly14/pacta_v1/issues/24)): detalle + `GET /api/invoices/[id]`: original por ruta autenticada, datos extraídos con evidencia, `missingFields`, advertencias, comparación contractual y decisión.
 - [ ] **A-10 · `feature/a-processing-errors`** ([#25](https://github.com/masterly14/pacta_v1/issues/25)): estados `failed` visibles, reintento solo para la organización y correos ignorados listados aparte.
 
 ### Integración y calidad
 
-- [ ] **A-12 · `feature/a-integration`** ([#27](https://github.com/masterly14/pacta_v1/issues/27)): al quedar `extracted`, llamar `evaluateInvoice(context)` una vez por evento lógico y mostrar la `PaymentDecision`. Depende de `feature/b-decisions`.
+- [x] **A-12 · `feature/a-integration`** ([#27](https://github.com/masterly14/pacta_v1/issues/27)): al quedar `extracted`, llamar `evaluateInvoice(context)` una vez por evento lógico y mostrar la `PaymentDecision`. Depende de `feature/b-decisions`.
 - [ ] **A-13** ([#28](https://github.com/masterly14/pacta_v1/issues/28)): ≥ 10 facturas ficticias (PDF, imagen, texto) con extracción esperada y casos trampa: sin datos esenciales, mismo PDF con otro nombre, mismo correo dos veces, prompt injection, salida malformada y fallo del LLM.
 - [ ] **A-14** ([#29](https://github.com/masterly14/pacta_v1/issues/29)): Playwright correo/carga manual → inbox → detalle.
 - [ ] **A-15** ([#30](https://github.com/masterly14/pacta_v1/issues/30), opcional): migrar los tests de `node --test` a Vitest.
