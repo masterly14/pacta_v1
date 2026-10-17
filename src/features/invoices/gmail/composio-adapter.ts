@@ -1,5 +1,5 @@
 import { COMPOSIO_GMAIL_NEW_MESSAGE_SLUG } from "../../../shared/schemas/composio-webhook.ts";
-import { getComposio } from "../../../lib/composio.ts";
+import { COMPOSIO_GMAIL_TOOLKIT_VERSION, getComposio } from "../../../lib/composio.ts";
 import type { FetchedGmailAttachment, FetchedGmailMessage, GmailComposioPort } from "./ports.ts";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -133,6 +133,7 @@ export function createComposioGmailPort(): GmailComposioPort {
       const result = await composio.tools.execute("GMAIL_GET_PROFILE", {
         userId: input.userId,
         connectedAccountId: input.connectedAccountId,
+        version: COMPOSIO_GMAIL_TOOLKIT_VERSION,
         arguments: {},
       });
       return {
@@ -178,6 +179,7 @@ export function createComposioGmailPort(): GmailComposioPort {
       const result = await composio.tools.execute("GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", {
         userId: input.userId,
         connectedAccountId: input.connectedAccountId,
+        version: COMPOSIO_GMAIL_TOOLKIT_VERSION,
         arguments: { message_id: input.messageId, user_id: "me" },
       });
       return {
@@ -200,6 +202,7 @@ export function createComposioGmailPort(): GmailComposioPort {
       const result = await composio.tools.execute("GMAIL_GET_ATTACHMENT", {
         userId: input.userId,
         connectedAccountId: input.connectedAccountId,
+        version: COMPOSIO_GMAIL_TOOLKIT_VERSION,
         arguments: {
           message_id: input.messageId,
           attachment_id: input.attachmentId,
