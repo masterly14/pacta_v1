@@ -5,7 +5,7 @@
  * Runs in: server and tests (pure, no I/O).
  * Triggered by: ContractInputSchema when validating the contract form or POST /api/contracts.
  * Receives → Returns: (decimal string, ISO 4217 code) → { ok: true, amountMinor } | { ok: false, error };
- *   formatMinor(amountMinor, code) → display text.
+ *   formatMinor(amountMinor, code) → display text ("$1,500.00", "1,500.00 EUR").
  * Talks to: nothing.
  */
 
@@ -46,32 +46,37 @@ export function parseAmountToMinor(input: string, currency: string): ParseAmount
   const value = input.trim();
   const match = /^(\d+)(?:\.(\d+))?$/.exec(value);
   if (!match) {
-    return { ok: false, error: "Use a positive decimal number such as 20.00" };
+    return { ok: false, error: "Usa un número decimal positivo, por ejemplo 20.00" };
   }
   const scale = currencyScale(currency);
   if (scale === null) {
-    return { ok: false, error: `Currency ${currency} is not supported` };
+    return { ok: false, error: `La moneda ${currency} no está soportada` };
   }
   const [, whole, fraction = ""] = match;
   if (fraction.length > scale) {
-    return { ok: false, error: `${currency} allows at most ${scale} decimal places` };
+    return {
+      ok: false,
+      error: scale === 0 ? `${currency} no admite decimales` : `${currency} admite como máximo ${scale} decimales`,
+    };
   }
   const digits = (whole + fraction.padEnd(scale, "0")).replace(/^0+(?=\d)/, "");
   if (digits.length > String(MAX_AMOUNT_MINOR).length || Number(digits) > MAX_AMOUNT_MINOR) {
-    return { ok: false, error: "Amount is too large" };
+    return { ok: false, error: "El monto es demasiado grande" };
   }
   return { ok: true, amountMinor: Number(digits) };
 }
 
-// Inverso para mostrar: 2050, "USD" → "20.50 USD". Sin escala conocida no se inventa un punto decimal.
+const groupThousands = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+// Inverso para mostrar, con el mismo estilo que políticas: 150000, "USD" → "$1,500.00";
+// 150000, "EUR" → "1,500.00 EUR". Sin escala conocida no se inventa un punto decimal.
 export function formatMinor(amountMinor: number, currency: string): string {
   const scale = currencyScale(currency);
   if (scale === null) {
-    return `${amountMinor} minor units ${currency}`;
-  }
-  if (scale === 0) {
-    return `${amountMinor} ${currency}`;
+    return `${amountMinor} unidades menores ${currency}`;
   }
   const digits = String(amountMinor).padStart(scale + 1, "0");
-  return `${digits.slice(0, -scale)}.${digits.slice(-scale)} ${currency}`;
+  const whole = groupThousands(scale === 0 ? digits : digits.slice(0, -scale));
+  const amount = scale === 0 ? whole : `${whole}.${digits.slice(-scale)}`;
+  return currency === "USD" ? `$${amount}` : `${amount} ${currency}`;
 }
