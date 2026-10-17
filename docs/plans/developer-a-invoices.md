@@ -23,7 +23,7 @@ Un contrato es **evidencia** para comparar facturas y **nunca autoriza un pago**
 | `match-contract.ts` | `matchContract(facts, contracts)`, pura: devuelve `ContractMatch \| null` validado con `ContractMatchSchema` |
 | `server.ts` | lecturas/mutaciones acotadas por `organizationId`, auditadas en `audit_events`; `findContractMatch(orgId, facts)` |
 | `schemas.ts` | `ContractInputSchema` (formulario y API) |
-| `money.ts` | decimal escrito → unidades menores sin floats, según la escala ISO 4217 |
+| `money.ts` | decimal escrito → unidades menores sin floats, según la escala ISO 4217; solo monedas de la lista `CURRENCY_SCALES` |
 | `permissions.ts` | solo el rol `admin` registra o termina contratos |
 | `actions.ts`, `components/contract-forms.tsx` | server actions y formularios de `/dashboard/contracts` |
 
@@ -56,6 +56,7 @@ Tabla `contracts` (migración `20261017174628_add_contracts_table`): proveedor, 
 |---|---|
 | Registro de contratos | Formulario manual en P0; PDF + LLM con confirmación humana después |
 | Quién registra | Rol `admin` de Clerk (los contratos no autorizan pagos, pero cambian la comparación) |
+| Monedas | Lista cerrada con escala conocida (USD, EUR, GBP, MXN, COP, JPY, CLP…). Otra moneda se rechaza, nunca se supone su escala |
 | Tolerancia de monto | Ninguna: cualquier diferencia escala. Revisar si molesta en suscripciones por uso |
 
 ## 4. Coordinación pendiente

@@ -5,13 +5,14 @@
  * Runs in: browser (React client components).
  * Triggered by: rendered by /dashboard/contracts; submits to the server actions.
  * Receives → Returns: props (suppliers, today, contract id) → form UI.
- * Talks to: ../actions.ts (server actions), shadcn Button, Input, Label.
+ * Talks to: ../actions.ts (server actions), ../money.ts (currency list), shadcn Button, Input, Label.
  */
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createContractAction, terminateContractAction, type ActionState } from "../actions";
+import { SUPPORTED_CURRENCIES } from "../money";
 
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -57,8 +58,14 @@ export function ContractForm({ suppliers, today }: { suppliers: { id: string; na
       <Field label="Monto acordado por factura" htmlFor="contract-amount">
         <Input id="contract-amount" name="agreedAmount" required inputMode="decimal" placeholder="20.00" />
       </Field>
-      <Field label="Moneda (ISO 4217)" htmlFor="contract-currency">
-        <Input id="contract-currency" name="currency" required maxLength={3} defaultValue="USD" />
+      <Field label="Moneda" htmlFor="contract-currency">
+        <select id="contract-currency" name="currency" required className={selectClass} defaultValue="USD">
+          {SUPPORTED_CURRENCIES.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+        </select>
       </Field>
       <Field label="Frecuencia" htmlFor="contract-frequency">
         <select id="contract-frequency" name="frequency" className={selectClass} defaultValue="monthly">
