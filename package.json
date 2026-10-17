@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/shared/auth/membership-role.test.ts",
+    "test": "vitest run && npm run test:node",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "test:node": "node --experimental-strip-types --test src/shared/auth/membership-role.test.ts",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.67",
@@ -64,6 +66,7 @@
     "eslint-config-next": "16.4.2",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
