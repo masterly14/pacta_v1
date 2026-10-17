@@ -1,3 +1,11 @@
+/**
+ * Purpose: trap-case tests for the engine (PLAN.md §13): approvals, hard blocks,
+ *   escalations, untrusted input and determinism.
+ * Runs in: Vitest (`npm test`).
+ * Triggered by: `npm test` / `npm run test:watch`.
+ * Receives → Returns: nothing; passes or fails.
+ * Talks to: ./decide.ts, ./rules.ts (types), ./test-fixtures.ts.
+ */
 import { describe, expect, it } from "vitest";
 import type { PaymentDecision } from "@/shared/schemas/payment-decision";
 import { combine, decide } from "./decide";

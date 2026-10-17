@@ -1,3 +1,11 @@
+/**
+ * Purpose: fictitious test data; a legitimate, fully authorized Vercel invoice plus facts.
+ * Runs in: tests only (Vitest).
+ * Triggered by: imported by decide.test.ts.
+ * Receives → Returns: optional overrides → InvoiceContext, EngineFacts, authorization or
+ *   prior-decision objects.
+ * Talks to: ./facts.ts and src/shared/schemas/invoice-context.ts (types only).
+ */
 import type { InvoiceContext } from "@/shared/schemas/invoice-context";
 import type { EngineAuthorization, EngineFacts, EnginePriorDecision } from "./facts";
 

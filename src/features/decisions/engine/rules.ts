@@ -1,3 +1,11 @@
+/**
+ * Purpose: the nine deterministic payment rules, in fixed order (RULES).
+ * Runs in: server and tests (pure, no I/O, no AI).
+ * Triggered by: decide(), which runs every rule for each invoice.
+ * Receives → Returns: (InvoiceContext, EngineFacts) → RuleOutcome (pass | fail | unknown,
+ *   reason code, explanation, evidence, hardBlock flag).
+ * Talks to: ./facts.ts and the shared Zod schemas (types only).
+ */
 import type { InvoiceContext } from "@/shared/schemas/invoice-context";
 import type { DecisionEvidenceReference, RuleEvaluation } from "@/shared/schemas/payment-decision";
 import type { EngineAuthorization, EngineFacts } from "./facts";
