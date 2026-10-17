@@ -3,7 +3,7 @@
  * Purpose: server actions behind the contracts forms; resolve the session, validate input
  *   with Zod and delegate to server.ts, which enforces permissions.
  * Runs in: server (Next.js server actions).
- * Triggered by: form submissions on /dashboard/contracts (via useActionState).
+ * Triggered by: form submissions on /platform/contracts (via useActionState).
  * Receives → Returns: (previous ActionState, FormData) → ActionState { ok, message } | null.
  * Talks to: ensureWorkspaceFromSession, ./schemas.ts, ./server.ts; next/cache refresh().
  */

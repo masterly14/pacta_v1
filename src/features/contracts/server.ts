@@ -2,7 +2,7 @@
  * Purpose: persist and read contracts, always scoped by organizationId and audited, and
  *   load the supplier's contracts to produce an invoice's ContractMatch.
  * Runs in: server (Node).
- * Triggered by: actions.ts and POST /api/contracts (mutations), the /dashboard/contracts
+ * Triggered by: actions.ts and POST /api/contracts (mutations), the /platform/contracts
  *   page (reads) and, later, the invoice context builder (findContractMatch).
  * Receives → Returns: (ContractActor, validated input) → ContractResult; organizationId →
  *   overview; (organizationId, invoice facts) → ContractMatch | null.

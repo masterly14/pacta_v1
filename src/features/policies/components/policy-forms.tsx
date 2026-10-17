@@ -3,7 +3,7 @@
  * Purpose: client forms for the policies page (supplier, policy version, authorization,
  *   revoke, approval permission, demo data), each showing its server result inline.
  * Runs in: browser (React client components).
- * Triggered by: rendered by /dashboard/policies; submits to the server actions.
+ * Triggered by: rendered by /platform/policies; submits to the server actions.
  * Receives → Returns: props (suppliers, member, authorization id) → form UI.
  * Talks to: ../actions.ts (server actions), shadcn Button, Input, Label.
  */

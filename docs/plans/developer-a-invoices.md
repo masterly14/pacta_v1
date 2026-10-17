@@ -6,11 +6,11 @@
 
 ## 1. Orden de trabajo (una rama corta por funcionalidad)
 
-- [x] **`feature/a-contracts`** (Brayan): tabla `contracts`, registro manual, `/dashboard/contracts`, `POST /api/contracts` y `matchContract()` → `ContractMatch`.
+- [x] **`feature/a-contracts`** (Brayan): tabla `contracts`, registro manual, `/platform/contracts`, `POST /api/contracts` y `matchContract()` → `ContractMatch`.
 - [ ] **`feature/a-contracts-pdf`** (Brayan, si hay tiempo): subir PDF del contrato, el LLM propone términos y una persona los confirma antes de activarlo.
 - [ ] _Ingesta (Resend + carga manual), documentos, extracción e `invoices`: por definir con masterly14._
 - [ ] _`buildInvoiceContext()`: identificación del proveedor + `findContractMatch()` + `missingFields`. Por definir con masterly14._
-- [ ] _Inbox `/dashboard/invoices` y detalle: por definir con masterly14._
+- [ ] _Inbox `/platform/invoices` y detalle: por definir con masterly14._
 
 ## 2. Contratos
 
@@ -25,7 +25,7 @@ Un contrato es **evidencia** para comparar facturas y **nunca autoriza un pago**
 | `schemas.ts` | `ContractInputSchema` (formulario y API) |
 | `money.ts` | decimal escrito → unidades menores sin floats, según la escala ISO 4217; solo monedas de la lista `CURRENCY_SCALES` |
 | `permissions.ts` | solo el rol `admin` registra o termina contratos |
-| `actions.ts`, `components/contract-forms.tsx` | server actions y formularios de `/dashboard/contracts` |
+| `actions.ts`, `components/contract-forms.tsx` | server actions y formularios de `/platform/contracts` |
 
 ### Reglas de comparación
 
@@ -61,9 +61,9 @@ Tabla `contracts` (migración `20261017174628_add_contracts_table`): proveedor, 
 
 ## 4. Coordinación pendiente
 
-- **Proveedores:** el formulario necesita proveedores existentes. Vienen de `/dashboard/policies` (`feature/b-policies`).
+- **Proveedores:** el formulario necesita proveedores existentes. Vienen de `/platform/policies` (`feature/b-policies`).
 - **Formato de cuenta:** `buildInvoiceContext()` debe producir `beneficiaryAccountReference` en el mismo formato enmascarado que se registra (`****1234`); si no coincide, la comparación marca discrepancia.
-- **Navegación:** falta un enlace a `/dashboard/contracts` en el layout global (compartido).
+- **Navegación:** resuelto; `/platform/contracts` está en el menú lateral de la plataforma.
 - **Proveedor de otra organización:** la FK `contracts.supplier_id` no garantiza que el proveedor sea de la misma organización; lo verifica `createContract()` en el servidor.
 
 ## 5. Registro

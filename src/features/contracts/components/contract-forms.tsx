@@ -3,7 +3,7 @@
  * Purpose: client forms for the contracts page (register a contract, terminate one), each
  *   showing its server result inline.
  * Runs in: browser (React client components).
- * Triggered by: rendered by /dashboard/contracts; submits to the server actions.
+ * Triggered by: rendered by /platform/contracts; submits to the server actions.
  * Receives → Returns: props (suppliers, today, contract id) → form UI.
  * Talks to: ../actions.ts (server actions), ../money.ts (currency list), shadcn Button, Input, Label.
  */
