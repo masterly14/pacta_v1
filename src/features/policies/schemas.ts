@@ -25,9 +25,13 @@ function usdAmount(options: { allowZero: boolean }) {
 // Checkbox de formulario: presente ("on") = true, ausente = false.
 const checkbox = z.preprocess((value) => value === "on" || value === "true" || value === true, z.boolean());
 
-// Campo opcional: cadena vacía → null.
+// Campo opcional: vacío o ausente → null. Un campo oculto (p. ej. el límite si "Aprueba" está
+// desmarcado, o la frecuencia en un pago único) no llega en el FormData.
 function optional<T extends z.ZodType>(schema: T) {
-  return z.preprocess((value) => (typeof value === "string" && value.trim() === "" ? null : value), schema.nullable());
+  return z.preprocess(
+    (value) => (value === undefined || (typeof value === "string" && value.trim() === "") ? null : value),
+    schema.nullable(),
+  );
 }
 
 // Referencia enmascarada de cuenta (p. ej. "****1234"), nunca el número completo.
