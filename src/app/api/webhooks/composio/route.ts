@@ -22,8 +22,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
   const result = accepted.result;
+  console.info("[gmail] webhook", result);
   if (result?.outcome === "received") {
-    after(() => downloadGmailMessage(result.inboundId));
+    after(async () => {
+      try {
+        const download = await downloadGmailMessage(result.inboundId);
+        console.info("[gmail] download", { inboundId: result.inboundId, ...download });
+      } catch (error) {
+        console.error("[gmail] download", error);
+      }
+    });
   }
   return NextResponse.json({ ok: true, ...result });
 }
