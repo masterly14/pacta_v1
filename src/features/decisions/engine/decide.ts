@@ -1,3 +1,12 @@
+/**
+ * Purpose: the payment decision engine; combines the nine rules into approved, blocked
+ *   or requires_approval with reasons and evidence.
+ * Runs in: server only in the app (via evaluateInvoice(), pending) and in tests. Pure.
+ * Triggered by: a call to decide(invoice, facts); never by the LLM or an incoming email.
+ * Receives → Returns: (unknown InvoiceContext, unknown EngineFacts) → PaymentDecision,
+ *   validated by PaymentDecisionSchema; throws if either input is invalid.
+ * Talks to: ./rules.ts, ./facts.ts, src/shared/schemas/*. No database, network, AI or clock.
+ */
 import { InvoiceContextSchema } from "@/shared/schemas/invoice-context";
 import {
   PaymentDecisionSchema,

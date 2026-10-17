@@ -1,3 +1,11 @@
+/**
+ * Purpose: Zod contract for the facts the engine needs about an organization (policy,
+ *   authorizations, prior decisions, budget used, recurrence hint, clock and decision ID).
+ * Runs in: server and tests (pure, no I/O).
+ * Triggered by: imported by decide() to validate its second argument.
+ * Receives → Returns: nothing at runtime; exports EngineFactsSchema and inferred types.
+ * Talks to: src/shared/schemas/invoice-context.ts, src/shared/schemas/payment-decision.ts.
+ */
 import { z } from "zod";
 import {
   AmountMinorSchema,
