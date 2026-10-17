@@ -122,7 +122,10 @@ export async function buildDemoInvoice(
     documentType: "manual_entry",
     receivedAt: now.toISOString().replace(/\.\d{3}Z$/, "Z"),
     supplierId: supplier.id,
-    supplierName: supplier.name,
+    name: supplier.name,
+    email: null, // escenario ficticio: no viene de un correo
+    subject: null,
+    body: null,
     supplierMatchStatus: "matched",
     beneficiaryAccountReference: base.beneficiaryAccountReference,
     amountMinor: base.amountMinor,
@@ -131,7 +134,7 @@ export async function buildDemoInvoice(
     invoiceDate,
     dueDate: null,
     contractMatch,
-    missingFields: [...missingFields, "dueDate"],
+    missingFields: [...missingFields, "email", "subject", "body", "dueDate"],
     extractionWarnings: base.warnings ?? [],
     evidence: [],
   });
