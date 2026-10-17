@@ -1,5 +1,6 @@
 import { auth, clerkClient, currentUser } from "@clerk/nextjs/server";
 import type { Organization, OrganizationMembership, User } from "@prisma/client";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { membershipRoleFromClerk } from "@/shared/auth/membership-role";
 
@@ -70,7 +71,8 @@ export async function persistWorkspace(input: EnsureWorkspaceInput): Promise<Wor
     });
 
     return { user, organization, membership };
-  });
+    // Neon por red: el límite por defecto (5 s) se agotaba en arranques en frío.
+  }, { maxWait: 10_000, timeout: 15_000 });
 }
 
 function primaryEmail(user: {
@@ -104,11 +106,31 @@ function displayNameFromClerk(user: {
 /**
  * Lee la sesión de Clerk y materializa User + Organization + membresía en Neon.
  * Fail-closed: sin org activa no hay workspace (no se inventa una organización).
+ *
+ * Camino rápido: si las tres filas ya existen, no llama a la API de Clerk ni abre transacción;
+ * el rol sale del token de sesión (firmado) y se sincroniza si cambió. Llamar a la API de Clerk
+ * en cada página agotaba el límite de la instancia de desarrollo ("Too Many Requests").
+ * Contrapartida: email, nombre visible y nombre de la organización se copian solo la primera vez.
  */
-export async function ensureWorkspaceFromSession(): Promise<Workspace> {
+export const ensureWorkspaceFromSession = cache(async (): Promise<Workspace> => {
   const { userId, orgId, orgRole, orgSlug } = await auth();
   if (!userId || !orgId) {
     throw new OrganizationRequiredError();
+  }
+
+  const role = membershipRoleFromClerk(orgRole);
+  const [user, organization, membership] = await Promise.all([
+    db.user.findUnique({ where: { id: userId } }),
+    db.organization.findUnique({ where: { id: orgId } }),
+    db.organizationMembership.findUnique({ where: { userId_organizationId: { userId, organizationId: orgId } } }),
+  ]);
+  if (user !== null && organization !== null && membership !== null) {
+    if (membership.role === role) return { user, organization, membership };
+    const updated = await db.organizationMembership.update({
+      where: { userId_organizationId: { userId, organizationId: orgId } },
+      data: { role },
+    });
+    return { user, organization, membership: updated };
   }
 
   const clerkUser = await currentUser();
@@ -139,6 +161,6 @@ export async function ensureWorkspaceFromSession(): Promise<Workspace> {
     email,
     displayName: displayNameFromClerk(clerkUser),
     organizationName,
-    membershipRole: membershipRoleFromClerk(orgRole),
+    membershipRole: role,
   });
-}
+});
