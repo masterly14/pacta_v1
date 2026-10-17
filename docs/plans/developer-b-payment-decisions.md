@@ -5,8 +5,8 @@
 
 ## 1. Orden de trabajo (una rama corta por funcionalidad)
 
-- [ ] **`feature/b-db-schema`**: tablas de B en `schema.prisma` + una migración (ver §4).
-- [ ] **`feature/b-engine`**: Vitest + `decide()` puro + fixtures de casos trampa (sin BD ni IA).
+- [x] **`feature/b-db-schema`**: tablas de B en `schema.prisma` + una migración (ver §4).
+- [x] **`feature/b-engine`**: Vitest + `decide()` puro + fixtures de casos trampa (sin BD ni IA). Código en `src/features/decisions/engine/`.
 - [ ] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (seed + UI mínima).
 - [ ] **`feature/b-decisions`**: `evaluateInvoice()`, `POST /api/invoices/[id]/evaluate`, decisiones persistidas, auditoría, idempotencia.
 - [ ] **`feature/b-approvals`**: bandeja, resolución con reevaluación, autorización recurrente explícita, bloqueo transaccional.
@@ -49,7 +49,7 @@ La IA solo interviene antes (vertical A) para leer documentos. El motor compara 
 | Concurrencia | Verificación de presupuesto + inserción de `approved` dentro de una transacción que bloquea la fila de política de la organización (`SELECT … FOR UPDATE`). Una factura no se aprueba dos veces (índice único parcial). |
 | CSV | Columnas `date` (YYYY-MM-DD), `description`, `amount` (texto decimal, negativo = salida), `currency`, `reference`. Parseo a unidades menores sin floats. Filas inválidas se rechazan con error por fila; repetidas se omiten. |
 | Recurrencia | ≥ 3 salidas al mismo proveedor, intervalos de 25–35 días, montos ±10 % → solo sugerencia, nunca autorización. |
-| Tests | Vitest (pendiente coordinar el script `test` con A, que hoy usa `node --test`). |
+| Tests | Vitest. `npm test` ejecuta Vitest y luego el test de A con `node --test` (`test:node`) hasta que A decida migrarlo. |
 
 ## 4. Tablas de B
 
@@ -70,8 +70,11 @@ Todas con `organization_id` → `organizations` e índices por organización.
 ## 5. Bloqueos y coordinación con A
 
 - `invoice_id` en `payment_decisions` / `approval_requests` es texto sin FK hasta que A cree `invoices`; agregar la FK en una migración coordinada.
-- Script `test`: migrar a Vitest de común acuerdo.
+- Script `test`: el test de A (`src/shared/auth/membership-role.test.ts`) sigue en `node --test`; migrarlo a Vitest es opcional y lo decide A.
+- Huella de archivo para duplicados: `InvoiceContext` no trae sha256. El loader de `evaluateInvoice()` buscará en `documents` (A) las facturas con el mismo sha256 y decisión no `blocked`, y las pasa en `documentDuplicateInvoiceIds`. Sin la tabla de A, la lista va vacía y solo se detecta por proveedor + número.
 
 ## 6. Registro
 
 - 2026-10-17: plan acordado en sesión de diseño. Orden elegido: tablas primero, luego motor.
+- 2026-10-17: tablas de B aplicadas en Neon (`20261017163245_add_payment_autopilot_tables`).
+- 2026-10-17: motor `decide(invoice, facts)` con 38 tests de casos trampa. Entradas validadas con Zod (`EngineFactsSchema`); la salida pasa por `PaymentDecisionSchema.parse` como última barrera. Explicaciones por plantilla, sin IA. Próximo: `feature/b-policies`.
