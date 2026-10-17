@@ -185,7 +185,7 @@ Los esquemas se implementarán en los archivos indicados abajo **antes de inicia
 - Detectar duplicados mediante identificadores confiables (proveedor + número de factura, cuando existan) y huella de archivo; coincidencias dudosas se escalan. No depender solo del nombre del archivo.
 - `payment_decisions` y `audit_events` se agregan sin editar eventos históricos; nuevas evaluaciones crean nuevas filas con versión de política.
 - Una factura aprobada o comprometida reserva presupuesto **exactamente una vez**; actualizar/revalidar dentro de transacción. Evitar contabilidad doble entre CSV del periodo y reservas. Si la conciliación del presupuesto es ambigua, no aprobar automáticamente.
-- Ningún desarrollador crea una migración compartida unilateralmente. Acuerden un primer esquema base y quién es responsable de integrar/ejecutar migraciones.
+- Migraciones lineales: cada dueño escribe las tablas de su vertical, como máximo una migración por PR, generada desde `main` actualizado (ver `CLAUDE.md` §9). Base aplicada: `init_users_and_organizations` (A).
 - Los datos del CSV **no crean proveedores autorizados ni políticas** automáticamente.
 
 ## 8. Reglas de negocio del motor determinístico
@@ -331,7 +331,7 @@ Cada desarrollador es dueño de **frontend + backend + persistencia + pruebas** 
 2. Decidir `organizationId`, roles, formato de CSV, moneda P0 (USD) y reglas duras frente a excepciones autorizables.
 3. Aprobar `InvoiceContextSchema` y `PaymentDecisionSchema` y crear fixtures válidos/inválidos.
 4. Aprobar esquema Prisma y ejecutar **una única migración base**. Definir responsable de integrarla.
-5. Establecer rama `feature/invoices` para A y `feature/payment-decisions` para B; ambos parten del mismo commit.
+5. Trabajar con una rama corta por funcionalidad (`feature/a-<funcionalidad>`, `feature/b-<funcionalidad>`) creada desde `main` actualizado e integrada con PRs pequeños.
 6. Definir el punto de integración: `InvoiceContext` persistido/validado → llamada server-side `evaluateInvoice` → `PaymentDecision` persistido.
 
 ### Trabajo paralelo (horas 2–16)
