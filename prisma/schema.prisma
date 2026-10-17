@@ -1,12 +1,63 @@
-// Esquema de Prisma. Sin modelos todavía (se definen en una tarea posterior).
+// Esquema compartido. Identidad de login: Clerk.
+// `Organization.id` = Clerk `org_...` (organizationId en InvoiceContext).
+// `User.id` = Clerk `user_...` (actor_id en auditoría / decisiones).
+// Toda consulta de negocio se acota por organizationId.
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+
+
+enum MembershipRole {
+  admin
+  member
+}
+
+/// Espacio de trabajo. Aísla facturas, contratos y políticas.
+model Organization {
+  id        String   @id
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  memberships OrganizationMembership[]
+
+  @@map("organizations")
+}
+
+
+
+model User {
+  id          String   @id
+  email       String
+  displayName String?  @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships OrganizationMembership[]
+
+  @@index([email])
+  @@map("users")
+}
+
+/// Relación User ↔ Organization. Un usuario solo opera dentro de orgs a las que pertenece.
+model OrganizationMembership {
+  userId         String         @map("user_id")
+  organizationId String         @map("organization_id")
+  role           MembershipRole
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, organizationId])
+  @@index([organizationId])
+  @@map("organization_memberships")
 }
