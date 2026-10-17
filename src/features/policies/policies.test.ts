@@ -110,6 +110,29 @@ describe("form schemas", () => {
     expect(PermissionInputSchema.safeParse({ userId: "user_1", canApprove: "on", approvalLimitMinor: "" }).success).toBe(false);
   });
 
+  // Formularios reales: un campo oculto no se envía (no llega como "" sino ausente).
+  const formData = (fields: Record<string, string>) => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+    return Object.fromEntries(fd);
+  };
+
+  it("saves a member without 'Aprueba' when the limit field is not rendered", () => {
+    expect(PermissionInputSchema.parse(formData({ userId: "user_1", canManagePolicies: "on" }))).toEqual({
+      userId: "user_1",
+      canApprove: false,
+      approvalLimitMinor: null,
+      canManagePolicies: true,
+    });
+  });
+
+  it("accepts a one-time authorization when the frequency field is not rendered", () => {
+    const result = AuthorizationInputSchema.parse(
+      formData({ supplierId: "s1", beneficiaryAccountRef: "****1234", maxAmountMinor: "100", scope: "one_time", validFrom: "2026-10-17", validUntil: "2026-12-31" }),
+    );
+    expect(result).toMatchObject({ scope: "one_time", frequency: null, maxAmountMinor: 10_000 });
+  });
+
   it("drops the limit when the person cannot approve (matches the table CHECK)", () => {
     expect(
       PermissionInputSchema.parse({ userId: "user_1", approvalLimitMinor: "500", canManagePolicies: "on" }),
