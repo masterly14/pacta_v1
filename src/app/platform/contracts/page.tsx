@@ -118,6 +118,9 @@ async function ContractsData() {
                     <TableCell>{FREQUENCY_LABEL[contract.frequency]}</TableCell>
                     <TableCell>
                       {contract.validFrom} → {contract.validTo ?? "sin fin"}
+                      {contract.terminatedAt !== null && (
+                        <div className="text-xs text-muted-foreground">terminado el {contract.terminatedAt.slice(0, 10)}</div>
+                      )}
                     </TableCell>
                     <TableCell>{contract.beneficiaryAccountRef ?? "—"}</TableCell>
                     <TableCell>

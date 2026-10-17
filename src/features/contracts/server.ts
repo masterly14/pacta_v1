@@ -7,23 +7,26 @@
  * Receives → Returns: (ContractActor, validated input) → ContractResult; organizationId →
  *   overview; (organizationId, invoice facts) → ContractMatch | null.
  * Talks to: db (src/lib/db.ts) — Contract, Supplier (read only), AuditEvent;
- *   ./permissions.ts, ./match-contract.ts.
+ *   ./permissions.ts, ./match-contract.ts, ./overlap.ts.
  */
 import type { Prisma, Contract } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { Workspace } from "@/shared/auth/ensure-workspace";
 import type { ContractMatch } from "@/shared/schemas/invoice-context";
 import { matchContract, type ContractMatchInvoiceFacts, type MatchableContract } from "./match-contract";
+import { findOverlap } from "./overlap";
 import { checkCanManageContracts, type ContractActor } from "./permissions";
 import type { ContractInput } from "./schemas";
 
+type DenialReason = "forbidden" | "not_found" | "conflict";
+
 export type ContractResult =
   | { ok: true; message: string; contractId: string }
-  | { ok: false; reason: "forbidden" | "not_found"; error: string };
+  | { ok: false; reason: DenialReason; error: string };
 
 type Tx = Prisma.TransactionClient;
 
-function denied(reason: "forbidden" | "not_found", error: string): ContractResult {
+function denied(reason: DenialReason, error: string): ContractResult {
   return { ok: false, reason, error };
 }
 
@@ -126,7 +129,26 @@ export async function createContract(actor: ContractActor, input: ContractInput)
   });
   if (supplier === null) return denied("not_found", "Proveedor no encontrado.");
 
-  const contractId = await db.$transaction(async (tx) => {
+  return db.$transaction(async (tx): Promise<ContractResult> => {
+    // Bloquea al proveedor: dos registros simultáneos no pueden saltarse la comprobación.
+    await tx.$queryRaw`SELECT id FROM suppliers WHERE id = ${supplier.id} FOR UPDATE`;
+
+    // Dos contratos vigentes el mismo día vuelven ambigua cada factura del proveedor.
+    const active = await tx.contract.findMany({
+      where: { organizationId: actor.organizationId, supplierId: supplier.id, status: "active" },
+      select: { validFrom: true, validTo: true },
+    });
+    const overlap = findOverlap(
+      { validFrom: input.validFrom, validTo: input.validTo },
+      active.map((c) => ({ validFrom: fromDbDate(c.validFrom), validTo: c.validTo === null ? null : fromDbDate(c.validTo) })),
+    );
+    if (overlap !== null) {
+      return denied(
+        "conflict",
+        `${supplier.name} ya tiene un contrato activo vigente ${overlap.validFrom} → ${overlap.validTo ?? "sin fin"} que se solapa. Termínalo antes de registrar uno nuevo.`,
+      );
+    }
+
     const contract = await tx.contract.create({
       data: {
         organizationId: actor.organizationId,
@@ -142,9 +164,8 @@ export async function createContract(actor: ContractActor, input: ContractInput)
       },
     });
     await audit(tx, actor, contract.id, "contract.created", { ...input, supplierName: supplier.name });
-    return contract.id;
+    return { ok: true, message: `Contrato con ${supplier.name} registrado.`, contractId: contract.id };
   });
-  return { ok: true, message: `Contrato con ${supplier.name} registrado.`, contractId };
 }
 
 // Un contrato no se borra ni se edita: se termina y queda en el historial.

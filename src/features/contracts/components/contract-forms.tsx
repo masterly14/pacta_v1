@@ -1,16 +1,18 @@
 "use client";
 /**
- * Purpose: client forms for the contracts page (register a contract, terminate one), each
- *   showing its server result inline.
+ * Purpose: client forms for the contracts page (register a contract, terminate one); errors
+ *   show inline and keep the typed values, successes clear the form or show a toast.
  * Runs in: browser (React client components).
  * Triggered by: rendered by /platform/contracts; submits to the server actions.
  * Receives → Returns: props (suppliers, today, contract id) → form UI.
- * Talks to: ../actions.ts (server actions), ../money.ts (currency list), shadcn Button, Input, Label.
+ * Talks to: ../actions.ts (server actions), ../money.ts (currency list), useFormAction,
+ *   sonner toast, shadcn Button, Input, Label.
  */
-import { useActionState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFormAction } from "@/shared/forms/use-form-action";
 import { createContractAction, terminateContractAction, type ActionState } from "../actions";
 import { SUPPORTED_CURRENCIES } from "../money";
 
@@ -36,7 +38,7 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
 }
 
 export function ContractForm({ suppliers, today }: { suppliers: { id: string; name: string }[]; today: string }) {
-  const [state, action, pending] = useActionState(createContractAction, null);
+  const { state, pending, formRef, onSubmit } = useFormAction(createContractAction, { resetOnSuccess: true });
   if (suppliers.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -45,7 +47,7 @@ export function ContractForm({ suppliers, today }: { suppliers: { id: string; na
     );
   }
   return (
-    <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <form ref={formRef} onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="Proveedor" htmlFor="contract-supplier">
         <select id="contract-supplier" name="supplierId" required className={selectClass}>
           {suppliers.map((supplier) => (
@@ -101,9 +103,12 @@ export function ContractForm({ suppliers, today }: { suppliers: { id: string; na
 }
 
 export function TerminateContractButton({ contractId }: { contractId: string }) {
-  const [state, action, pending] = useActionState(terminateContractAction, null);
+  // Al terminar, la fila deja de mostrar este botón: la confirmación va en un toast.
+  const { state, pending, onSubmit } = useFormAction(terminateContractAction, {
+    onSuccess: (result) => toast.success(result.message),
+  });
   return (
-    <form action={action} className="flex flex-col items-end gap-1">
+    <form onSubmit={onSubmit} className="flex flex-col items-end gap-1">
       <input type="hidden" name="contractId" value={contractId} />
       <Button type="submit" variant="outline" size="sm" disabled={pending}>
         {pending ? "Terminando…" : "Terminar"}

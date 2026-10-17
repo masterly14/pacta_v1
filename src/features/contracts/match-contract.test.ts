@@ -88,7 +88,7 @@ describe("matchContract", () => {
     const result = matchContract(makeFacts({ amountMinor: 2001 }), [makeContract()]);
     expect(result?.matchStatus).toBe("mismatch");
     expect(result?.discrepancies).toEqual([
-      expect.objectContaining({ field: "amount", expected: "20.00 USD", actual: "20.01 USD" }),
+      expect.objectContaining({ field: "amount", expected: "$20.00", actual: "$20.01" }),
     ]);
     expectValid(result);
   });
