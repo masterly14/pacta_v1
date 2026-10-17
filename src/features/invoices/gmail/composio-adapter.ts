@@ -93,6 +93,22 @@ function parseAttachmentsMeta(value: unknown): FetchedGmailAttachment[] {
   return attachments;
 }
 
+// Composio entrega la lista como `data.attachmentList` (camelCase); versiones anteriores del
+// toolkit usaban `attachment_list` o `attachments`. Se acepta cualquiera, en la raíz o en `data`.
+const ATTACHMENT_LIST_KEYS = ["attachmentList", "attachment_list", "attachments"] as const;
+
+export function attachmentsFromFetchResult(result: unknown): FetchedGmailAttachment[] {
+  const root = asRecord(result);
+  for (const container of [root, asRecord(root.data), asRecord(root.response_data ?? root.responseData)]) {
+    for (const key of ATTACHMENT_LIST_KEYS) {
+      if (Array.isArray(container[key])) {
+        return parseAttachmentsMeta(container[key]);
+      }
+    }
+  }
+  return [];
+}
+
 export function createComposioGmailPort(): GmailComposioPort {
   return {
     async linkAccount(input) {
@@ -188,12 +204,7 @@ export function createComposioGmailPort(): GmailComposioPort {
         sender: nestedString(result, ["sender", "from"]),
         subject: nestedString(result, ["subject"]),
         text: nestedString(result, ["messageText", "message_text", "message_body", "body"]),
-        attachments: parseAttachmentsMeta(
-          asRecord(result).attachment_list
-            ?? asRecord(result).attachments
-            ?? asRecord(asRecord(result).data).attachment_list
-            ?? asRecord(asRecord(result).data).attachments,
-        ),
+        attachments: attachmentsFromFetchResult(result),
       } satisfies FetchedGmailMessage;
     },
 
@@ -206,13 +217,20 @@ export function createComposioGmailPort(): GmailComposioPort {
         arguments: {
           message_id: input.messageId,
           attachment_id: input.attachmentId,
+          file_name: input.filename ?? "attachment",
         },
       });
-      const bytes = await bytesFromUnknown(result);
+      // Composio responde con `successful: false` en lugar de lanzar: se trata como fallo
+      // transitorio (`fetch_failed`) y no como un adjunto vacío.
+      if (asRecord(result).successful === false) {
+        throw new Error("Composio no pudo descargar el adjunto");
+      }
+      const file = asRecord(asRecord(asRecord(result).data).file);
+      const bytes = await bytesFromUnknown(Object.keys(file).length > 0 ? file : result);
       return {
         attachmentId: input.attachmentId,
-        filename: nestedString(result, ["filename", "name", "file_name"]),
-        mimeType: nestedString(result, ["mimeType", "mime_type", "contentType"]),
+        filename: nestedString(file, ["name", "filename", "file_name"]) ?? nestedString(result, ["filename", "name", "file_name"]),
+        mimeType: nestedString(file, ["mimetype", "mimeType", "mime_type"]) ?? nestedString(result, ["mimeType", "mime_type", "contentType"]),
         bytes,
       };
     },

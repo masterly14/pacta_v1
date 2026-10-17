@@ -48,6 +48,8 @@ export type GmailComposioPort = {
     connectedAccountId: string;
     messageId: string;
     attachmentId: string;
+    // Composio exige el nombre del archivo para descargar el adjunto.
+    filename: string | null;
   }): Promise<FetchedGmailAttachment>;
 };
 

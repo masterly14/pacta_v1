@@ -100,6 +100,7 @@ export async function downloadGmailMessage(
           connectedAccountId: mailbox.composioConnectedAccountId,
           messageId: inbound.gmailMessageId,
           attachmentId: meta.attachmentId,
+          filename: meta.filename,
         });
       } catch {
         // Fallo transitorio: se registra y el correo queda `failed` para poder reintentarlo.
