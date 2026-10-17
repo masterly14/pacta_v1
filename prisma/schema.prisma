@@ -239,6 +239,7 @@ model PaymentDecision {
   approvalRequestId String?                @map("approval_request_id") // solicitud que resuelve (decisión humana)
   invoiceDate       DateTime?              @map("invoice_date") @db.Date // para duplicados sospechosos
   authorizationId   String?                @map("authorization_id") // autorización que cubrió una aprobación
+  invoiceContext    Json?                  @map("invoice_context") // InvoiceContext evaluado (evidencia y reevaluación)
   evaluatedAt       DateTime               @map("evaluated_at") @db.Timestamptz(6)
   createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
 
