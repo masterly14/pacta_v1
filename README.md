@@ -7,7 +7,7 @@ Agente de IA que recibe facturas por correo (Resend), Slack y WhatsApp y decide 
 
 ## Stack
 
-- Next.js (App Router, TypeScript estricto, Tailwind, ESLint) con pnpm
+- Next.js (App Router, TypeScript estricto, Tailwind, ESLint) con npm
 - UI: shadcn/ui y AI Elements (Vercel)
 - Auth: Clerk
 - Base de datos: Prisma 6 + Neon Postgres (adapter de Neon)
@@ -35,17 +35,17 @@ prisma/schema.prisma    esquema de base de datos
 ## Desarrollo
 
 ```bash
-pnpm install
+npm install
 cp .env.example .env.local   # o: vercel env pull .env.local
-pnpm dev
+npm run dev
 ```
 
 Comandos útiles:
 
 ```bash
-pnpm lint
-pnpm build
-pnpm prisma generate   # también corre solo en postinstall
+npm run lint
+npm run build
+npx prisma generate   # también corre solo en postinstall
 ```
 
 Las variables de entorno están listadas en `.env.example`. Nunca hagas commit de `.env*`
