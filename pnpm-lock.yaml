@@ -65,12 +65,12 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      cn:
-        specifier: ^0.5.0
-        version: 0.5.0
       date-fns:
         specifier: ^4.4.0
         version: 4.4.0
@@ -113,6 +113,9 @@ importers:
       streamdown:
         specifier: ^2.7.0
         version: 2.7.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -128,9 +131,6 @@ importers:
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.3
-        version: 4.3.3
-      '@tailwindcss/turbopack':
-        specifier: ^4
         version: 4.3.3
       '@types/node':
         specifier: ^20
@@ -1768,9 +1768,6 @@ packages:
   '@tailwindcss/postcss@4.3.3':
     resolution: {integrity: sha512-JTSZZGQi1AyKirbLN3azmjVzef92tcX7h+iSqPdaeStyFpGpDlKvvpxeOE8njhbUanbRwr3z8DyzhICWnMtQeg==}
 
-  '@tailwindcss/turbopack@4.3.3':
-    resolution: {integrity: sha512-FgL4wRgItNdXcDjcgYUSd59gNsWqNVK4GotjZimZMmt7OOIkRNqH2QEUcRXLdBDXvwTsi5rkYxDxzfrFUkmObQ==}
-
   '@tanstack/query-core@5.104.3':
     resolution: {integrity: sha512-DZY9TuJAOgU3UyHUhXb4CcTYEHNZszlwkPg4VViIwTxOKzLprPUU+rbaPZQd3srqkGOtpaDdKpW972UV/LKlcg==}
 
@@ -2738,11 +2735,6 @@ packages:
   cn@0.2.6:
     resolution: {integrity: sha512-+i4L0zUGgRcEnhsxueVrP7iBGxBx5iD0WOTYg1MwFEu2ZyCmH5Ov2V1cul2Ht5UchRQQgftCf4be/RxspuW6QQ==}
     engines: {node: '>=20'}
-    hasBin: true
-
-  cn@0.5.0:
-    resolution: {integrity: sha512-JGEixZEpfFXm1P5uXwvEobOFLlHwIWi5v4tjd1ZwfiYmcEilkuD2l+054rvJcYCR1B+uVThHeUbgmNz1FwuxuA==}
-    engines: {node: '>=22'}
     hasBin: true
 
   code-block-writer@13.0.3:
@@ -7735,13 +7727,6 @@ snapshots:
       postcss: 8.5.23
       tailwindcss: 4.3.3
 
-  '@tailwindcss/turbopack@4.3.3':
-    dependencies:
-      '@alloc/quick-lru': 5.3.0
-      '@tailwindcss/node': 4.3.3
-      '@tailwindcss/oxide': 4.3.3
-      tailwindcss: 4.3.3
-
   '@tanstack/query-core@5.104.3': {}
 
   '@tokenizer/inflate@0.4.1':
@@ -9002,8 +8987,6 @@ snapshots:
       - '@types/react-dom'
 
   cn@0.2.6: {}
-
-  cn@0.5.0: {}
 
   code-block-writer@13.0.3: {}
 
