@@ -38,11 +38,16 @@ export const EngineAuthorizationSchema = z.strictObject({
   validFrom: CalendarDateSchema,
   validUntil: CalendarDateSchema,
   status: z.enum(["active", "revoked", "consumed"]),
+  // Aprobaciones ya cubiertas por esta autorización en su periodo actual (según `frequency`);
+  // en `one_time`, en total. Cada autorización cubre como máximo una factura por periodo.
+  approvalsInCurrentPeriod: z.int().nonnegative(),
 });
 
-// Decisión previa de otra factura (o de la misma, en una reevaluación).
+// Decisión previa de otra factura (o de la misma, en una reevaluación). Una factura puede
+// tener varias filas; el motor usa solo la más reciente por `evaluatedAt`.
 export const EnginePriorDecisionSchema = z.strictObject({
   decisionId: EntityIdSchema,
+  evaluatedAt: UtcInstantSchema,
   invoiceId: EntityIdSchema,
   supplierId: EntityIdSchema.nullable(),
   invoiceNumber: z.string().min(1).nullable(),

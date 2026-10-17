@@ -13,7 +13,7 @@
 - [ ] **`feature/b-payment-history`**: importación CSV + sugerencias de recurrencia.
 - [ ] Páginas de B: `/dashboard/policies`, `/dashboard/approvals`, `/dashboard/payment-history`, `/dashboard/audit`.
 
-## 2. Motor determinístico (sin IA)
+## 2. Motor determinístico (sin IA, 10 reglas)
 
 La IA solo interviene antes (vertical A) para leer documentos. El motor compara datos estructurados con reglas TypeScript.
 
@@ -25,14 +25,15 @@ La IA solo interviene antes (vertical A) para leer documentos. El motor compara 
 | # | `ruleId` | Falla con | Resultado |
 |---|---|---|---|
 | 1 | `essential_fields_present` (proveedor confirmado, monto, moneda, número, cuenta) | `INSUFFICIENT_DATA` | escala |
-| 2 | `currency_supported` (solo USD en P0) | `CURRENCY_NOT_SUPPORTED` | escala |
-| 3 | `not_duplicate` | `DUPLICATE_INVOICE` | **bloquea** si confirmado; escala si sospechoso |
-| 4 | `supplier_authorized` | `SUPPLIER_NOT_AUTHORIZED` o `RECURRENCE_NOT_AUTHORIZED` (si hay recurrencia en CSV) | escala |
-| 5 | `beneficiary_matches_authorization` | `BENEFICIARY_CHANGED` | escala |
-| 6 | `within_authorization_limit` | `AMOUNT_LIMIT_EXCEEDED` | escala |
-| 7 | `within_policy_auto_limit` | `AMOUNT_LIMIT_EXCEEDED` | escala |
-| 8 | `contract_consistent` | `CONTRACT_MISMATCH` | escala |
-| 9 | `budget_available` | `BUDGET_INSUFFICIENT` | **bloquea** |
+| 2 | `no_extraction_warnings` (A no reportó advertencias de extracción) | `INSUFFICIENT_DATA` | escala |
+| 3 | `currency_supported` (solo USD en P0) | `CURRENCY_NOT_SUPPORTED` | escala |
+| 4 | `not_duplicate` | `DUPLICATE_INVOICE` | **bloquea** si confirmado; escala si sospechoso o reenvío de una bloqueada |
+| 5 | `supplier_authorized` (activa, vigente hoy y en la fecha de factura, sin usar en su periodo) | `SUPPLIER_NOT_AUTHORIZED` o `RECURRENCE_NOT_AUTHORIZED` (si hay recurrencia en CSV) | escala |
+| 6 | `beneficiary_matches_authorization` | `BENEFICIARY_CHANGED` | escala |
+| 7 | `within_authorization_limit` | `AMOUNT_LIMIT_EXCEEDED` | escala |
+| 8 | `within_policy_auto_limit` | `AMOUNT_LIMIT_EXCEEDED` | escala |
+| 9 | `contract_consistent` | `CONTRACT_MISMATCH` | escala |
+| 10 | `budget_available` | `BUDGET_INSUFFICIENT` | **bloquea** |
 
 ## 3. Decisiones acordadas
 
@@ -40,10 +41,10 @@ La IA solo interviene antes (vertical A) para leer documentos. El motor compara 
 |---|---|
 | Bloqueos absolutos | Solo **duplicado confirmado** y **presupuesto insuficiente**. Todo lo demás escala; una aprobación humana nunca salta un bloqueo absoluto. |
 | Cuenta beneficiaria cambiada | Escala (puede ser un cambio legítimo de banco). La autorización existente no se transfiere a la cuenta nueva. |
-| Proveedor autorizado | Coinciden **todas** las dimensiones de una autorización activa: proveedor, cuenta beneficiaria, moneda, monto máximo, alcance (único/recurrente + frecuencia) y vigencia. Contrato o historial nunca autorizan. |
+| Proveedor autorizado | Coinciden **todas** las dimensiones de una autorización activa: proveedor, cuenta beneficiaria, moneda, monto máximo, alcance y vigencia (hoy **y** fecha de factura). Cada autorización cubre **una factura por periodo** de su frecuencia (`one_time`: una en total); el loader informa `approvalsInCurrentPeriod`. Contrato o historial nunca autorizan. |
 | Contrato | No es obligatorio si hay autorización. `mismatch` o `ambiguous` escalan; `not_found`/`null` son informativos. |
 | Presupuesto | Consumido = suma de decisiones `approved` del **mes calendario UTC** (por fecha de decisión), en USD. El CSV **no** cuenta (evita doble conteo). Si no se puede calcular → escala. |
-| Duplicados | Confirmado = mismo `supplierId` + `invoiceNumber`, o mismo sha256 de archivo, con decisión previa no `blocked` → bloquea. Sospechoso (mismo proveedor, monto y fecha, otro número) o número ausente → escala. |
+| Duplicados | Número normalizado (mayúsculas, sin separadores). Solo cuenta la decisión **más reciente** de cada factura previa. Confirmado = mismo `supplierId` + número, o mismo sha256, con última decisión no `blocked` → bloquea. Reenvío de una factura cuya última decisión fue `blocked` → escala (una persona confirma). Sospechoso (mismo proveedor, monto y fecha, otro número) o número ausente → escala. |
 | Permisos | Identidad y rol vienen de Clerk (espejo en `organization_memberships`, de A). Permisos de pago en tabla propia de B `approval_permissions`: sin fila = sin permisos; `approvalLimitMinor` obligatorio si `canApprove` (no hay aprobadores ilimitados). Solo rol `admin` edita permisos. Todo se verifica en servidor. |
 | Aprobación humana | El servidor revalida con `decide()` contra política y presupuesto vigentes y verifica el límite del aprobador. Guarda **nueva** fila con `decisionSource: human`; no edita la anterior. Autorización recurrente solo mediante casilla explícita con cuenta, monto máximo, frecuencia y vigencia. |
 | Concurrencia | Verificación de presupuesto + inserción de `approved` dentro de una transacción que bloquea la fila de política de la organización (`SELECT … FOR UPDATE`). Una factura no se aprueba dos veces (índice único parcial). |
@@ -77,4 +78,5 @@ Todas con `organization_id` → `organizations` e índices por organización.
 
 - 2026-10-17: plan acordado en sesión de diseño. Orden elegido: tablas primero, luego motor.
 - 2026-10-17: tablas de B aplicadas en Neon (`20261017163245_add_payment_autopilot_tables`).
+- 2026-10-17: revisión de código del PR #5: se añadieron uso por periodo de autorizaciones, vigencia por fecha de factura, normalización de número, última decisión por factura, regla de advertencias de extracción y escalado de reenvíos bloqueados (48 tests).
 - 2026-10-17: motor `decide(invoice, facts)` con 38 tests de casos trampa. Entradas validadas con Zod (`EngineFactsSchema`); la salida pasa por `PaymentDecisionSchema.parse` como última barrera. Explicaciones por plantilla, sin IA. Próximo: `feature/b-policies`.

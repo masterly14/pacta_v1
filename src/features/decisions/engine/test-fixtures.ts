@@ -55,6 +55,7 @@ export function makeAuthorization(overrides: Partial<EngineAuthorization> = {}):
     validFrom: "2026-01-01",
     validUntil: "2026-12-31",
     status: "active",
+    approvalsInCurrentPeriod: 0, // aún no cubrió ninguna factura este mes
     ...overrides,
   };
 }
@@ -62,6 +63,7 @@ export function makeAuthorization(overrides: Partial<EngineAuthorization> = {}):
 export function makePriorDecision(overrides: Partial<EnginePriorDecision> = {}): EnginePriorDecision {
   return {
     decisionId: "dec_prior",
+    evaluatedAt: "2026-09-02T12:00:00Z",
     invoiceId: "inv_prior",
     supplierId: SUPPLIER_ID,
     invoiceNumber: "VER-2026-09",
