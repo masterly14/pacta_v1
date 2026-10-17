@@ -1,5 +1,5 @@
 /**
- * Purpose: the payment decision engine; combines the nine rules into approved, blocked
+ * Purpose: the payment decision engine; combines the ten rules into approved, blocked
  *   or requires_approval with reasons and evidence.
  * Runs in: server only in the app (via evaluateInvoice(), pending) and in tests. Pure.
  * Triggered by: a call to decide(invoice, facts); never by the LLM or an incoming email.
