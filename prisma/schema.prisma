@@ -40,6 +40,7 @@ model Organization {
   bankImportBatches     BankImportBatch[]
   bankTransactions      BankTransaction[]
   auditEvents           AuditEvent[]
+  invoices              Invoice[]
 
   // Vertical A
   contracts Contract[]
@@ -141,6 +142,7 @@ model Supplier {
   decisions        PaymentDecision[]
   bankTransactions BankTransaction[]
   contracts        Contract[]
+  invoices         Invoice[]
 
   @@unique([organizationId, normalizedName])
   @@map("suppliers")
@@ -396,11 +398,12 @@ model GmailInboundMessage {
   createdAt         DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  connection   GmailConnection @relation(fields: [gmailConnectionId], references: [id], onDelete: Restrict)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection   GmailConnection      @relation(fields: [gmailConnectionId], references: [id], onDelete: Restrict)
   documents    Document[]
   groups       DocumentGroup[]
   ignoredItems IgnoredInboundItem[]
+  invoices     Invoice[]
 
   @@unique([gmailConnectionId, gmailMessageId])
   @@index([organizationId, receivedAt])
@@ -432,6 +435,7 @@ model Document {
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   inboundMessage GmailInboundMessage @relation(fields: [gmailInboundMessageId], references: [id], onDelete: Restrict)
   group          DocumentGroup?      @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  invoices       Invoice[]
 
   @@index([organizationId])
   @@index([gmailInboundMessageId])
@@ -462,6 +466,7 @@ model DocumentGroup {
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   inboundMessage GmailInboundMessage @relation(fields: [gmailInboundMessageId], references: [id], onDelete: Restrict)
   documents      Document[]
+  invoice        Invoice?
 
   @@index([organizationId])
   @@index([gmailInboundMessageId])
@@ -549,4 +554,66 @@ model Contract {
   @@index([organizationId, supplierId, status])
   @@index([organizationId, createdAt])
   @@map("contracts")
+}
+
+// ---------------------------------------------------------------------------
+// Facturas (A-01): una por grupo `invoice_candidate` o por carga manual.
+// ---------------------------------------------------------------------------
+
+enum InvoiceIntakeSource {
+  email
+  dashboard
+}
+
+// Igual que SupplierMatchStatusSchema (Zod): `matched` identifica, no autoriza.
+enum InvoiceSupplierMatch {
+  matched
+  ambiguous
+  not_found
+}
+
+enum InvoiceExtractionStatus {
+  pending
+  processing
+  extracted
+  failed
+}
+
+/// Factura recibida. Guarda lo extraído (hechos, no autorización) y el InvoiceContext validado;
+/// la decisión vive en payment_decisions (vertical B).
+model Invoice {
+  id                    String                  @id
+  organizationId        String                  @map("organization_id")
+  source                InvoiceIntakeSource
+  // Idempotencia del correo: un grupo produce a lo sumo una factura. SET NULL para no bloquear
+  // el reintento de descarga, que regenera los grupos.
+  documentGroupId       String?                 @unique @map("document_group_id")
+  gmailInboundMessageId String?                 @map("gmail_inbound_message_id")
+  primaryDocumentId     String?                 @map("primary_document_id")
+  extractionStatus      InvoiceExtractionStatus @default(pending) @map("extraction_status")
+  extractionError       String?                 @map("extraction_error") // etapa y motivo, sin datos de la factura
+  supplierId            String?                 @map("supplier_id")
+  supplierMatchStatus   InvoiceSupplierMatch?   @map("supplier_match_status")
+  name                  String? // nombre extraído (no identifica al proveedor)
+  invoiceNumber         String?                 @map("invoice_number")
+  amountMinor           Int?                    @map("amount_minor")
+  currency              String?                 @db.Char(3)
+  invoiceDate           DateTime?               @map("invoice_date") @db.Date
+  dueDate               DateTime?               @map("due_date") @db.Date
+  contextJson           Json?                   @map("context_json") // InvoiceContext validado
+  receivedAt            DateTime                @map("received_at") @db.Timestamptz(6)
+  processedAt           DateTime?               @map("processed_at") @db.Timestamptz(6)
+  createdAt             DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  documentGroup   DocumentGroup?       @relation(fields: [documentGroupId], references: [id], onDelete: SetNull)
+  inboundMessage  GmailInboundMessage? @relation(fields: [gmailInboundMessageId], references: [id], onDelete: SetNull)
+  primaryDocument Document?            @relation(fields: [primaryDocumentId], references: [id], onDelete: SetNull)
+  supplier        Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, receivedAt])
+  @@index([organizationId, extractionStatus])
+  @@index([gmailInboundMessageId])
+  @@map("invoices")
 }
