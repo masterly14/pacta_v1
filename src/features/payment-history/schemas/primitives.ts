@@ -8,7 +8,7 @@ export {
   CurrencyCodeSchema,
   EntityIdSchema,
   UtcInstantSchema,
-} from "../../../shared/schemas/invoice-context.ts";
+} from "@/shared/schemas/invoice-context";
 
 // `amount` del CSV es siempre positivo; el sentido del movimiento va aparte (AmountMinorSchema no admite negativos).
 export const DirectionSchema = z.enum(["debit", "credit"]);
@@ -17,6 +17,14 @@ export type Direction = z.infer<typeof DirectionSchema>;
 export const Sha256Schema = z.string().regex(/^[a-f0-9]{64}$/, "Debe ser un sha256 en hexadecimal minúscula");
 
 export const RowNumberSchema = z.int().positive();
+
+// bank_transactions.amount_minor es Int4 con signo (negativo = salida). Distinto de AmountMinorSchema (≥ 0).
+export const INT32_MAX = 2_147_483_647;
+export const SignedAmountMinorSchema = z
+  .int()
+  .min(-INT32_MAX)
+  .max(INT32_MAX)
+  .refine((amount) => amount !== 0, "Un movimiento no puede tener importe 0");
 
 // ---------------------------------------------------------------------------
 // Etiquetas del lote (opcionales, libres, solo contexto: no son permiso ni frontera de seguridad)

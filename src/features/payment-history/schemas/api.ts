@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { ColumnMappingSchema, DetectedHeadersSchema, MappingSuggestionSchema } from "./column-mapping.ts";
-import { RawCsvRowSchema } from "./csv-fields.ts";
-import { BatchSummarySchema } from "./import-batch.ts";
-import { ContextNoteSchema, EntityIdSchema, TagsSchema } from "./primitives.ts";
+import { ColumnMappingSchema, DetectedHeadersSchema, MappingSuggestionSchema } from "./column-mapping";
+import { RawCsvRowSchema } from "./csv-fields";
+import { BatchSummarySchema } from "./import-batch";
+import { ContextNoteSchema, EntityIdSchema, TagsSchema } from "./primitives";
 
 // Contratos de borde HTTP del importador. Todo lo que entra se valida aquí; el archivo va aparte (multipart).
 

@@ -121,19 +121,14 @@ export function transactionFixture(overrides: Record<string, unknown> = {}) {
   return {
     id: "txn_demo_1",
     organizationId: "org_demo",
-    batchId: "batch_demo_1",
-    rowNumber: 2,
+    importBatchId: "batch_demo_1",
     postedOn: "2026-01-15",
-    direction: "debit",
-    amountMinor: 2000,
+    amountMinor: -2000, // salida de 20,00 USD
     currency: "USD",
-    descriptionRaw: "SUSCRIPCION HOSTING",
-    counterpartyRaw: "Hosting Demo Inc",
-    counterpartyNormalized: "hosting demo inc",
+    description: "COMPRA TARJETA 4455 HOSTING DEMO INC 15/01",
     externalRef: null,
     fingerprint: "b".repeat(64),
     supplierId: null,
-    supplierLinkStatus: "unlinked",
     createdAt: "2026-04-01T10:10:00Z",
     ...overrides,
   };
@@ -151,12 +146,15 @@ export const spendKnownFixture = {
 export const spendUnknownFixture = { status: "unknown", reason: "PERIOD_NOT_COVERED" } as const;
 
 export const recurrenceSuggestionFixture = {
-  counterpartyNormalized: "hosting demo inc",
+  groupKind: "unlinked_counterparty",
+  counterpartyNormalized: "hosting demo",
   supplierId: null,
   cadence: "monthly",
   typicalAmountMinor: 2000,
   currency: "USD",
   occurrences: 3,
   transactionIds: ["txn_demo_1", "txn_demo_2", "txn_demo_3"],
+  firstPostedOn: "2026-01-15",
+  lastPostedOn: "2026-03-15",
   isSuggestionOnly: true,
 } as const;
