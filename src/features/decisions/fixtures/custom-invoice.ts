@@ -62,7 +62,10 @@ export async function buildCustomInvoice(
   // `missingFields` debe listar exactamente los campos null (lo exige InvoiceContextSchema).
   const fields = {
     invoiceNumber: input.invoiceNumber,
-    supplierName: supplier?.name ?? null,
+    name: supplier?.name ?? null,
+    email: null, // carga de prueba: no viene de un correo
+    subject: null,
+    body: null,
     beneficiaryAccountReference: input.beneficiaryAccountReference,
     amountMinor,
     currency: input.currency,
