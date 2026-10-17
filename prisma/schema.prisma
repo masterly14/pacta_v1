@@ -24,7 +24,10 @@ model Organization {
   name      String
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memberships OrganizationMembership[]
+  memberships      OrganizationMembership[]
+  gmailConnections GmailConnection[]
+  gmailMessages    GmailInboundMessage[]
+  documents        Document[]
 
   // Vertical B
   suppliers             Supplier[]
@@ -49,7 +52,8 @@ model User {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships OrganizationMembership[]
+  memberships      OrganizationMembership[]
+  gmailConnections GmailConnection[]
 
   @@index([email])
   @@map("users")
@@ -323,6 +327,100 @@ model AuditEvent {
   @@index([organizationId, createdAt])
   @@index([organizationId, entityType, entityId])
   @@map("audit_events")
+}
+
+enum GmailConnectionStatus {
+  pending
+  active
+  failed
+  expired
+  revoked
+}
+
+enum GmailInboundProcessingStatus {
+  received
+  processing
+  processed
+  failed
+  ignored
+}
+
+/// Buzón Gmail de la organización. Tokens en Composio; aquí solo ids y estado.
+model GmailConnection {
+  id                         String                @id
+  organizationId             String                @map("organization_id")
+  connectedByUserId          String                @map("connected_by_user_id")
+  composioUserId             String                @map("composio_user_id")
+  composioConnectedAccountId String                @unique @map("composio_connected_account_id")
+  composioAuthConfigId       String                @map("composio_auth_config_id")
+  composioTriggerId          String?               @unique @map("composio_trigger_id")
+  emailAddress               String?               @unique @map("email_address")
+  alias                      String?
+  status                     GmailConnectionStatus
+  connectedAt                DateTime?             @map("connected_at") @db.Timestamptz(6)
+  revokedAt                  DateTime?             @map("revoked_at") @db.Timestamptz(6)
+  createdAt                  DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connectedBy  User                  @relation(fields: [connectedByUserId], references: [id], onDelete: Restrict)
+  messages     GmailInboundMessage[]
+
+  @@index([organizationId])
+  @@map("gmail_connections")
+}
+
+/// Ingesta de un correo. Unicidad por buzón + message id de Gmail.
+model GmailInboundMessage {
+  id                String                       @id
+  organizationId    String                       @map("organization_id")
+  gmailConnectionId String                       @map("gmail_connection_id")
+  composioEventId   String                       @unique @map("composio_event_id")
+  gmailMessageId    String                       @map("gmail_message_id")
+  gmailThreadId     String?                      @map("gmail_thread_id")
+  sender            String?
+  subject           String?
+  receivedAt        DateTime                     @map("received_at") @db.Timestamptz(6)
+  processingStatus  GmailInboundProcessingStatus @map("processing_status")
+  invoiceId         String?                      @map("invoice_id")
+  createdAt         DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  connection   GmailConnection @relation(fields: [gmailConnectionId], references: [id], onDelete: Restrict)
+  documents    Document[]
+
+  @@unique([gmailConnectionId, gmailMessageId])
+  @@index([organizationId, receivedAt])
+  @@map("gmail_inbound_messages")
+}
+
+enum DocumentSource {
+  email_body
+  invoice_document
+}
+
+/// Original privado (cuerpo o adjunto). No implica una decisión de pago.
+model Document {
+  id                    String         @id
+  organizationId        String         @map("organization_id")
+  gmailInboundMessageId String         @map("gmail_inbound_message_id")
+  fileRef               String         @map("file_ref")
+  publicUrl             String         @map("public_url")
+  mimeType              String         @map("mime_type")
+  sha256                String
+  originalFilename      String?        @map("original_filename")
+  source                DocumentSource
+  byteSize              Int            @map("byte_size")
+  receivedAt            DateTime       @map("received_at") @db.Timestamptz(6)
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  inboundMessage GmailInboundMessage @relation(fields: [gmailInboundMessageId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([gmailInboundMessageId])
+  @@map("documents")
 }
 
 // ---------------------------------------------------------------------------
