@@ -8,7 +8,7 @@
 - [x] **`feature/b-db-schema`**: tablas de B en `schema.prisma` + una migración (ver §4).
 - [x] **`feature/b-engine`**: Vitest + `decide()` puro + fixtures de casos trampa (sin BD ni IA). Código en `src/features/decisions/engine/`.
 - [x] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (datos demo + UI mínima). Código en `src/features/policies/` y `/platform/policies`.
-- [ ] **`feature/b-decisions`**: `evaluateInvoice()`, `POST /api/invoices/[id]/evaluate`, decisiones persistidas, auditoría, idempotencia.
+- [x] **`feature/b-decisions`**: `evaluateInvoice()` (`src/features/decisions/server.ts`), decisiones persistidas, solicitud de aprobación, auditoría, idempotencia, bloqueo por organización; simulador de facturas ficticias en `/platform/audit` y lista de pendientes en `/platform/approvals`. El endpoint HTTP queda para cuando A tenga `invoices`.
 - [ ] **`feature/b-approvals`**: bandeja, resolución con reevaluación, autorización recurrente explícita, bloqueo transaccional.
 - [ ] **`feature/b-payment-history`**: importación CSV + sugerencias de recurrencia.
 - [ ] Páginas de B: `/platform/policies`, `/platform/approvals`, `/platform/payment-history`, `/platform/audit`.
@@ -81,6 +81,8 @@ Todas con `organization_id` → `organizations` e índices por organización.
 
 - 2026-10-17: plan acordado en sesión de diseño. Orden elegido: tablas primero, luego motor.
 - 2026-10-17: tablas de B aplicadas en Neon (`20261017163245_add_payment_autopilot_tables`).
+- 2026-10-17: decisiones: `evaluateInvoice(context)` carga hechos (política vigente, autorizaciones con uso por periodo calendario UTC de la fecha de factura, decisiones previas, duplicados por sha256, presupuesto del mes UTC, sugerencia de recurrencia por ≥ 3 salidas en 18 meses), llama a `decide()` y guarda decisión + solicitud + auditoría en una transacción con `SELECT … FOR UPDATE` sobre la organización. Migración `20261017195842` añade `invoice_date` y `authorization_id` (CHECK: solo en `approved`). Probado: sin el bloqueo, 8 facturas concurrentes con presupuesto para una se aprobaron las 8; con el bloqueo, exactamente 1. A llamará `evaluateInvoice()` desde su pipeline; mientras tanto, simulador con 10 escenarios ficticios.
+- Pendiente: las explicaciones de las reglas (`engine/rules.ts`) están en inglés; la UI está en español.
 - 2026-10-17: correcciones tras prueba en Chrome: un proveedor no puede tener dos contratos vigentes solapados (409 en la API, bloqueo de fila del proveedor); los formularios conservan lo escrito tras un error (`src/shared/forms/use-form-action.ts`); toasts al terminar contratos, revocar autorizaciones y cargar datos demo; montos de contratos con el mismo formato que políticas; mensajes de moneda en español.
 - 2026-10-17: políticas: CRUD con auditoría, permisos, datos demo y página. 38 tests unitarios + 10 de integración opcionales (`TEST_DATABASE_URL`, base desechable). Build local requiere que `.env.local` no sobrescriba `DATABASE_URL` con vacío.
 - 2026-10-17: revisión de código del PR #5: se añadieron uso por periodo de autorizaciones, vigencia por fecha de factura, normalización de número, última decisión por factura, regla de advertencias de extracción y escalado de reenvíos bloqueados (48 tests).

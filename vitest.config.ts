@@ -7,6 +7,9 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts"],
+    // Las pruebas de integración comparten una base desechable y la vacían con TRUNCATE:
+    // en paralelo se borrarían datos entre archivos.
+    fileParallelism: !process.env.TEST_DATABASE_URL,
     // Usan node:test, no Vitest; se ejecutan con `npm run test:node`.
     exclude: [
       "node_modules/**",
