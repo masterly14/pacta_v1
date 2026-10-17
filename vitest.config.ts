@@ -7,7 +7,16 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts"],
-    // Usa node:test; se ejecuta con su propio comando en `npm test`.
-    exclude: ["src/shared/auth/membership-role.test.ts", "node_modules/**"],
+    // Las pruebas de integración comparten una base desechable y la vacían con TRUNCATE:
+    // en paralelo se borrarían datos entre archivos.
+    fileParallelism: !process.env.TEST_DATABASE_URL,
+    // Usan node:test, no Vitest; se ejecutan con `npm run test:node`.
+    exclude: [
+      "node_modules/**",
+      "src/shared/auth/membership-role.test.ts",
+      "src/shared/schemas/gmail-contracts.test.ts",
+      "src/features/invoices/gmail/gmail-backend.test.ts",
+      "src/lib/r2.test.ts",
+    ],
   },
 });

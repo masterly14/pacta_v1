@@ -1,16 +1,19 @@
 "use client";
 /**
  * Purpose: client forms for the policies page (supplier, policy version, authorization,
- *   revoke, approval permission, demo data), each showing its server result inline.
+ *   revoke, approval permission, demo data); errors show inline and keep the typed values,
+ *   successes clear the form or show a toast when the control disappears.
  * Runs in: browser (React client components).
- * Triggered by: rendered by /dashboard/policies; submits to the server actions.
+ * Triggered by: rendered by /platform/policies; submits to the server actions.
  * Receives → Returns: props (suppliers, member, authorization id) → form UI.
- * Talks to: ../actions.ts (server actions), shadcn Button, Input, Label.
+ * Talks to: ../actions.ts (server actions), useFormAction, sonner toast, shadcn Button, Input, Label.
  */
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFormAction } from "@/shared/forms/use-form-action";
 import {
   createAuthorizationAction,
   createPolicyVersionAction,
@@ -43,9 +46,9 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
 }
 
 export function SupplierForm() {
-  const [state, action, pending] = useActionState(createSupplierAction, null);
+  const { state, pending, formRef, onSubmit } = useFormAction(createSupplierAction, { resetOnSuccess: true });
   return (
-    <form action={action} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+    <form ref={formRef} onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
       <Field label="Nombre" htmlFor="supplier-name">
         <Input id="supplier-name" name="name" required maxLength={120} placeholder="Nube Hosting LLC" />
       </Field>
@@ -63,9 +66,10 @@ export function SupplierForm() {
 }
 
 export function PolicyVersionForm({ autoLimit, budget }: { autoLimit: string; budget: string }) {
-  const [state, action, pending] = useActionState(createPolicyVersionAction, null);
+  // Tras crear la versión, el reset deja los valores nuevos (los defaultValue se actualizan).
+  const { state, pending, formRef, onSubmit } = useFormAction(createPolicyVersionAction, { resetOnSuccess: true });
   return (
-    <form action={action} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+    <form ref={formRef} onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
       <Field label="Límite de aprobación automática (USD)" htmlFor="policy-limit">
         <Input id="policy-limit" name="autoApprovalLimitMinor" required inputMode="decimal" defaultValue={autoLimit} />
       </Field>
@@ -83,13 +87,16 @@ export function PolicyVersionForm({ autoLimit, budget }: { autoLimit: string; bu
 }
 
 export function AuthorizationForm({ suppliers, today }: { suppliers: { id: string; name: string }[]; today: string }) {
-  const [state, action, pending] = useActionState(createAuthorizationAction, null);
   const [scope, setScope] = useState<"recurring" | "one_time">("recurring");
+  const { state, pending, formRef, onSubmit } = useFormAction(createAuthorizationAction, {
+    resetOnSuccess: true,
+    onSuccess: () => setScope("recurring"),
+  });
   if (suppliers.length === 0) {
     return <p className="text-sm text-muted-foreground">Agrega un proveedor antes de autorizar pagos.</p>;
   }
   return (
-    <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <form ref={formRef} onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Field label="Proveedor" htmlFor="auth-supplier">
         <select id="auth-supplier" name="supplierId" required className={selectClass}>
           {suppliers.map((supplier) => (
@@ -146,9 +153,12 @@ export function AuthorizationForm({ suppliers, today }: { suppliers: { id: strin
 }
 
 export function RevokeAuthorizationButton({ authorizationId }: { authorizationId: string }) {
-  const [state, action, pending] = useActionState(revokeAuthorizationAction, null);
+  // Al revocar, la fila deja de mostrar este botón: la confirmación va en un toast.
+  const { state, pending, onSubmit } = useFormAction(revokeAuthorizationAction, {
+    onSuccess: (result) => toast.success(result.message),
+  });
   return (
-    <form action={action} className="flex flex-col items-end gap-1">
+    <form onSubmit={onSubmit} className="flex flex-col items-end gap-1">
       <input type="hidden" name="authorizationId" value={authorizationId} />
       <Button type="submit" variant="outline" size="sm" disabled={pending}>
         {pending ? "Revocando…" : "Revocar"}
@@ -169,10 +179,11 @@ export function PermissionForm({
   approvalLimit: string;
   canManagePolicies: boolean;
 }) {
-  const [state, action, pending] = useActionState(setApprovalPermissionAction, null);
+  // Sin reset: el formulario muestra los permisos guardados.
+  const { state, pending, onSubmit } = useFormAction(setApprovalPermissionAction);
   const [approve, setApprove] = useState(canApprove);
   return (
-    <form action={action} className="flex flex-wrap items-center gap-3">
+    <form onSubmit={onSubmit} className="flex flex-wrap items-center gap-3">
       <input type="hidden" name="userId" value={userId} />
       <label className="flex items-center gap-1.5 text-sm">
         <input type="checkbox" name="canApprove" checked={approve} onChange={(event) => setApprove(event.target.checked)} />
@@ -202,9 +213,12 @@ export function PermissionForm({
 }
 
 export function LoadDemoDataButton() {
-  const [state, action, pending] = useActionState(loadDemoDataAction, null);
+  // La tarjeta desaparece en cuanto la organización tiene datos: la confirmación va en un toast.
+  const { state, pending, onSubmit } = useFormAction(loadDemoDataAction, {
+    onSuccess: (result) => toast.success(result.message),
+  });
   return (
-    <form action={action} className="flex flex-col gap-2">
+    <form onSubmit={onSubmit} className="flex flex-col gap-2">
       <Button type="submit" variant="secondary" disabled={pending}>
         {pending ? "Cargando…" : "Cargar datos demo"}
       </Button>

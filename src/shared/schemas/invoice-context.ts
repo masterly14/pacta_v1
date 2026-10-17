@@ -126,7 +126,8 @@ export const InvoiceContextSchema = z
 
     // Origen
     source: InvoiceSourceSchema,
-    sourceMessageId: z.string().min(1).nullable(), // ID del proveedor de email; null en carga manual
+    sourceAccountId: EntityIdSchema.nullable(), // id interno de GmailConnection; null en carga manual
+    sourceMessageId: z.string().min(1).nullable(), // gmailMessageId; null en carga manual
     documentId: EntityIdSchema.nullable(),
     documentType: DocumentTypeSchema,
     receivedAt: UtcInstantSchema,
@@ -161,8 +162,19 @@ export const InvoiceContextSchema = z
     if (invoice.supplierMatchStatus !== "matched" && invoice.supplierId !== null) {
       ctx.addIssue({ code: "custom", path: ["supplierId"], message: "supplierId debe ser null si el proveedor no está confirmado" });
     }
+    if (invoice.source === "email" && invoice.sourceAccountId === null) {
+      ctx.addIssue({ code: "custom", path: ["sourceAccountId"], message: "Un email requiere sourceAccountId del buzón Gmail" });
+    }
     if (invoice.source === "email" && invoice.sourceMessageId === null) {
       ctx.addIssue({ code: "custom", path: ["sourceMessageId"], message: "Un email requiere sourceMessageId para idempotencia" });
+    }
+    if (invoice.source === "dashboard") {
+      if (invoice.sourceAccountId !== null) {
+        ctx.addIssue({ code: "custom", path: ["sourceAccountId"], message: "La carga manual no lleva sourceAccountId" });
+      }
+      if (invoice.sourceMessageId !== null) {
+        ctx.addIssue({ code: "custom", path: ["sourceMessageId"], message: "La carga manual no lleva sourceMessageId" });
+      }
     }
     if (invoice.amountMinor !== null && invoice.currency === null) {
       ctx.addIssue({ code: "custom", path: ["currency"], message: "Un importe requiere moneda explícita" });

@@ -2,7 +2,7 @@
  * Purpose: persist and read suppliers, versioned payment policies, explicit authorizations
  *   and approval permissions, always scoped by organizationId and audited.
  * Runs in: server (Node).
- * Triggered by: actions.ts (mutations) and the /dashboard/policies page (reads).
+ * Triggered by: actions.ts (mutations) and the /platform/policies page (reads).
  * Receives → Returns: (PolicyActor, validated input) → PolicyResult; organizationId → overview.
  * Talks to: db (src/lib/db.ts) — Supplier, PaymentPolicy, PaymentAuthorization,
  *   ApprovalPermission, OrganizationMembership, AuditEvent; ./permissions.ts, ./normalize.ts.

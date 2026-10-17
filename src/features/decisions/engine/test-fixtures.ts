@@ -22,6 +22,7 @@ export function makeInvoice(overrides: Partial<InvoiceContext> = {}): InvoiceCon
     organizationId: ORG_ID,
     invoiceNumber: "VER-2026-10",
     source: "email",
+    sourceAccountId: "gc_demo",
     sourceMessageId: "msg_1",
     documentId: "doc_current",
     documentType: "pdf",

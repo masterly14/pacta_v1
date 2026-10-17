@@ -2,12 +2,15 @@
  * Purpose: manage the organization's payment policy, supplier catalog, explicit payment
  *   authorizations and approval permissions.
  * Runs in: server (React Server Component; data streamed inside <Suspense>).
- * Triggered by: GET /dashboard/policies and refresh() after a policies server action.
- * Receives → Returns: request → rendered HTML (forms only for people allowed to use them).
- * Talks to: ensureWorkspaceFromSession, features/policies (server, permissions, money,
- *   components/policy-forms), shadcn Card, Table, Badge.
+ * Triggered by: GET /platform/policies and refresh() after a policies server action.
+ * Receives → Returns: request → rendered HTML inside the platform shell (forms only for people
+ *   allowed to use them; a prompt to pick an organization when the session has none).
+ * Talks to: ensureWorkspaceFromSession, PlatformSection, features/policies (server, permissions,
+ *   money, components/policy-forms), shadcn Card, Table, Badge.
  */
+import type { Metadata } from "next";
 import { Suspense } from "react";
+import { PlatformSection } from "@/components/platform/section";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,7 +25,9 @@ import {
 import { formatUsd, toUsdInput } from "@/features/policies/money";
 import { checkCanGrantPermissions, checkCanManagePolicies } from "@/features/policies/permissions";
 import { getPoliciesOverview, loadPolicyActor } from "@/features/policies/server";
-import { ensureWorkspaceFromSession } from "@/shared/auth/ensure-workspace";
+import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
+
+export const metadata: Metadata = { title: "Políticas" };
 
 const FREQUENCY_LABEL = { weekly: "semanal", monthly: "mensual", quarterly: "trimestral", yearly: "anual" } as const;
 const STATUS_VARIANT = { active: "default", revoked: "destructive", consumed: "secondary" } as const;
@@ -30,24 +35,32 @@ const STATUS_LABEL = { active: "activa", revoked: "revocada", consumed: "usada" 
 
 export default function PoliciesPage() {
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Políticas y autorizaciones</h1>
-        <p className="text-muted-foreground">
-          Reglas que el motor aplica a cada factura. Estar en el catálogo o tener historial no autoriza pagos: solo
-          una autorización explícita lo hace.
-        </p>
+    <PlatformSection
+      title="Políticas"
+      description="Límites, presupuesto y autorizaciones explícitas que el motor aplica a cada factura. Estar en el catálogo o tener historial no autoriza pagos: solo una autorización explícita lo hace."
+    >
+      <div className="flex flex-col gap-6">
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando políticas…</p>}>
+          <PoliciesData />
+        </Suspense>
       </div>
-      <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando políticas…</p>}>
-        <PoliciesData />
-      </Suspense>
-    </main>
+    </PlatformSection>
   );
 }
 
 // La sesión y la BD son datos de ejecución: con cacheComponents deben leerse dentro de <Suspense>.
 async function PoliciesData() {
-  const workspace = await ensureWorkspaceFromSession();
+  let workspace;
+  try {
+    workspace = await ensureWorkspaceFromSession();
+  } catch (error) {
+    if (!(error instanceof OrganizationRequiredError)) throw error;
+    return (
+      <p className="rounded-lg border px-3 py-2 text-sm text-muted-foreground">
+        Las políticas pertenecen a una organización. Elige o crea una con el selector de arriba.
+      </p>
+    );
+  }
   const actor = await loadPolicyActor(workspace);
   const overview = await getPoliciesOverview(workspace.organization.id);
   const canManage = checkCanManagePolicies(actor) === null;

@@ -3,7 +3,7 @@
  * Purpose: server actions behind the policies forms; resolve the session, validate input
  *   with Zod and delegate to server.ts, which enforces permissions.
  * Runs in: server (Next.js server actions).
- * Triggered by: form submissions on /dashboard/policies (via useActionState).
+ * Triggered by: form submissions on /platform/policies (via useActionState).
  * Receives → Returns: (previous ActionState, FormData) → ActionState { ok, message } | null.
  * Talks to: ensureWorkspaceFromSession, ./schemas.ts, ./server.ts; next/cache refresh().
  */

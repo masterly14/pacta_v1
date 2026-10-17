@@ -7,11 +7,11 @@
 
 - [x] **`feature/b-db-schema`**: tablas de B en `schema.prisma` + una migración (ver §4).
 - [x] **`feature/b-engine`**: Vitest + `decide()` puro + fixtures de casos trampa (sin BD ni IA). Código en `src/features/decisions/engine/`.
-- [x] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (datos demo + UI mínima). Código en `src/features/policies/` y `/dashboard/policies`.
-- [ ] **`feature/b-decisions`**: `evaluateInvoice()`, `POST /api/invoices/[id]/evaluate`, decisiones persistidas, auditoría, idempotencia.
+- [x] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (datos demo + UI mínima). Código en `src/features/policies/` y `/platform/policies`.
+- [x] **`feature/b-decisions`**: `evaluateInvoice()` (`src/features/decisions/server.ts`), decisiones persistidas, solicitud de aprobación, auditoría, idempotencia, bloqueo por organización; simulador de facturas ficticias en `/platform/audit` y lista de pendientes en `/platform/approvals`. El endpoint HTTP queda para cuando A tenga `invoices`.
 - [ ] **`feature/b-approvals`**: bandeja, resolución con reevaluación, autorización recurrente explícita, bloqueo transaccional.
 - [ ] **`feature/b-payment-history`**: importación CSV + sugerencias de recurrencia.
-- [ ] Páginas de B: `/dashboard/policies`, `/dashboard/approvals`, `/dashboard/payment-history`, `/dashboard/audit`.
+- [ ] Páginas de B: `/platform/policies`, `/platform/approvals`, `/platform/payment-history`, `/platform/audit`.
 
 ## 2. Motor determinístico (sin IA, 10 reglas)
 
@@ -51,7 +51,7 @@ La IA solo interviene antes (vertical A) para leer documentos. El motor compara 
 | CSV | Columnas `date` (YYYY-MM-DD), `description`, `amount` (texto decimal, negativo = salida), `currency`, `reference`. Parseo a unidades menores sin floats. Filas inválidas se rechazan con error por fila; repetidas se omiten. |
 | Recurrencia | ≥ 3 salidas al mismo proveedor, intervalos de 25–35 días, montos ±10 % → solo sugerencia, nunca autorización. |
 | Gestión de políticas | Rol `admin` (Clerk) → editar permisos de pago y cargar datos demo. `canManagePolicies` → proveedores, versiones de política y autorizaciones. Crear una autorización exige además `canApprove` con límite ≥ monto máximo: nadie autoriza más de lo que podría aprobar. |
-| Datos demo | Botón solo para admin en `/dashboard/policies` (idempotente). Proveedores = los del CSV demo (Nube Hosting LLC, Diseño Studio, Papelería Central). Solo Papelería Central queda autorizada; Nube Hosting tiene historial recurrente sin autorización y debe escalar. El admin recibe permisos explícitos (límite 10,000.00 USD). |
+| Datos demo | Botón solo para admin en `/platform/policies` (idempotente). Proveedores = los del CSV demo (Nube Hosting LLC, Diseño Studio, Papelería Central). Solo Papelería Central queda autorizada; Nube Hosting tiene historial recurrente sin autorización y debe escalar. El admin recibe permisos explícitos (límite 10,000.00 USD). |
 | Normalización de proveedores | `normalizeSupplierName` (policies) debe producir lo mismo que `normalizeName` (payment-history); un test lo verifica. Al integrar, payment-history debería importar la de policies. |
 | Tests | Vitest. `npm test` ejecuta Vitest y luego el test de A con `node --test` (`test:node`) hasta que A decida migrarlo. |
 
@@ -81,6 +81,9 @@ Todas con `organization_id` → `organizations` e índices por organización.
 
 - 2026-10-17: plan acordado en sesión de diseño. Orden elegido: tablas primero, luego motor.
 - 2026-10-17: tablas de B aplicadas en Neon (`20261017163245_add_payment_autopilot_tables`).
+- 2026-10-17: decisiones: `evaluateInvoice(context)` carga hechos (política vigente, autorizaciones con uso por periodo calendario UTC de la fecha de factura, decisiones previas, duplicados por sha256, presupuesto del mes UTC, sugerencia de recurrencia por ≥ 3 salidas en 18 meses), llama a `decide()` y guarda decisión + solicitud + auditoría en una transacción con `SELECT … FOR UPDATE` sobre la organización. Migración `20261017195842` añade `invoice_date` y `authorization_id` (CHECK: solo en `approved`). Probado: sin el bloqueo, 8 facturas concurrentes con presupuesto para una se aprobaron las 8; con el bloqueo, exactamente 1. A llamará `evaluateInvoice()` desde su pipeline; mientras tanto, simulador con 10 escenarios ficticios.
+- Pendiente: las explicaciones de las reglas (`engine/rules.ts`) están en inglés; la UI está en español.
+- 2026-10-17: correcciones tras prueba en Chrome: un proveedor no puede tener dos contratos vigentes solapados (409 en la API, bloqueo de fila del proveedor); los formularios conservan lo escrito tras un error (`src/shared/forms/use-form-action.ts`); toasts al terminar contratos, revocar autorizaciones y cargar datos demo; montos de contratos con el mismo formato que políticas; mensajes de moneda en español.
 - 2026-10-17: políticas: CRUD con auditoría, permisos, datos demo y página. 38 tests unitarios + 10 de integración opcionales (`TEST_DATABASE_URL`, base desechable). Build local requiere que `.env.local` no sobrescriba `DATABASE_URL` con vacío.
 - 2026-10-17: revisión de código del PR #5: se añadieron uso por periodo de autorizaciones, vigencia por fecha de factura, normalización de número, última decisión por factura, regla de advertencias de extracción y escalado de reenvíos bloqueados (48 tests).
 - 2026-10-17: motor `decide(invoice, facts)` con 38 tests de casos trampa. Entradas validadas con Zod (`EngineFactsSchema`); la salida pasa por `PaymentDecisionSchema.parse` como última barrera. Explicaciones por plantilla, sin IA. Próximo: `feature/b-policies`.

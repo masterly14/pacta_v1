@@ -124,7 +124,7 @@ Los esquemas se implementarán en los archivos indicados abajo **antes de inicia
 | Grupo | Campos esperados | Condiciones |
 |---|---|---|
 | Identidad | `invoiceId`, `organizationId`, `invoiceNumber` | IDs internos estables; número externo puede ser `null` |
-| Origen | `source`, `sourceMessageId`, `documentId`, `documentType`, `receivedAt` | `source`: `email \| dashboard \| whatsapp \| slack`; P0 solo email/dashboard |
+| Origen | `source`, `sourceAccountId`, `sourceMessageId`, `documentId`, `documentType`, `receivedAt` | `source`: `email \| dashboard \| whatsapp \| slack`; P0 email = buzón Gmail de la org (`sourceAccountId` = `GmailConnection.id`, `sourceMessageId` = `gmailMessageId`); dashboard no lleva buzón |
 | Proveedor | `supplierId`, `supplierName`, `supplierMatchStatus`, `beneficiaryAccountReference` | `supplierMatchStatus`: `matched \| ambiguous \| not_found`; `supplierId` nullable |
 | Importe | `amountMinor`, `currency`, `description` | Enteros seguros en unidades menores; desconocido `null`; moneda ISO 4217 |
 | Fechas | `invoiceDate`, `dueDate` | Fecha calendario `YYYY-MM-DD` o `null` |
@@ -167,8 +167,9 @@ Los esquemas se implementarán en los archivos indicados abajo **antes de inicia
 |---|---|---|---|
 | `organizations` | Compartida | `id`, `name`, `created_at` | Organización demo y aislamiento de datos |
 | `suppliers` | B | `id`, `organization_id`, `name`, `normalized_name`, `beneficiary_account_ref`, `created_at` | Catálogo de proveedores (no implica autorización) |
-| `documents` | A | `id`, `organization_id`, `file_ref`, `mime_type`, `sha256`, `source`, `received_at` | Documentos originales privados y trazabilidad |
-| `inbound_messages` | A | `id`, `organization_id`, `provider_message_id`, `source`, `processing_status`, `received_at` | Idempotencia de email y estado de ingesta |
+| `documents` | A | `id`, `organization_id`, `gmail_inbound_message_id`, `file_ref`, `public_url`, `mime_type`, `sha256`, `source`, `received_at` | Capturas en R2 Monark (`pacta/invoices/...`) con URL pública; no autorizan pago |
+| `gmail_connections` | Compartida | `id`, `organization_id`, `connected_by_user_id`, `composio_connected_account_id`, `email_address`, `status` | Buzones Gmail de la org (varios por org; tokens en Composio) |
+| `gmail_inbound_messages` | A | `id`, `organization_id`, `gmail_connection_id`, `composio_event_id`, `gmail_message_id`, `processing_status`, `received_at` | Idempotencia de webhook/correo y estado de ingesta |
 | `contracts` | A | `id`, `organization_id`, `supplier_id`, `status`, `agreed_amount_minor`, `currency`, `frequency`, `valid_from`, `valid_to`, `document_id` | Condiciones extraídas y verificadas |
 | `invoices` | A | `id`, `organization_id`, `supplier_id`, `invoice_number`, `amount_minor`, `currency`, `invoice_date`, `due_date`, `document_id`, `extraction_status`, `context_json`, `created_at` | Factura canónica y contexto validado |
 | `bank_transactions` | B | `id`, `organization_id`, `supplier_id`, `posted_on`, `amount_minor`, `currency`, `external_ref`, `import_batch_id` | Movimientos ficticios importados desde CSV |
@@ -181,7 +182,7 @@ Los esquemas se implementarán en los archivos indicados abajo **antes de inicia
 **Notas de diseño que deben resolverse juntos en la sesión inicial:**
 
 - El vínculo de proveedor (`supplier_id`) es opcional hasta ser confirmado; guardar el nombre extraído separado de la identidad verificada.
-- Indexar por `(organization_id, created_at)` y claves de búsqueda; agregar unicidad de `(organization_id, source, provider_message_id)` para mensajes con ID externo.
+- Indexar por `(organization_id, created_at)` y claves de búsqueda. Unicidad de correo: `(gmail_connection_id, gmail_message_id)` y `composio_event_id`; un `email_address` de buzón pertenece a una sola organización.
 - Detectar duplicados mediante identificadores confiables (proveedor + número de factura, cuando existan) y huella de archivo; coincidencias dudosas se escalan. No depender solo del nombre del archivo.
 - `payment_decisions` y `audit_events` se agregan sin editar eventos históricos; nuevas evaluaciones crean nuevas filas con versión de política.
 - Una factura aprobada o comprometida reserva presupuesto **exactamente una vez**; actualizar/revalidar dentro de transacción. Evitar contabilidad doble entre CSV del periodo y reservas. Si la conciliación del presupuesto es ambigua, no aprobar automáticamente.
@@ -226,9 +227,9 @@ Los esquemas se implementarán en los archivos indicados abajo **antes de inicia
 
 ### Rutas de aplicación
 
-- `GET /dashboard/invoices` — inbox (A).
-- `GET /dashboard/invoices/[id]` — factura y contexto (A; el estado de decisión se muestra consumiendo el resultado de B).
-- `GET /dashboard/contracts` — contratos (A).
+- `GET /platform/invoices` — inbox (A).
+- `GET /platform/invoices/[id]` — factura y contexto (A; el estado de decisión se muestra consumiendo el resultado de B).
+- `GET /platform/contracts` — contratos (A).
 - `POST /api/webhooks/resend` — recepción de eventos firmados (A).
 - `POST /api/invoices` — carga manual/autorizada (A).
 - `GET /api/invoices/[id]` — factura estructurada (A).
@@ -266,10 +267,10 @@ Depende de Clerk/organización, esquema base de BD, almacenamiento privado, prov
 
 ### Rutas de aplicación
 
-- `GET /dashboard/payment-history` — CSV e historial (B).
-- `GET /dashboard/policies` — políticas y autorizaciones (B).
-- `GET /dashboard/approvals` — bandeja de aprobación (B).
-- `GET /dashboard/audit` — historial de decisiones (B).
+- `GET /platform/payment-history` — CSV e historial (B).
+- `GET /platform/policies` — políticas y autorizaciones (B).
+- `GET /platform/approvals` — bandeja de aprobación (B).
+- `GET /platform/audit` — historial de decisiones (B).
 - `POST /api/payment-history/import` — cargar CSV (B).
 - `POST /api/invoices/[id]/evaluate` — evaluar factura ya validada (coordinación A/B, implementación de reglas B).
 - `GET /api/decisions` — consultar resultados (B).
