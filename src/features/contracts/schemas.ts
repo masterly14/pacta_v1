@@ -13,7 +13,7 @@ import {
   CurrencyCodeSchema,
   EntityIdSchema,
 } from "@/shared/schemas/invoice-context";
-import { parseAmountToMinor } from "./money";
+import { parseAmountToMinor, SUPPORTED_CURRENCIES } from "./money";
 
 // Campo opcional: cadena vacía → null.
 function optional<T extends z.ZodType>(schema: T) {
@@ -29,7 +29,9 @@ export const ContractInputSchema = z
     agreedAmount: z.string(),
     currency: z.preprocess(
       (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
-      CurrencyCodeSchema,
+      CurrencyCodeSchema.refine((code) => SUPPORTED_CURRENCIES.includes(code), {
+        message: `Moneda no admitida. Usa una de: ${SUPPORTED_CURRENCIES.join(", ")}`,
+      }),
     ),
     frequency: ContractFrequencySchema,
     validFrom: CalendarDateSchema,

@@ -53,6 +53,7 @@ describe("ContractInputSchema", () => {
 
   it("rejects invalid currencies and frequencies", () => {
     expect(ContractInputSchema.safeParse(raw({ currency: "US" })).success).toBe(false);
+    expect(ContractInputSchema.safeParse(raw({ currency: "XOF" })).success).toBe(false);
     expect(ContractInputSchema.safeParse(raw({ frequency: "daily" })).success).toBe(false);
   });
 

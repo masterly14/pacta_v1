@@ -29,7 +29,11 @@ describe("parseAmountToMinor", () => {
   it("uses the currency scale", () => {
     expect(parseAmountToMinor("1500", "JPY")).toEqual({ ok: true, amountMinor: 1500 });
     expect(parseAmountToMinor("1.5", "JPY").ok).toBe(false);
-    expect(parseAmountToMinor("1.234", "KWD")).toEqual({ ok: true, amountMinor: 1234 });
+    expect(parseAmountToMinor("5000", "CLP")).toEqual({ ok: true, amountMinor: 5000 });
+  });
+
+  it.each(["XOF", "KWD", "IQD", "XXX", "toString"])("rejects unsupported currency %s instead of guessing its scale", (currency) => {
+    expect(parseAmountToMinor("5000", currency)).toEqual({ ok: false, error: `Currency ${currency} is not supported` });
   });
 
   it.each(["20.055", "-1", "abc", "", "1e3", "20.", ".5", "1.2.3", "1,250.00"])("rejects %j", (input) => {
@@ -48,6 +52,6 @@ describe("formatMinor", () => {
     expect(formatMinor(2050, "USD")).toBe("20.50 USD");
     expect(formatMinor(5, "USD")).toBe("0.05 USD");
     expect(formatMinor(1500, "JPY")).toBe("1500 JPY");
-    expect(formatMinor(1234, "KWD")).toBe("1.234 KWD");
+    expect(formatMinor(1234, "XOF")).toBe("1234 minor units XOF");
   });
 });
