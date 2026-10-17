@@ -98,7 +98,8 @@ Responsable de **historial CSV, recurrencias, proveedores y políticas autorizad
 
 ## 9. Colaboración y Git
 
-- Cada desarrollador trabaja en una **rama de feature separada**, desde una base compartida con contratos y migraciones acordadas.
+- **Una rama corta por funcionalidad**, creada desde `main` actualizado (`feature/a-<funcionalidad>`, `feature/b-<funcionalidad>`), integrada con un PR pequeño en pocas horas.
+- **Migraciones lineales:** como máximo una migración por PR, generada desde `main` actualizado. Si `main` recibe otra migración mientras el PR está abierto, borrar la propia, actualizar la rama y regenerarla. Nunca editar una migración ya fusionada. Cada dueño escribe las tablas de su vertical; una tabla que referencia a otra espera a que esa exista en `main`.
 - Hacer commits pequeños y funcionales; integrar mediante Pull Requests, revisando especialmente cambios a `shared/` y `db/`.
 - Evitar modificar código, migraciones o configuración del otro desarrollador sin coordinación. Nunca forzar push sobre su rama.
 - Mantener el proyecto desplegable. Ante conflicto entre alcance y tiempo, proteger el flujo principal; Slack, WhatsApp, integraciones bancarias, landing elaborada y extras son posteriores.

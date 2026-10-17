@@ -1,0 +1,77 @@
+# Plan B — Payment Autopilot
+
+> **Owner:** Desarrollador B · **Referencias:** [`PLAN.md`](../../PLAN.md) §8, §10, §13 · [`CLAUDE.md`](../../CLAUDE.md)
+> **Consume:** `InvoiceContext` (`src/shared/schemas/invoice-context.ts`) · **Produce:** `PaymentDecision` (`src/shared/schemas/payment-decision.ts`)
+
+## 1. Orden de trabajo (una rama corta por funcionalidad)
+
+- [ ] **`feature/b-db-schema`**: tablas de B en `schema.prisma` + una migración (ver §4).
+- [ ] **`feature/b-engine`**: Vitest + `decide()` puro + fixtures de casos trampa (sin BD ni IA).
+- [ ] **`feature/b-policies`**: proveedores, políticas versionadas, autorizaciones y permisos de aprobación (seed + UI mínima).
+- [ ] **`feature/b-decisions`**: `evaluateInvoice()`, `POST /api/invoices/[id]/evaluate`, decisiones persistidas, auditoría, idempotencia.
+- [ ] **`feature/b-approvals`**: bandeja, resolución con reevaluación, autorización recurrente explícita, bloqueo transaccional.
+- [ ] **`feature/b-payment-history`**: importación CSV + sugerencias de recurrencia.
+- [ ] Páginas de B: `/dashboard/policies`, `/dashboard/approvals`, `/dashboard/payment-history`, `/dashboard/audit`.
+
+## 2. Motor determinístico (sin IA)
+
+La IA solo interviene antes (vertical A) para leer documentos. El motor compara datos estructurados con reglas TypeScript.
+
+- **`decide(context, facts): PaymentDecision`** — función pura. `facts` = política vigente, autorizaciones, decisiones previas, presupuesto consumido, sugerencias de recurrencia.
+- **`evaluateInvoice(context): Promise<PaymentDecision>`** — solo servidor; carga `facts` de la BD y llama a `decide()`.
+- Se evalúan **todas** las reglas aunque alguna falle. Una regla sin dato de entrada devuelve `unknown`.
+- Resultado: algún bloqueo absoluto falla → `blocked`; cualquier otra regla `fail`/`unknown` → `requires_approval`; todas `pass` → `approved` con `AUTO_APPROVAL_RULES_PASSED`.
+
+| # | `ruleId` | Falla con | Resultado |
+|---|---|---|---|
+| 1 | `essential_fields_present` (proveedor confirmado, monto, moneda, número, cuenta) | `INSUFFICIENT_DATA` | escala |
+| 2 | `currency_supported` (solo USD en P0) | `CURRENCY_NOT_SUPPORTED` | escala |
+| 3 | `not_duplicate` | `DUPLICATE_INVOICE` | **bloquea** si confirmado; escala si sospechoso |
+| 4 | `supplier_authorized` | `SUPPLIER_NOT_AUTHORIZED` o `RECURRENCE_NOT_AUTHORIZED` (si hay recurrencia en CSV) | escala |
+| 5 | `beneficiary_matches_authorization` | `BENEFICIARY_CHANGED` | escala |
+| 6 | `within_authorization_limit` | `AMOUNT_LIMIT_EXCEEDED` | escala |
+| 7 | `within_policy_auto_limit` | `AMOUNT_LIMIT_EXCEEDED` | escala |
+| 8 | `contract_consistent` | `CONTRACT_MISMATCH` | escala |
+| 9 | `budget_available` | `BUDGET_INSUFFICIENT` | **bloquea** |
+
+## 3. Decisiones acordadas
+
+| Tema | Decisión |
+|---|---|
+| Bloqueos absolutos | Solo **duplicado confirmado** y **presupuesto insuficiente**. Todo lo demás escala; una aprobación humana nunca salta un bloqueo absoluto. |
+| Cuenta beneficiaria cambiada | Escala (puede ser un cambio legítimo de banco). La autorización existente no se transfiere a la cuenta nueva. |
+| Proveedor autorizado | Coinciden **todas** las dimensiones de una autorización activa: proveedor, cuenta beneficiaria, moneda, monto máximo, alcance (único/recurrente + frecuencia) y vigencia. Contrato o historial nunca autorizan. |
+| Contrato | No es obligatorio si hay autorización. `mismatch` o `ambiguous` escalan; `not_found`/`null` son informativos. |
+| Presupuesto | Consumido = suma de decisiones `approved` del **mes calendario UTC** (por fecha de decisión), en USD. El CSV **no** cuenta (evita doble conteo). Si no se puede calcular → escala. |
+| Duplicados | Confirmado = mismo `supplierId` + `invoiceNumber`, o mismo sha256 de archivo, con decisión previa no `blocked` → bloquea. Sospechoso (mismo proveedor, monto y fecha, otro número) o número ausente → escala. |
+| Permisos | Identidad y rol vienen de Clerk (espejo en `organization_memberships`, de A). Permisos de pago en tabla propia de B `approval_permissions`: sin fila = sin permisos; `approvalLimitMinor` obligatorio si `canApprove` (no hay aprobadores ilimitados). Solo rol `admin` edita permisos. Todo se verifica en servidor. |
+| Aprobación humana | El servidor revalida con `decide()` contra política y presupuesto vigentes y verifica el límite del aprobador. Guarda **nueva** fila con `decisionSource: human`; no edita la anterior. Autorización recurrente solo mediante casilla explícita con cuenta, monto máximo, frecuencia y vigencia. |
+| Concurrencia | Verificación de presupuesto + inserción de `approved` dentro de una transacción que bloquea la fila de política de la organización (`SELECT … FOR UPDATE`). Una factura no se aprueba dos veces (índice único parcial). |
+| CSV | Columnas `date` (YYYY-MM-DD), `description`, `amount` (texto decimal, negativo = salida), `currency`, `reference`. Parseo a unidades menores sin floats. Filas inválidas se rechazan con error por fila; repetidas se omiten. |
+| Recurrencia | ≥ 3 salidas al mismo proveedor, intervalos de 25–35 días, montos ±10 % → solo sugerencia, nunca autorización. |
+| Tests | Vitest (pendiente coordinar el script `test` con A, que hoy usa `node --test`). |
+
+## 4. Tablas de B
+
+Todas con `organization_id` → `organizations` e índices por organización.
+
+| Tabla | Propósito | Notas |
+|---|---|---|
+| `suppliers` | Catálogo (no implica autorización) | único por `(organization_id, normalized_name)` |
+| `payment_policies` | Política versionada: límite automático, presupuesto mensual | único por `(organization_id, version)` |
+| `payment_authorizations` | Autorizaciones explícitas único/recurrente | estado `active \| revoked \| consumed` |
+| `approval_permissions` | Permisos de aprobación por usuario | FK compuesta a `organization_memberships`; CHECK límite obligatorio |
+| `payment_decisions` | Cada `PaymentDecision`, solo inserción | guarda `supplier_id` + `invoice_number` + monto para duplicados y presupuesto; único parcial: un `approved` por factura |
+| `approval_requests` | Bandeja humana | único parcial: una solicitud `pending` por factura |
+| `bank_import_batches` | Lote de importación CSV | quién y cuándo importó |
+| `bank_transactions` | Movimientos ficticios del CSV | único por `(organization_id, fingerprint)` |
+| `audit_events` | Rastro append-only | actor nullable = sistema |
+
+## 5. Bloqueos y coordinación con A
+
+- `invoice_id` en `payment_decisions` / `approval_requests` es texto sin FK hasta que A cree `invoices`; agregar la FK en una migración coordinada.
+- Script `test`: migrar a Vitest de común acuerdo.
+
+## 6. Registro
+
+- 2026-10-17: plan acordado en sesión de diseño. Orden elegido: tablas primero, luego motor.
