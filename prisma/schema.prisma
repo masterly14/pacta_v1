@@ -36,6 +36,9 @@ model Organization {
   bankTransactions      BankTransaction[]
   auditEvents           AuditEvent[]
 
+  // Vertical A
+  contracts Contract[]
+
   @@map("organizations")
 }
 
@@ -131,6 +134,7 @@ model Supplier {
   authorizations   PaymentAuthorization[]
   decisions        PaymentDecision[]
   bankTransactions BankTransaction[]
+  contracts        Contract[]
 
   @@unique([organizationId, normalizedName])
   @@map("suppliers")
@@ -319,4 +323,51 @@ model AuditEvent {
   @@index([organizationId, createdAt])
   @@index([organizationId, entityType, entityId])
   @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// Vertical A — Contratos (docs/plans/developer-a-invoices.md)
+// Registrados a mano en P0. Un contrato es evidencia para comparar facturas;
+// NUNCA autoriza un pago (eso solo lo hace PaymentAuthorization).
+// ---------------------------------------------------------------------------
+
+enum ContractStatus {
+  active
+  terminated
+}
+
+enum ContractFrequency {
+  one_time
+  weekly
+  monthly
+  quarterly
+  yearly
+}
+
+/// Condiciones acordadas con un proveedor. Se termina, no se borra.
+/// @db-guarantee CHECK contracts_terms_check: monto acordado > 0, moneda ^[A-Z]{3}$,
+///   validTo null o >= validFrom; terminated <=> terminatedAt y terminatedBy no null.
+model Contract {
+  id                    String            @id @default(cuid())
+  organizationId        String            @map("organization_id")
+  supplierId            String            @map("supplier_id")
+  status                ContractStatus    @default(active)
+  agreedAmountMinor     Int               @map("agreed_amount_minor")
+  currency              String            @db.Char(3)
+  frequency             ContractFrequency
+  validFrom             DateTime          @map("valid_from") @db.Date
+  validTo               DateTime?         @map("valid_to") @db.Date // null = sin fecha de fin
+  beneficiaryAccountRef String?           @map("beneficiary_account_ref") // referencia enmascarada
+  description           String?
+  createdBy             String            @map("created_by")
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  terminatedAt          DateTime?         @map("terminated_at") @db.Timestamptz(6)
+  terminatedBy          String?           @map("terminated_by")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+
+  @@index([organizationId, supplierId, status])
+  @@index([organizationId, createdAt])
+  @@map("contracts")
 }
