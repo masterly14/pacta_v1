@@ -15,6 +15,7 @@ export default defineConfig({
       "node_modules/**",
       "src/shared/auth/membership-role.test.ts",
       "src/shared/schemas/gmail-contracts.test.ts",
+      "src/shared/schemas/notification-contracts.test.ts",
       "src/features/invoices/gmail/gmail-backend.test.ts",
       "src/lib/r2.test.ts",
       "src/features/payment-history/**/*.test.ts",
