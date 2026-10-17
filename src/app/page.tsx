@@ -1,5 +1,32 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { connection } from "next/server";
 import { buttonVariants } from "@/components/ui/button";
+
+async function HomeActions() {
+  await connection();
+  const { userId } = await auth();
+
+  if (userId) {
+    return (
+      <Link href="/platform/invoices" className={buttonVariants()}>
+        Abrir plataforma
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex gap-3">
+      <Link href="/sign-in" className={buttonVariants()}>
+        Iniciar sesión
+      </Link>
+      <Link href="/sign-up" className={buttonVariants({ variant: "outline" })}>
+        Crear cuenta
+      </Link>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
@@ -10,14 +37,9 @@ export default function Home() {
         persona según las reglas de la empresa. Proyecto de hackathon, no mueve
         dinero real.
       </p>
-      <div className="flex gap-3">
-        <Link href="/sign-in" className={buttonVariants()}>
-          Iniciar sesión
-        </Link>
-        <Link href="/sign-up" className={buttonVariants({ variant: "outline" })}>
-          Crear cuenta
-        </Link>
-      </div>
+      <Suspense fallback={<div className="h-8" aria-hidden />}>
+        <HomeActions />
+      </Suspense>
     </main>
   );
 }
