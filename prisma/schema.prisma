@@ -39,6 +39,9 @@ model Organization {
   bankTransactions      BankTransaction[]
   auditEvents           AuditEvent[]
 
+  // Vertical A
+  contracts Contract[]
+
   @@map("organizations")
 }
 
@@ -135,6 +138,7 @@ model Supplier {
   authorizations   PaymentAuthorization[]
   decisions        PaymentDecision[]
   bankTransactions BankTransaction[]
+  contracts        Contract[]
 
   @@unique([organizationId, normalizedName])
   @@map("suppliers")
@@ -343,20 +347,20 @@ enum GmailInboundProcessingStatus {
 
 /// Buzón Gmail de la organización. Tokens en Composio; aquí solo ids y estado.
 model GmailConnection {
-  id                         String                 @id
-  organizationId             String                 @map("organization_id")
-  connectedByUserId          String                 @map("connected_by_user_id")
-  composioUserId             String                 @map("composio_user_id")
-  composioConnectedAccountId String                 @unique @map("composio_connected_account_id")
-  composioAuthConfigId       String                 @map("composio_auth_config_id")
-  composioTriggerId          String?                @unique @map("composio_trigger_id")
-  emailAddress               String?                @unique @map("email_address")
+  id                         String                @id
+  organizationId             String                @map("organization_id")
+  connectedByUserId          String                @map("connected_by_user_id")
+  composioUserId             String                @map("composio_user_id")
+  composioConnectedAccountId String                @unique @map("composio_connected_account_id")
+  composioAuthConfigId       String                @map("composio_auth_config_id")
+  composioTriggerId          String?               @unique @map("composio_trigger_id")
+  emailAddress               String?               @unique @map("email_address")
   alias                      String?
   status                     GmailConnectionStatus
-  connectedAt                DateTime?              @map("connected_at") @db.Timestamptz(6)
-  revokedAt                  DateTime?              @map("revoked_at") @db.Timestamptz(6)
-  createdAt                  DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                  DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  connectedAt                DateTime?             @map("connected_at") @db.Timestamptz(6)
+  revokedAt                  DateTime?             @map("revoked_at") @db.Timestamptz(6)
+  createdAt                  DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   connectedBy  User                  @relation(fields: [connectedByUserId], references: [id], onDelete: Restrict)
@@ -368,19 +372,19 @@ model GmailConnection {
 
 /// Ingesta de un correo. Unicidad por buzón + message id de Gmail.
 model GmailInboundMessage {
-  id                 String                        @id
-  organizationId     String                        @map("organization_id")
-  gmailConnectionId  String                        @map("gmail_connection_id")
-  composioEventId    String                        @unique @map("composio_event_id")
-  gmailMessageId     String                        @map("gmail_message_id")
-  gmailThreadId      String?                       @map("gmail_thread_id")
-  sender             String?
-  subject            String?
-  receivedAt         DateTime                      @map("received_at") @db.Timestamptz(6)
-  processingStatus   GmailInboundProcessingStatus  @map("processing_status")
-  invoiceId          String?                       @map("invoice_id")
-  createdAt          DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String                       @id
+  organizationId    String                       @map("organization_id")
+  gmailConnectionId String                       @map("gmail_connection_id")
+  composioEventId   String                       @unique @map("composio_event_id")
+  gmailMessageId    String                       @map("gmail_message_id")
+  gmailThreadId     String?                      @map("gmail_thread_id")
+  sender            String?
+  subject           String?
+  receivedAt        DateTime                     @map("received_at") @db.Timestamptz(6)
+  processingStatus  GmailInboundProcessingStatus @map("processing_status")
+  invoiceId         String?                      @map("invoice_id")
+  createdAt         DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   connection   GmailConnection @relation(fields: [gmailConnectionId], references: [id], onDelete: Restrict)
@@ -417,4 +421,51 @@ model Document {
   @@index([organizationId])
   @@index([gmailInboundMessageId])
   @@map("documents")
+}
+
+// ---------------------------------------------------------------------------
+// Vertical A — Contratos (docs/plans/developer-a-invoices.md)
+// Registrados a mano en P0. Un contrato es evidencia para comparar facturas;
+// NUNCA autoriza un pago (eso solo lo hace PaymentAuthorization).
+// ---------------------------------------------------------------------------
+
+enum ContractStatus {
+  active
+  terminated
+}
+
+enum ContractFrequency {
+  one_time
+  weekly
+  monthly
+  quarterly
+  yearly
+}
+
+/// Condiciones acordadas con un proveedor. Se termina, no se borra.
+/// @db-guarantee CHECK contracts_terms_check: monto acordado > 0, moneda ^[A-Z]{3}$,
+///   validTo null o >= validFrom; terminated <=> terminatedAt y terminatedBy no null.
+model Contract {
+  id                    String            @id @default(cuid())
+  organizationId        String            @map("organization_id")
+  supplierId            String            @map("supplier_id")
+  status                ContractStatus    @default(active)
+  agreedAmountMinor     Int               @map("agreed_amount_minor")
+  currency              String            @db.Char(3)
+  frequency             ContractFrequency
+  validFrom             DateTime          @map("valid_from") @db.Date
+  validTo               DateTime?         @map("valid_to") @db.Date // null = sin fecha de fin
+  beneficiaryAccountRef String?           @map("beneficiary_account_ref") // referencia enmascarada
+  description           String?
+  createdBy             String            @map("created_by")
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  terminatedAt          DateTime?         @map("terminated_at") @db.Timestamptz(6)
+  terminatedBy          String?           @map("terminated_by")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+
+  @@index([organizationId, supplierId, status])
+  @@index([organizationId, createdAt])
+  @@map("contracts")
 }
