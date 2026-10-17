@@ -1,0 +1,12 @@
+// Esquema de Prisma. Sin modelos todavía (se definen en una tarea posterior).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}

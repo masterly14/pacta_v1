@@ -1,0 +1,10 @@
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+onlyBuiltDependencies:
+  - "@prisma/client"
+  - "@swc/core"
+  - cbor-extract
+  - esbuild
+  - prisma
+  - "@prisma/engines"
