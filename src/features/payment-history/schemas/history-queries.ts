@@ -5,7 +5,7 @@ import {
   CurrencyCodeSchema,
   EntityIdSchema,
   TagsSchema,
-} from "./primitives.ts";
+} from "./primitives";
 
 // Contrato entre el historial y el motor determinístico de B. Fail-closed: lo que no se puede
 // afirmar es `unknown` con razón; nunca se expresa como 0 ni como "sin gasto".
@@ -88,19 +88,30 @@ export const RecurrenceCadenceSchema = z.enum(["weekly", "monthly", "quarterly",
 
 export const RecurrenceSuggestionSchema = z
   .strictObject({
+    // `supplier`: movimientos ya vinculados a un proveedor. `unlinked_counterparty`: aún sin proveedor,
+    // agrupados por clave de contraparte (candidato a crear/vincular proveedor).
+    groupKind: z.enum(["supplier", "unlinked_counterparty"]),
     counterpartyNormalized: z.string().min(1),
     supplierId: EntityIdSchema.nullable(),
     cadence: RecurrenceCadenceSchema,
-    typicalAmountMinor: AmountMinorSchema,
+    typicalAmountMinor: AmountMinorSchema, // mediana en valor absoluto
     currency: CurrencyCodeSchema,
     occurrences: z.int().min(2),
     transactionIds: z.array(EntityIdSchema).min(2),
+    firstPostedOn: CalendarDateSchema,
+    lastPostedOn: CalendarDateSchema,
     // Marca de tipo: historial ≠ autorización. Una autorización solo nace de una acción humana explícita.
     isSuggestionOnly: z.literal(true),
   })
   .superRefine((suggestion, ctx) => {
     if (suggestion.transactionIds.length !== suggestion.occurrences) {
       ctx.addIssue({ code: "custom", path: ["transactionIds"], message: "transactionIds debe tener exactamente 'occurrences' elementos" });
+    }
+    if (suggestion.firstPostedOn > suggestion.lastPostedOn) {
+      ctx.addIssue({ code: "custom", path: ["firstPostedOn"], message: "firstPostedOn no puede ser posterior a lastPostedOn" });
+    }
+    if ((suggestion.groupKind === "supplier") !== (suggestion.supplierId !== null)) {
+      ctx.addIssue({ code: "custom", path: ["supplierId"], message: "supplierId es obligatorio con groupKind 'supplier' y null con 'unlinked_counterparty'" });
     }
   });
 export type RecurrenceSuggestion = z.infer<typeof RecurrenceSuggestionSchema>;

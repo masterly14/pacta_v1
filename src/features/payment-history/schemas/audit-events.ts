@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { ColumnMappingSchema } from "./column-mapping.ts";
-import { BatchSummarySchema } from "./import-batch.ts";
-import { ContextNoteSchema, EntityIdSchema, Sha256Schema, TagsSchema } from "./primitives.ts";
+import { ColumnMappingSchema } from "./column-mapping";
+import { BatchSummarySchema } from "./import-batch";
+import { ContextNoteSchema, EntityIdSchema, Sha256Schema, TagsSchema } from "./primitives";
 
 // Payloads de `audit_events.payload_json` del historial bancario. El actor y el instante viven en
 // columnas de la tabla (actor_id, created_at); el payload solo describe qué cambió. Append-only.

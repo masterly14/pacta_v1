@@ -5,7 +5,7 @@ import {
   CurrencyCodeSchema,
   DirectionSchema,
   RowNumberSchema,
-} from "./primitives.ts";
+} from "./primitives";
 
 // Límites del import (PLAN: el body de una función de Vercel es de 4,5 MB).
 export const MAX_FILE_BYTES = 4 * 1024 * 1024;

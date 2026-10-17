@@ -1,23 +1,22 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "vitest";
 import {
   ColumnMappingSchema,
   DetectedHeadersSchema,
   mappingHeaders,
   validateMappingAgainstHeaders,
-} from "./column-mapping.ts";
+} from "./column-mapping";
 import {
   detectedHeadersFixture,
   mappingAmountAndDirectionFixture,
   mappingSignedFixture,
   mappingSplitColumnsFixture,
   splitHeadersFixture,
-} from "./fixtures.ts";
+} from "./fixtures";
 
 describe("ColumnMappingSchema", () => {
   it("acepta los tres layouts de importe", () => {
     for (const fixture of [mappingAmountAndDirectionFixture, mappingSignedFixture, mappingSplitColumnsFixture]) {
-      assert.equal(ColumnMappingSchema.safeParse(fixture).success, true);
+      expect(ColumnMappingSchema.safeParse(fixture).success).toBe(true);
     }
   });
 
@@ -26,7 +25,7 @@ describe("ColumnMappingSchema", () => {
       ...mappingAmountAndDirectionFixture,
       amount: { layout: "amount_and_direction", amountHeader: "Importe", directionHeader: "Importe" },
     });
-    assert.equal(result.success, false);
+    expect(result.success).toBe(false);
   });
 
   it("rechaza débito y crédito en la misma columna", () => {
@@ -34,52 +33,40 @@ describe("ColumnMappingSchema", () => {
       ...mappingSplitColumnsFixture,
       amount: { layout: "debit_credit_columns", debitHeader: "Debit", creditHeader: "Debit" },
     });
-    assert.equal(result.success, false);
+    expect(result.success).toBe(false);
   });
 
   it("rechaza una descripción asignada a la columna de la fecha", () => {
     const result = ColumnMappingSchema.safeParse({ ...mappingSignedFixture, description: { header: "Fecha" } });
-    assert.equal(result.success, false);
+    expect(result.success).toBe(false);
   });
 
   it("exige formato de fecha explícito (nunca se adivina)", () => {
-    assert.equal(
-      ColumnMappingSchema.safeParse({ ...mappingSignedFixture, date: { header: "Fecha" } }).success,
-      false,
-    );
-    assert.equal(
-      ColumnMappingSchema.safeParse({ ...mappingSignedFixture, date: { header: "Fecha", format: "auto" } }).success,
-      false,
-    );
+    expect(ColumnMappingSchema.safeParse({ ...mappingSignedFixture, date: { header: "Fecha" } }).success).toBe(false);
+    expect(ColumnMappingSchema.safeParse({ ...mappingSignedFixture, date: { header: "Fecha", format: "auto" } }).success).toBe(false);
   });
 
   it("exige separador decimal explícito", () => {
     const withoutSeparator: Record<string, unknown> = { ...mappingSignedFixture };
     delete withoutSeparator.decimalSeparator;
-    assert.equal(ColumnMappingSchema.safeParse(withoutSeparator).success, false);
+    expect(ColumnMappingSchema.safeParse(withoutSeparator).success).toBe(false);
   });
 
   it("rechaza moneda fija en minúsculas o con layout mezclado", () => {
-    assert.equal(
-      ColumnMappingSchema.safeParse({ ...mappingSignedFixture, currency: { source: "fixed", code: "usd" } }).success,
-      false,
-    );
-    assert.equal(
-      ColumnMappingSchema.safeParse({
+    expect(ColumnMappingSchema.safeParse({ ...mappingSignedFixture, currency: { source: "fixed", code: "usd" } }).success).toBe(false);
+    expect(ColumnMappingSchema.safeParse({
         ...mappingSignedFixture,
         amount: { layout: "signed_amount", amountHeader: "Importe", debitHeader: "Debit" },
-      }).success,
-      false,
-    );
+      }).success).toBe(false);
   });
 
   it("rechaza campos extra (strict)", () => {
-    assert.equal(ColumnMappingSchema.safeParse({ ...mappingSignedFixture, autoApply: true }).success, false);
+    expect(ColumnMappingSchema.safeParse({ ...mappingSignedFixture, autoApply: true }).success).toBe(false);
   });
 
   it("lista las cabeceras referenciadas", () => {
     const mapping = ColumnMappingSchema.parse(mappingAmountAndDirectionFixture);
-    assert.deepEqual(mappingHeaders(mapping), [
+    expect(mappingHeaders(mapping)).toEqual([
       "Fecha",
       "Importe",
       "Tipo",
@@ -96,32 +83,32 @@ describe("validateMappingAgainstHeaders", () => {
 
   it("ok cuando todas las cabeceras existen", () => {
     const mapping = ColumnMappingSchema.parse(mappingAmountAndDirectionFixture);
-    assert.deepEqual(validateMappingAgainstHeaders(mapping, detected), { ok: true });
+    expect(validateMappingAgainstHeaders(mapping, detected)).toEqual({ ok: true });
   });
 
   it("informa las cabeceras inexistentes", () => {
     const mapping = ColumnMappingSchema.parse(mappingSplitColumnsFixture);
     const check = validateMappingAgainstHeaders(mapping, detected);
-    assert.equal(check.ok, false);
-    if (!check.ok) assert.ok(check.missingHeaders.includes("Debit"));
+    expect(check.ok).toBe(false);
+    if (!check.ok) expect(check.missingHeaders.includes("Debit")).toBeTruthy();
   });
 
   it("el mapeo split valida contra sus propias cabeceras", () => {
     const mapping = ColumnMappingSchema.parse(mappingSplitColumnsFixture);
     const check = validateMappingAgainstHeaders(mapping, DetectedHeadersSchema.parse(splitHeadersFixture));
-    assert.deepEqual(check, { ok: true });
+    expect(check).toEqual({ ok: true });
   });
 });
 
 describe("DetectedHeadersSchema", () => {
   it("rechaza cabeceras duplicadas aunque cambien mayúsculas o tildes", () => {
-    assert.equal(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: ["Fecha", "fecha"] }).success, false);
-    assert.equal(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: ["Descripción", "Descripcion"] }).success, false);
+    expect(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: ["Fecha", "fecha"] }).success).toBe(false);
+    expect(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: ["Descripción", "Descripcion"] }).success).toBe(false);
   });
 
   it("rechaza lista vacía y más de 200 cabeceras", () => {
-    assert.equal(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: [] }).success, false);
+    expect(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: [] }).success).toBe(false);
     const many = Array.from({ length: 201 }, (_, i) => `col${i}`);
-    assert.equal(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: many }).success, false);
+    expect(DetectedHeadersSchema.safeParse({ schemaVersion: 1, headers: many }).success).toBe(false);
   });
 });

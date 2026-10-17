@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ColumnMappingSchema, DetectedHeadersSchema, validateMappingAgainstHeaders } from "./column-mapping.ts";
-import { MAX_FILE_BYTES } from "./csv-fields.ts";
+import { ColumnMappingSchema, DetectedHeadersSchema, validateMappingAgainstHeaders } from "./column-mapping";
+import { MAX_FILE_BYTES } from "./csv-fields";
 import {
   CalendarDateSchema,
   ContextNoteSchema,
@@ -8,7 +8,7 @@ import {
   Sha256Schema,
   TagsSchema,
   UtcInstantSchema,
-} from "./primitives.ts";
+} from "./primitives";
 
 // ---------------------------------------------------------------------------
 // Estados y transiciones

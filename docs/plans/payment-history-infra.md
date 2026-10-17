@@ -9,7 +9,7 @@
 - Prisma hoy solo tiene `Organization`, `User` y `OrganizationMembership`. No existen `bank_transactions`, `suppliers` ni `payment_policies`; `PLAN.md` §7 es una propuesta pendiente de aprobar. Toda tabla nueva requiere **migración coordinada** con A.
 - `docs/plans/developer-*.md` no existen todavía.
 - No hay dependencia de parser CSV. **Corrección:** `@vercel/blob` sí está instalado y A tiene `BlobStorePort` / `createVercelBlobStore` en `src/features/invoices/gmail/` (se puede importar, no editar). La tabla `Document` está atada a `gmailInboundMessageId`, así que el lote guarda su propio `file_ref`.
-- **Corrección:** el runner real es `node --experimental-strip-types --test` (`node:test`), no Vitest; `package.json` lista los archivos de prueba y `tsconfig.json` excluye `*.test.ts`.
+- **Corrección (actualizada con `main`):** `main` ya usa Vitest (`npm test` = `vitest run` + `node:test` solo para `membership-role`); los imports internos son sin extensión y con alias `@/`. El código de `payment-history` sigue esa convención.
 - `AmountMinorSchema` es **no negativo**: los movimientos necesitan una columna `direction` (débito/crédito) y no un importe con signo.
 - Esta rama es `feature/invoices` (vertical A). La implementación pertenece a B y debe hacerse en su rama.
 
@@ -317,3 +317,31 @@ model BankImportRejection {
 ```
 
 `audit_events` aún no existe en Prisma; cuando se cree, `payload_json` se valida con `BankImportAuditPayloadSchema`. Aplicar solo tras aprobación de ambos y sobre una rama sin los cambios sueltos de A.
+
+## 14. Fase 2: recurrencias y asociación con proveedores (implementado)
+
+**Base:** `main` ya trae la BD acordada (`bank_transactions` con importe con signo `Int`, `description`, sin etiquetas ni estados de lote) y el normalizador `normalizeSupplierName` de `policies`. Por eso:
+
+- Los contratos de movimiento se **alinearon a la BD** (`BankTransactionSchema`: `importBatchId`, `amountMinor` con signo, `description`, `supplierId`; `SignedAmountMinorSchema` en rango Int32). Etiquetas, estados de lote, mapeo de columnas y `direction` quedan como diseño de la **fase de importación**, que traerá su propia migración. El borrador Prisma de §13 queda **reemplazado** por el esquema de `main`.
+- **Presupuesto:** el plan B excluye el CSV del consumo de presupuesto (solo cuentan decisiones `approved`). Lo que dice §6 sobre contar CSV y reservas queda **obsoleto**.
+
+| Pieza | Archivo | Qué hace |
+|---|---|---|
+| Umbrales | `config.ts` | recurrencia: ≥ 3 salidas, ±10 %, bandas semanal 6–8 / mensual 25–35 / trimestral 85–95 / anual 355–375 días; asociación: similitud ≥ 0,8, auto-crear con ≥ 2 apariciones |
+| Clave de contraparte | `suppliers/counterparty-key.ts` | descripción bancaria → clave estable (sin ruido, números, fechas ni sufijos legales); `null` = sin contraparte identificable |
+| Planificador | `suppliers/supplier-matching.ts` | puro: exacto → vincula; parecido → sugiere; varios candidatos → `ambiguous`; sin candidato → `create_new` con `autoCreateEligible` |
+| Servicio | `suppliers/association-service.ts` | `associateTransactions` (exactos + `autoCreate` opcional) y `confirmSuggestion` (acción humana), sobre un puerto; auditoría en `audit_events` |
+| Adaptador Prisma | `suppliers/prisma-store.ts` | `createMany + skipDuplicates`, `updateMany WHERE supplier_id IS NULL`, todo por `organizationId` |
+| Recurrencias | `recurrence/detect-recurrence.ts`, `recurrence-service.ts` | puro + lectura acotada; `hasRecurrenceSuggestion` alimenta `EngineFacts.recurrenceSuggested` |
+
+**Decisiones de comportamiento**
+
+- Un proveedor del catálogo se compara por la **clave de su nombre** (no por `normalizedName`), porque "Hosting Demo Inc" tiene `normalizedName` con "inc" y la clave del banco no. Dos proveedores con la misma clave ⇒ sugerencia ambigua, nunca vínculo.
+- Los proveedores creados desde el banco usan `normalizeSupplierName(name)` para `normalizedName` y llevan `beneficiaryAccountRef = null`. **Existir en el catálogo no autoriza**: el motor sigue exigiendo cuenta beneficiaria y autorización explícita.
+- `autoCreate` (por defecto `false`) y `confirmSuggestion` exigen `canManagePolicies` (`checkCanManagePolicies`); un proceso sin persona solo vincula exactos.
+- Sin marca de origen en `suppliers` (no hay migración): cada creación/vinculación deja `supplier.auto_created`, `supplier.created_from_bank` o `bank_transactions.linked` en `audit_events`, con `requestedBy` cuando la creación es automática.
+- Fail-closed: si hay demasiados movimientos (> 20 000) el servicio no escribe ni afirma nada.
+
+**Verificado:** `vitest run` (todo el repo: 220 pasan, 10 omitidos preexistentes), `tsc --noEmit`, typecheck de tests, `eslint src/features/payment-history` y `npm run build`. **No verificado:** el adaptador Prisma contra una base real (no hay BD de prueba); se cubre por tipos y por los tests de los servicios con fakes.
+
+**Pendiente:** importador (parser, mapeo de columnas, fingerprint, etiquetas) y su migración; rutas HTTP y UI de sugerencias; conectar `hasRecurrenceSuggestion` al loader de `evaluateInvoice`; relinkear movimientos ya vinculados (acción humana auditada).

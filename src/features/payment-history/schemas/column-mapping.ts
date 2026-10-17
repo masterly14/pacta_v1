@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { CurrencyCodeSchema } from "./primitives.ts";
-import { CanonicalFieldSchema } from "./csv-fields.ts";
+import { CurrencyCodeSchema } from "./primitives";
+import { CanonicalFieldSchema } from "./csv-fields";
 
 // Mapeo de columnas confirmado por una persona cuando las cabeceras del archivo no coinciden
 // con el formato recomendado (payment-history-infra.md §3.2). Ninguna sugerencia se aplica sola.

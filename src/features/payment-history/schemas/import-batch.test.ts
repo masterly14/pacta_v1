@@ -1,13 +1,12 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { BankTransactionSchema } from "./bank-transaction.ts";
+import { describe, expect, it } from "vitest";
+import { BankTransactionSchema, isOutflow } from "./bank-transaction";
 import {
   BATCH_TRANSITIONS,
   BatchStatusSchema,
   BatchSummarySchema,
   canTransition,
   ImportBatchSchema,
-} from "./import-batch.ts";
+} from "./import-batch";
 import {
   batchCommittedFixture,
   batchNeedsMappingFixture,
@@ -16,63 +15,57 @@ import {
   mappingSplitColumnsFixture,
   summaryFixture,
   transactionFixture,
-} from "./fixtures.ts";
+} from "./fixtures";
 
 describe("transiciones de estado del lote", () => {
   it("permite el flujo normal", () => {
-    assert.equal(canTransition("needs_mapping", "staged"), true);
-    assert.equal(canTransition("staged", "committed"), true);
-    assert.equal(canTransition("committed", "voided"), true);
+    expect(canTransition("needs_mapping", "staged")).toBe(true);
+    expect(canTransition("staged", "committed")).toBe(true);
+    expect(canTransition("committed", "voided")).toBe(true);
   });
 
   it("un lote committed no se remapea ni vuelve a staged: se anula", () => {
-    assert.equal(canTransition("committed", "staged"), false);
-    assert.equal(canTransition("committed", "needs_mapping"), false);
-    assert.equal(canTransition("committed", "failed"), false);
+    expect(canTransition("committed", "staged")).toBe(false);
+    expect(canTransition("committed", "needs_mapping")).toBe(false);
+    expect(canTransition("committed", "failed")).toBe(false);
   });
 
   it("voided es terminal", () => {
     for (const status of BatchStatusSchema.options) {
-      assert.equal(canTransition("voided", status), false);
+      expect(canTransition("voided", status)).toBe(false);
     }
-    assert.deepEqual(BATCH_TRANSITIONS.voided, []);
+    expect(BATCH_TRANSITIONS.voided).toEqual([]);
   });
 
   it("no se confirma un lote sin pasar por staged", () => {
-    assert.equal(canTransition("needs_mapping", "committed"), false);
-    assert.equal(canTransition("failed", "committed"), false);
+    expect(canTransition("needs_mapping", "committed")).toBe(false);
+    expect(canTransition("failed", "committed")).toBe(false);
   });
 });
 
 describe("BatchSummarySchema", () => {
   it("acepta un resumen consistente", () => {
-    assert.equal(BatchSummarySchema.safeParse(summaryFixture).success, true);
+    expect(BatchSummarySchema.safeParse(summaryFixture).success).toBe(true);
   });
 
   it("rechaza si aceptadas + rechazadas + duplicadas no igualan el total", () => {
-    assert.equal(BatchSummarySchema.safeParse({ ...summaryFixture, rowsTotal: 11 }).success, false);
+    expect(BatchSummarySchema.safeParse({ ...summaryFixture, rowsTotal: 11 }).success).toBe(false);
   });
 
   it("rechaza periodFrom posterior a periodTo o solo uno de los dos", () => {
-    assert.equal(
-      BatchSummarySchema.safeParse({ ...summaryFixture, periodFrom: "2026-05-01", periodTo: "2026-01-01" }).success,
-      false,
-    );
-    assert.equal(BatchSummarySchema.safeParse({ ...summaryFixture, periodTo: null }).success, false);
+    expect(BatchSummarySchema.safeParse({ ...summaryFixture, periodFrom: "2026-05-01", periodTo: "2026-01-01" }).success).toBe(false);
+    expect(BatchSummarySchema.safeParse({ ...summaryFixture, periodTo: null }).success).toBe(false);
   });
 
   it("acepta lote sin filas válidas con periodo null", () => {
-    assert.equal(
-      BatchSummarySchema.safeParse({
+    expect(BatchSummarySchema.safeParse({
         rowsTotal: 2,
         rowsAccepted: 0,
         rowsRejected: 2,
         rowsDuplicate: 0,
         periodFrom: null,
         periodTo: null,
-      }).success,
-      true,
-    );
+      }).success).toBe(true);
   });
 });
 
@@ -86,93 +79,87 @@ describe("ImportBatchSchema", () => {
       batchNeedsMappingFixture({ status: "failed" }),
     ]) {
       const result = ImportBatchSchema.safeParse(fixture);
-      assert.equal(result.success, true, JSON.stringify(result.error?.issues));
+      expect(result.success).toBe(true);
     }
   });
 
   it("un lote committed sin mapeo o sin resumen se rechaza", () => {
-    assert.equal(
-      ImportBatchSchema.safeParse(
+    expect(ImportBatchSchema.safeParse(
         batchCommittedFixture({ columnMapping: null, mappingConfirmedBy: null, mappingConfirmedAt: null }),
-      ).success,
-      false,
-    );
-    assert.equal(ImportBatchSchema.safeParse(batchCommittedFixture({ summary: null })).success, false);
+      ).success).toBe(false);
+    expect(ImportBatchSchema.safeParse(batchCommittedFixture({ summary: null })).success).toBe(false);
   });
 
   it("un lote committed sin actor de confirmación se rechaza", () => {
-    assert.equal(ImportBatchSchema.safeParse(batchCommittedFixture({ committedBy: null })).success, false);
+    expect(ImportBatchSchema.safeParse(batchCommittedFixture({ committedBy: null })).success).toBe(false);
   });
 
   it("un lote staged no puede venir ya confirmado", () => {
-    assert.equal(
-      ImportBatchSchema.safeParse(batchStagedFixture({ committedAt: "2026-04-01T10:10:00Z", committedBy: "user_admin" })).success,
-      false,
-    );
+    expect(ImportBatchSchema.safeParse(batchStagedFixture({ committedAt: "2026-04-01T10:10:00Z", committedBy: "user_admin" })).success).toBe(false);
   });
 
   it("un lote voided requiere actor, instante y motivo; los demás no los llevan", () => {
-    assert.equal(ImportBatchSchema.safeParse(batchVoidedFixture({ voidReason: null })).success, false);
-    assert.equal(ImportBatchSchema.safeParse(batchVoidedFixture({ voidedBy: null })).success, false);
-    assert.equal(ImportBatchSchema.safeParse(batchCommittedFixture({ voidReason: "no debería" })).success, false);
-    assert.equal(ImportBatchSchema.safeParse(batchVoidedFixture({ voidReason: "x" })).success, false);
+    expect(ImportBatchSchema.safeParse(batchVoidedFixture({ voidReason: null })).success).toBe(false);
+    expect(ImportBatchSchema.safeParse(batchVoidedFixture({ voidedBy: null })).success).toBe(false);
+    expect(ImportBatchSchema.safeParse(batchCommittedFixture({ voidReason: "no debería" })).success).toBe(false);
+    expect(ImportBatchSchema.safeParse(batchVoidedFixture({ voidReason: "x" })).success).toBe(false);
   });
 
   it("un lote needs_mapping no puede traer mapeo ni resumen", () => {
-    assert.equal(
-      ImportBatchSchema.safeParse(
+    expect(ImportBatchSchema.safeParse(
         batchNeedsMappingFixture({ columnMapping: batchStagedFixture().columnMapping }),
-      ).success,
-      false,
-    );
+      ).success).toBe(false);
   });
 
   it("el mapeo debe referenciar cabeceras que existen en el archivo", () => {
     const result = ImportBatchSchema.safeParse(
       batchStagedFixture({ columnMapping: mappingSplitColumnsFixture }),
     );
-    assert.equal(result.success, false);
+    expect(result.success).toBe(false);
   });
 
   it("el mapeo y su confirmación van juntos", () => {
-    assert.equal(ImportBatchSchema.safeParse(batchStagedFixture({ mappingConfirmedBy: null })).success, false);
+    expect(ImportBatchSchema.safeParse(batchStagedFixture({ mappingConfirmedBy: null })).success).toBe(false);
   });
 
   it("las etiquetas del lote se normalizan y respetan el máximo", () => {
     const parsed = ImportBatchSchema.parse(batchStagedFixture({ tags: ["RRHH", " rrhh "] }));
-    assert.deepEqual(parsed.tags, ["rrhh"]);
+    expect(parsed.tags).toEqual(["rrhh"]);
     const eleven = Array.from({ length: 11 }, (_, i) => `t${i}`);
-    assert.equal(ImportBatchSchema.safeParse(batchStagedFixture({ tags: eleven })).success, false);
+    expect(ImportBatchSchema.safeParse(batchStagedFixture({ tags: eleven })).success).toBe(false);
   });
 
   it("rechaza archivos de más de 4 MB, sha256 inválido y campos extra", () => {
-    assert.equal(ImportBatchSchema.safeParse(batchStagedFixture({ fileSize: 4 * 1024 * 1024 + 1 })).success, false);
-    assert.equal(ImportBatchSchema.safeParse(batchStagedFixture({ fileSha256: "xyz" })).success, false);
-    assert.equal(ImportBatchSchema.safeParse(batchStagedFixture({ approved: true })).success, false);
+    expect(ImportBatchSchema.safeParse(batchStagedFixture({ fileSize: 4 * 1024 * 1024 + 1 })).success).toBe(false);
+    expect(ImportBatchSchema.safeParse(batchStagedFixture({ fileSha256: "xyz" })).success).toBe(false);
+    expect(ImportBatchSchema.safeParse(batchStagedFixture({ approved: true })).success).toBe(false);
   });
 });
 
 describe("BankTransactionSchema", () => {
-  it("acepta un movimiento sin vínculo a proveedor", () => {
-    assert.equal(BankTransactionSchema.safeParse(transactionFixture()).success, true);
+  it("acepta una salida sin proveedor y una vinculada", () => {
+    expect(BankTransactionSchema.safeParse(transactionFixture()).success).toBe(true);
+    expect(BankTransactionSchema.safeParse(transactionFixture({ supplierId: "sup_1" })).success).toBe(true);
   });
 
-  it("supplierId y supplierLinkStatus deben ser coherentes", () => {
-    assert.equal(BankTransactionSchema.safeParse(transactionFixture({ supplierId: "sup_1" })).success, false);
-    assert.equal(BankTransactionSchema.safeParse(transactionFixture({ supplierLinkStatus: "suggested" })).success, false);
-    assert.equal(
-      BankTransactionSchema.safeParse(transactionFixture({ supplierId: "sup_1", supplierLinkStatus: "suggested" })).success,
-      true,
-    );
+  it("el importe lleva signo: salida negativa, entrada positiva, nunca 0", () => {
+    expect(BankTransactionSchema.safeParse(transactionFixture({ amountMinor: 5000 })).success).toBe(true);
+    expect(BankTransactionSchema.safeParse(transactionFixture({ amountMinor: 0 })).success).toBe(false);
   });
 
-  it("rechaza importe flotante o negativo y fingerprint inválido", () => {
-    assert.equal(BankTransactionSchema.safeParse(transactionFixture({ amountMinor: 10.5 })).success, false);
-    assert.equal(BankTransactionSchema.safeParse(transactionFixture({ amountMinor: -10 })).success, false);
-    assert.equal(BankTransactionSchema.safeParse(transactionFixture({ fingerprint: "abc" })).success, false);
+  it("rechaza importe flotante o fuera del rango Int32 de la BD y fingerprint inválido", () => {
+    expect(BankTransactionSchema.safeParse(transactionFixture({ amountMinor: -10.5 })).success).toBe(false);
+    expect(BankTransactionSchema.safeParse(transactionFixture({ amountMinor: -2_147_483_648 })).success).toBe(false);
+    expect(BankTransactionSchema.safeParse(transactionFixture({ amountMinor: 2_147_483_648 })).success).toBe(false);
+    expect(BankTransactionSchema.safeParse(transactionFixture({ fingerprint: "abc" })).success).toBe(false);
+  });
+
+  it("isOutflow distingue salidas de entradas", () => {
+    expect(isOutflow({ amountMinor: -1 })).toBe(true);
+    expect(isOutflow({ amountMinor: 1 })).toBe(false);
   });
 
   it("no existe campo de autorización: un campo extra se rechaza", () => {
-    assert.equal(BankTransactionSchema.safeParse(transactionFixture({ authorized: true })).success, false);
+    expect(BankTransactionSchema.safeParse(transactionFixture({ authorized: true })).success).toBe(false);
   });
 });
