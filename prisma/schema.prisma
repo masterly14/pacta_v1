@@ -75,6 +75,11 @@ model OrganizationMembership {
 // Importes: unidades menores enteras (int4, máx. ~21.4M USD); moneda ISO 4217.
 // Actores (`*By`, `actorId`): Clerk `user_...` como texto, sin FK, para que la
 // auditoría sobreviva a la baja de un usuario.
+//
+// Garantías en SQL: Prisma 6 no expresa CHECK, índices únicos parciales ni
+// triggers, así que viven en la migración `20261017163245_add_payment_autopilot_tables`
+// y se documentan con `@db-guarantee` en cada modelo. Prisma las ignora al
+// comparar (no las borra), pero si cambias un modelo marcado, actualiza su SQL.
 // ---------------------------------------------------------------------------
 
 enum PaymentAuthorizationScope {
@@ -132,6 +137,7 @@ model Supplier {
 }
 
 /// Política versionada. Cada cambio crea una versión nueva; nunca se edita una existente.
+/// @db-guarantee CHECK payment_policies_amounts_check: version > 0, límite y presupuesto >= 0, moneda ^[A-Z]{3}$.
 model PaymentPolicy {
   id                     String   @id @default(cuid())
   organizationId         String   @map("organization_id")
@@ -151,6 +157,8 @@ model PaymentPolicy {
 
 /// Autorización explícita otorgada por una persona. Cubre una factura solo si coinciden
 /// proveedor, cuenta, moneda, monto máximo, alcance y vigencia.
+/// @db-guarantee CHECK payment_authorizations_terms_check: monto máximo > 0, moneda ^[A-Z]{3}$,
+///   validUntil >= validFrom, frecuencia obligatoria si recurring y null si one_time.
 model PaymentAuthorization {
   id                      String                     @id @default(cuid())
   organizationId          String                     @map("organization_id")
@@ -177,6 +185,8 @@ model PaymentAuthorization {
 }
 
 /// Permisos de pago por usuario. Sin fila = sin permisos. Solo `admin` los edita.
+/// @db-guarantee CHECK approval_permissions_limit_check: si canApprove, approvalLimitMinor no null y > 0;
+///   si no, approvalLimitMinor null (no hay aprobadores ilimitados).
 model ApprovalPermission {
   userId             String   @map("user_id")
   organizationId     String   @map("organization_id")
@@ -194,6 +204,12 @@ model ApprovalPermission {
 }
 
 /// Cada PaymentDecision validada. Solo inserción: una reevaluación crea otra fila.
+/// @db-guarantee CHECK payment_decisions_actor_check: automatic => actorId null;
+///   human => actorId y approvalRequestId no null.
+/// @db-guarantee CHECK payment_decisions_approved_check: approved => policyVersion, amountMinor y currency no null.
+/// @db-guarantee UNIQUE parcial payment_decisions_one_approved_per_invoice: (organizationId, invoiceId)
+///   WHERE decision = 'approved' — una factura se aprueba y reserva presupuesto a lo sumo una vez.
+/// @db-guarantee TRIGGER payment_decisions_append_only: rechaza UPDATE y DELETE.
 model PaymentDecision {
   id                String                 @id @default(cuid())
   organizationId    String                 @map("organization_id")
@@ -225,6 +241,8 @@ model PaymentDecision {
 }
 
 /// Bandeja de intervención humana.
+/// @db-guarantee UNIQUE parcial approval_requests_one_pending_per_invoice: (organizationId, invoiceId)
+///   WHERE status = 'pending'.
 model ApprovalRequest {
   id             String                @id @default(cuid())
   organizationId String                @map("organization_id")
@@ -285,6 +303,7 @@ model BankTransaction {
 }
 
 /// Rastro append-only. actorId null = sistema.
+/// @db-guarantee TRIGGER audit_events_append_only: rechaza UPDATE y DELETE.
 model AuditEvent {
   id             String   @id @default(cuid())
   organizationId String   @map("organization_id")
