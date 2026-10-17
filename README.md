@@ -12,6 +12,7 @@ Agente de IA que recibe facturas por correo (Resend), Slack y WhatsApp y decide 
 - Auth: Clerk
 - Base de datos: Prisma 6 + Neon Postgres (adapter de Neon)
 - Validación: zod (contratos en `src/contracts`)
+- Modelos: DeepSeek (`@ai-sdk/deepseek`, cliente en `src/lib/ai.ts`)
 - Agentes: AI SDK 7 (`ai`), `@ai-sdk/workflow`, Vercel Workflow (`workflow`), Chat SDK (`chat`) con adapters de Slack y WhatsApp
 - Correo: Resend
 - Observabilidad: Langfuse + OpenTelemetry (`@vercel/otel`)
