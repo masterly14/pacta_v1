@@ -13,8 +13,6 @@ datasource db {
   directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
-
-
 enum MembershipRole {
   admin
   member
@@ -28,10 +26,18 @@ model Organization {
 
   memberships OrganizationMembership[]
 
+  // Vertical B
+  suppliers             Supplier[]
+  paymentPolicies       PaymentPolicy[]
+  paymentAuthorizations PaymentAuthorization[]
+  paymentDecisions      PaymentDecision[]
+  approvalRequests      ApprovalRequest[]
+  bankImportBatches     BankImportBatch[]
+  bankTransactions      BankTransaction[]
+  auditEvents           AuditEvent[]
+
   @@map("organizations")
 }
-
-
 
 model User {
   id          String   @id
@@ -57,7 +63,241 @@ model OrganizationMembership {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  approvalPermission ApprovalPermission?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@map("organization_memberships")
+}
+
+// ---------------------------------------------------------------------------
+// Vertical B — Payment Autopilot (docs/plans/developer-b-payment-decisions.md)
+// Importes: unidades menores enteras (int4, máx. ~21.4M USD); moneda ISO 4217.
+// Actores (`*By`, `actorId`): Clerk `user_...` como texto, sin FK, para que la
+// auditoría sobreviva a la baja de un usuario.
+// ---------------------------------------------------------------------------
+
+enum PaymentAuthorizationScope {
+  one_time
+  recurring
+}
+
+enum PaymentAuthorizationStatus {
+  active
+  revoked
+  consumed
+}
+
+enum PaymentFrequency {
+  weekly
+  monthly
+  quarterly
+  yearly
+}
+
+enum PaymentDecisionOutcome {
+  approved
+  blocked
+  requires_approval
+}
+
+enum PaymentDecisionSource {
+  automatic
+  human
+}
+
+enum ApprovalRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+/// Catálogo de proveedores. Estar en el catálogo NO implica autorización.
+model Supplier {
+  id                    String   @id @default(cuid())
+  organizationId        String   @map("organization_id")
+  name                  String
+  normalizedName        String   @map("normalized_name")
+  beneficiaryAccountRef String?  @map("beneficiary_account_ref") // informativa; la autorización manda
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization     Organization           @relation(fields: [organizationId], references: [id])
+  authorizations   PaymentAuthorization[]
+  decisions        PaymentDecision[]
+  bankTransactions BankTransaction[]
+
+  @@unique([organizationId, normalizedName])
+  @@map("suppliers")
+}
+
+/// Política versionada. Cada cambio crea una versión nueva; nunca se edita una existente.
+model PaymentPolicy {
+  id                     String   @id @default(cuid())
+  organizationId         String   @map("organization_id")
+  version                Int
+  autoApprovalLimitMinor Int      @map("auto_approval_limit_minor")
+  monthlyBudgetMinor     Int      @map("monthly_budget_minor")
+  currency               String   @db.Char(3)
+  effectiveFrom          DateTime @map("effective_from") @db.Timestamptz(6)
+  createdBy              String   @map("created_by")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, version])
+  @@map("payment_policies")
+}
+
+/// Autorización explícita otorgada por una persona. Cubre una factura solo si coinciden
+/// proveedor, cuenta, moneda, monto máximo, alcance y vigencia.
+model PaymentAuthorization {
+  id                      String                     @id @default(cuid())
+  organizationId          String                     @map("organization_id")
+  supplierId              String                     @map("supplier_id")
+  beneficiaryAccountRef   String                     @map("beneficiary_account_ref")
+  currency                String                     @db.Char(3)
+  maxAmountMinor          Int                        @map("max_amount_minor")
+  scope                   PaymentAuthorizationScope
+  frequency               PaymentFrequency? // obligatoria si scope = recurring
+  validFrom               DateTime                   @map("valid_from") @db.Date
+  validUntil              DateTime                   @map("valid_until") @db.Date
+  status                  PaymentAuthorizationStatus @default(active)
+  authorizedBy            String                     @map("authorized_by")
+  sourceApprovalRequestId String?                    @map("source_approval_request_id")
+  createdAt               DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt               DateTime?                  @map("revoked_at") @db.Timestamptz(6)
+  revokedBy               String?                    @map("revoked_by")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+
+  @@index([organizationId, supplierId, status])
+  @@map("payment_authorizations")
+}
+
+/// Permisos de pago por usuario. Sin fila = sin permisos. Solo `admin` los edita.
+model ApprovalPermission {
+  userId             String   @map("user_id")
+  organizationId     String   @map("organization_id")
+  canApprove         Boolean  @default(false) @map("can_approve")
+  approvalLimitMinor Int?     @map("approval_limit_minor") // obligatorio si canApprove
+  canManagePolicies  Boolean  @default(false) @map("can_manage_policies")
+  grantedBy          String   @map("granted_by")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  membership OrganizationMembership @relation(fields: [userId, organizationId], references: [userId, organizationId], onDelete: Cascade)
+
+  @@id([userId, organizationId])
+  @@map("approval_permissions")
+}
+
+/// Cada PaymentDecision validada. Solo inserción: una reevaluación crea otra fila.
+model PaymentDecision {
+  id                String                 @id @default(cuid())
+  organizationId    String                 @map("organization_id")
+  invoiceId         String                 @map("invoice_id") // FK pendiente hasta que A cree `invoices`
+  supplierId        String?                @map("supplier_id")
+  invoiceNumber     String?                @map("invoice_number")
+  amountMinor       Int?                   @map("amount_minor")
+  currency          String?                @db.Char(3)
+  decision          PaymentDecisionOutcome
+  decisionSource    PaymentDecisionSource  @map("decision_source")
+  reasonCodes       Json                   @map("reason_codes")
+  rulesEvaluated    Json                   @map("rules_evaluated")
+  payload           Json // PaymentDecision completa validada por Zod
+  policyVersion     Int?                   @map("policy_version")
+  actorId           String?                @map("actor_id")
+  approvalRequestId String?                @map("approval_request_id") // solicitud que resuelve (decisión humana)
+  evaluatedAt       DateTime               @map("evaluated_at") @db.Timestamptz(6)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization      Organization     @relation(fields: [organizationId], references: [id])
+  supplier          Supplier?        @relation(fields: [supplierId], references: [id])
+  resolvesRequest   ApprovalRequest? @relation("ApprovalResolution", fields: [approvalRequestId], references: [id])
+  triggeredApproval ApprovalRequest? @relation("ApprovalTrigger")
+
+  @@index([organizationId, invoiceId])
+  @@index([organizationId, supplierId, invoiceNumber])
+  @@index([organizationId, decision, evaluatedAt])
+  @@map("payment_decisions")
+}
+
+/// Bandeja de intervención humana.
+model ApprovalRequest {
+  id             String                @id @default(cuid())
+  organizationId String                @map("organization_id")
+  invoiceId      String                @map("invoice_id")
+  decisionId     String                @unique @map("decision_id") // decisión que escaló
+  status         ApprovalRequestStatus @default(pending)
+  requestedAt    DateTime              @default(now()) @map("requested_at") @db.Timestamptz(6)
+  resolvedAt     DateTime?             @map("resolved_at") @db.Timestamptz(6)
+  resolvedBy     String?               @map("resolved_by")
+  comment        String?
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  decision     PaymentDecision   @relation("ApprovalTrigger", fields: [decisionId], references: [id])
+  resolutions  PaymentDecision[] @relation("ApprovalResolution")
+
+  @@index([organizationId, status, requestedAt])
+  @@map("approval_requests")
+}
+
+/// Lote de importación CSV.
+model BankImportBatch {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  fileName       String   @map("file_name")
+  rowCount       Int      @map("row_count")
+  importedBy     String   @map("imported_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  transactions BankTransaction[]
+
+  @@index([organizationId, createdAt])
+  @@map("bank_import_batches")
+}
+
+/// Movimiento ficticio importado de CSV. Historial, no autorización ni presupuesto.
+model BankTransaction {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  importBatchId  String   @map("import_batch_id")
+  supplierId     String?  @map("supplier_id")
+  postedOn       DateTime @map("posted_on") @db.Date
+  amountMinor    Int      @map("amount_minor") // con signo: negativo = salida
+  currency       String   @db.Char(3)
+  description    String
+  externalRef    String?  @map("external_ref")
+  fingerprint    String // hash de fecha + monto + descripción, para omitir repetidos
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  importBatch  BankImportBatch @relation(fields: [importBatchId], references: [id])
+  supplier     Supplier?       @relation(fields: [supplierId], references: [id])
+
+  @@unique([organizationId, fingerprint])
+  @@unique([organizationId, externalRef])
+  @@index([organizationId, supplierId, postedOn])
+  @@map("bank_transactions")
+}
+
+/// Rastro append-only. actorId null = sistema.
+model AuditEvent {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  entityType     String   @map("entity_type")
+  entityId       String   @map("entity_id")
+  eventType      String   @map("event_type")
+  actorId        String?  @map("actor_id")
+  payload        Json
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@map("audit_events")
 }
