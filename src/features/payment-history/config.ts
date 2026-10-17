@@ -45,5 +45,5 @@ export const GENERIC_TOKENS: ReadonlySet<string> = new Set([
 ]);
 
 export const LEGAL_SUFFIXES: ReadonlySet<string> = new Set([
-  "inc", "llc", "ltd", "corp", "co", "sa", "sas", "srl", "gmbh", "plc",
+  "inc", "llc", "ltd", "ltda", "corp", "co", "sa", "sac", "sas", "srl", "sl", "spa", "gmbh", "plc", "bv", "ag",
 ]);
