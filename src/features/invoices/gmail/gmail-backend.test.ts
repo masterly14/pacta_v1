@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { Document, GmailConnection, GmailInboundMessage, IgnoredInboundItem } from "@prisma/client";
 import { completeGmailOauth } from "./complete-oauth.ts";
 import { connectMailbox } from "./connect-mailbox.ts";
+import { attachmentsFromFetchResult } from "./composio-adapter.ts";
 import { downloadGmailMessage } from "./download-gmail-message.ts";
 import { getOrganizationDocument } from "./get-document.ts";
 import { ingestComposioWebhook, ingestSignedWebhook } from "./ingest-webhook.ts";
@@ -591,5 +592,26 @@ describe("getOrganizationDocument", () => {
       () => getOrganizationDocument({ documentId: "doc_1", organizationId: orgId }, { repo }),
       { name: "DocumentNotFoundError" },
     );
+  });
+});
+
+describe("attachmentsFromFetchResult", () => {
+  const pdf = { attachmentId: "att_1", filename: "recibo.pdf", mimeType: "application/pdf" };
+
+  it("lee data.attachmentList, el formato real de Composio", () => {
+    assert.deepEqual(attachmentsFromFetchResult({ data: { attachmentList: [pdf] } }), [
+      { attachmentId: "att_1", filename: "recibo.pdf", mimeType: "application/pdf", bytes: null },
+    ]);
+  });
+
+  it("sigue aceptando attachment_list y attachments, en la raíz o en data", () => {
+    assert.equal(attachmentsFromFetchResult({ attachment_list: [pdf] }).length, 1);
+    assert.equal(attachmentsFromFetchResult({ data: { attachments: [pdf] } }).length, 1);
+  });
+
+  it("devuelve vacío sin lista y omite elementos sin attachmentId", () => {
+    assert.deepEqual(attachmentsFromFetchResult({ data: {} }), []);
+    assert.deepEqual(attachmentsFromFetchResult(null), []);
+    assert.deepEqual(attachmentsFromFetchResult({ data: { attachmentList: [{ filename: "x.pdf" }] } }), []);
   });
 });
