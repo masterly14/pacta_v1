@@ -18,7 +18,8 @@ export function gmailHttpError(error: unknown): NextResponse {
     return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
   }
   const message = error instanceof Error ? error.message : "Error interno";
-  if (message.includes("no está definida")) {
+  console.error("[gmail]", error);
+  if (message.includes("no está definida") || message.includes("Composio")) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
   return NextResponse.json({ error: "Error interno" }, { status: 500 });

@@ -16,8 +16,14 @@ export async function GET(request: Request) {
       connectionId,
       organizationId: workspace.organization.id,
     });
-    return NextResponse.redirect(`${getAppUrl()}/?gmail=${result.status}`);
+    return NextResponse.redirect(
+      `${getAppUrl()}/platform/integrations?gmail=${result.status}`,
+    );
   } catch (error) {
-    return gmailHttpError(error);
+    try {
+      return NextResponse.redirect(`${getAppUrl()}/platform/integrations?gmail=failed`);
+    } catch {
+      return gmailHttpError(error);
+    }
   }
 }
