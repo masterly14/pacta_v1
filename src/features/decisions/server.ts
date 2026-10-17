@@ -165,5 +165,10 @@ export async function listPendingApprovals(organizationId: string) {
   });
 }
 
+// Opciones para el formulario "Factura de prueba".
+export async function listSupplierOptions(organizationId: string) {
+  return db.supplier.findMany({ where: { organizationId }, orderBy: { name: "asc" }, select: { id: true, name: true } });
+}
+
 export type RecentDecision = Awaited<ReturnType<typeof listRecentDecisions>>[number];
 export type PendingApproval = Awaited<ReturnType<typeof listPendingApprovals>>[number];

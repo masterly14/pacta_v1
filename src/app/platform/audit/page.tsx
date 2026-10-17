@@ -1,6 +1,7 @@
 /**
  * Purpose: show every payment decision with its rules, reasons and policy version, and (for
- *   administrators) a simulator that runs fictitious invoices through the real decision flow.
+ *   administrators) a simulator: fixed scenarios plus a "Factura de prueba" form, both run
+ *   through the real decision flow.
  * Runs in: server (React Server Component; data streamed inside <Suspense>).
  * Triggered by: GET /platform/audit and refresh() after a simulator run.
  * Receives → Returns: request → rendered HTML inside the platform shell.
@@ -14,8 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatMinor } from "@/features/contracts/money";
-import { DecisionSimulator } from "@/features/decisions/components/simulator";
-import { listRecentDecisions } from "@/features/decisions/server";
+import { CustomInvoiceForm, DecisionSimulator } from "@/features/decisions/components/simulator";
+import { listRecentDecisions, listSupplierOptions } from "@/features/decisions/server";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
 
 export const metadata: Metadata = { title: "Auditoría" };
@@ -58,6 +59,8 @@ async function AuditData() {
   }
   const decisions = await listRecentDecisions(workspace.organization.id);
   const isAdmin = workspace.membership.role === "admin";
+  const suppliers = isAdmin ? await listSupplierOptions(workspace.organization.id) : [];
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <>
@@ -75,6 +78,22 @@ async function AuditData() {
           </CardHeader>
           <CardContent>
             <DecisionSimulator />
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Factura de prueba · datos ficticios</CardTitle>
+            <CardDescription>
+              Escribe tu propia factura y mira qué decide el motor. Deja un campo vacío para simular que la
+              extracción no lo encontró. Se evalúa con las políticas, autorizaciones y contratos reales de esta
+              organización.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CustomInvoiceForm suppliers={suppliers} today={today} />
           </CardContent>
         </Card>
       )}

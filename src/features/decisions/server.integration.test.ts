@@ -227,6 +227,34 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     }
   });
 
+  it("evaluates test invoices typed in the form, with empty fields treated as missing", async () => {
+    const { buildCustomInvoice, CustomInvoiceInputSchema } = await import("./fixtures/custom-invoice");
+    await seedPolicy();
+    await seedAuthorization(PAPELERIA, "****4821");
+    const form = (values: Record<string, string>) =>
+      CustomInvoiceInputSchema.parse({ supplierId: PAPELERIA, invoiceNumber: "", amount: "", currency: "USD", beneficiaryAccountReference: "", invoiceDate: "2026-10-05", description: "", ...values });
+    const run = async (values: Record<string, string>) => {
+      const built = await buildCustomInvoice(form(values), ORG, new Date());
+      if (!built.ok) throw new Error(built.error);
+      return evaluateInvoice(built.invoice);
+    };
+
+    const ok = await run({ invoiceNumber: "PC-77", amount: "45.90", beneficiaryAccountReference: "****4821" });
+    expect(ok.decision).toBe("approved");
+
+    const unknownSupplier = await run({ supplierId: "", invoiceNumber: "X-1", amount: "10.00", beneficiaryAccountReference: "****1111" });
+    expect(unknownSupplier.decision).toBe("requires_approval");
+    expect(unknownSupplier.reasonCodes).toContain("INSUFFICIENT_DATA");
+
+    const noAmount = await run({ invoiceNumber: "PC-78", beneficiaryAccountReference: "****4821", invoiceDate: "2026-11-05" });
+    expect(noAmount.decision).toBe("requires_approval");
+    expect(noAmount.rulesEvaluated.find((r) => r.ruleId === "budget_available")?.result).toBe("unknown");
+
+    await prisma.supplier.create({ data: { id: "sup_foreign", organizationId: OTHER_ORG, name: "Ajeno", normalizedName: "ajeno" } });
+    expect(await buildCustomInvoice(form({ supplierId: "sup_foreign", amount: "1.00" }), ORG, new Date())).toEqual({ ok: false, error: "Proveedor no encontrado." });
+    expect(await buildCustomInvoice(form({ amount: "1.234" }), ORG, new Date())).toMatchObject({ ok: false });
+  });
+
   it("rejects an invalid invoice before touching the database", async () => {
     await expect(evaluateInvoice({ ...invoice(), amountMinor: 20.5 })).rejects.toThrow();
     expect(await prisma.paymentDecision.count()).toBe(0);
