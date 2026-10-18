@@ -94,7 +94,7 @@ export type BukObligationSource = ObligationSource & {
   /** Dataset de nómina que corresponde a lo leído, visto desde `asOf`. */
   dataset(asOf: string): PayrollDataset;
   /** Líneas + datos de corrida listos para el motor, validados con los contratos compartidos. */
-  occurrence(template: ObligationTemplate, asOf: string): { dataset: PayrollDataset; period: ObligationPeriod; lines: ObligationContext[]; occurrence: OccurrenceContext };
+  occurrence(template: ObligationTemplate, asOf: string, period?: ObligationPeriod): { dataset: PayrollDataset; period: ObligationPeriod; lines: ObligationContext[]; occurrence: OccurrenceContext };
 };
 
 /** Período de pago del mes leído. Calendario `month_end`: vence el último día del mes. */
@@ -124,8 +124,8 @@ export function createBukObligationSource(raw: BukRawBundle, store: PactaEvidenc
       const employee = dataset(instant).employees.find((row) => row.counterpartyRef === counterpartyRef);
       return employee ? { kind: "payroll", employee } : null;
     },
-    occurrence(template, asOf) {
-      const period = periodOf(raw);
+    occurrence(template, asOf, override) {
+      const period = override ?? periodOf(raw);
       const built = dataset(asOf);
       const lines = source.generateLines(template, built, period, asOf);
       return { dataset: built, period, lines, occurrence: describeOccurrence({ template, dataset: built, period, asOf, lines }) };

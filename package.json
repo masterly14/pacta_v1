@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "mock:generate": "node ./node_modules/vite-node/vite-node.mjs --config vitest.config.ts src/features/obligations/fixtures/buk/generate.ts",
     "mock:verify": "vitest run src/features/obligations",
+    "obligations:smoke": "node --env-file=.env ./node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/smoke-obligations-db.ts",
     "learning:backtest": "node ./node_modules/vite-node/vite-node.mjs --config vitest.config.ts src/features/obligations/learning/backtest-cli.ts"
   },
   "dependencies": {
