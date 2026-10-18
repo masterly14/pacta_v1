@@ -39,6 +39,12 @@ const SUPPLIERS: SupplierSeed[] = [
   { key: "streambox", name: "StreamBox Pro", account: "****0042", email: "no-reply@streambox.example" },
   { key: "nordico", name: "Diseño Nórdico", account: "****9183", email: "studio@disenonordico.example" },
   { key: "dominios", name: "Dominios Latam", account: "****3376", email: "renovaciones@dominioslatam.example" },
+  { key: "agua", name: "Agua Pura Express", account: "****1147", email: "pedidos@aguapura.example" },
+  { key: "mensajeria", name: "Mensajería Veloz", account: "****5508", email: "facturas@mensajeriaveloz.example" },
+  { key: "frutas", name: "Frutas de Oficina", account: "****2671", email: "hola@frutasdeoficina.example" },
+  { key: "internet", name: "Internet Fibra Plus", account: "****9034", email: "facturacion@fibraplus.example" },
+  { key: "electricidad", name: "Electricidad Andina", account: "****6620", email: "facturas@electricidadandina.example" },
+  { key: "coworking", name: "Coworking Central", account: "****4478", email: "admin@coworkingcentral.example" },
 ];
 
 // Autorizaciones explícitas (lo único que permite aprobar sin una persona).
@@ -48,6 +54,12 @@ const AUTHORIZATIONS: { supplier: string; frequency: "weekly" | "monthly"; maxAm
   { supplier: "cafe", frequency: "weekly", maxAmountMinor: 20_000 },
   { supplier: "contable", frequency: "monthly", maxAmountMinor: 250_000 },
   { supplier: "imprenta", frequency: "monthly", maxAmountMinor: 60_000 },
+  { supplier: "agua", frequency: "weekly", maxAmountMinor: 6_000 },
+  { supplier: "mensajeria", frequency: "weekly", maxAmountMinor: 12_000 },
+  { supplier: "frutas", frequency: "weekly", maxAmountMinor: 9_000 },
+  { supplier: "internet", frequency: "monthly", maxAmountMinor: 15_000 },
+  { supplier: "electricidad", frequency: "monthly", maxAmountMinor: 45_000 },
+  { supplier: "coworking", frequency: "monthly", maxAmountMinor: 150_000 },
 ];
 
 type InvoiceSeed = {
@@ -61,6 +73,8 @@ type InvoiceSeed = {
   currency?: string;
   account?: string;
   description: string;
+  // Advertencias de la lectura (p. ej. el modelo indicó que no es una factura).
+  warnings?: { code: string; message: string }[];
 };
 
 // Un mes de facturas. Resultado esperado al lado (lo decide el motor, no el script).
@@ -86,6 +100,27 @@ const INVOICES: InvoiceSeed[] = [
   { key: "scp-2610-account", date: "2026-10-14", time: "18:30", supplier: "contable", name: "Software Contable Pro", number: "SCP-2610", amountMinor: 18_000, account: "****9999", description: "Módulo de nómina" }, // escalada: cambio de cuenta
   { key: "tr-1236", date: "2026-10-15", time: "10:25", supplier: "transportes", name: "Transportes Rápidos", number: "TR-1236", amountMinor: 53_000, description: "Envíos a clientes" }, // escalada
   { key: "ie-552", date: "2026-10-16", time: "14:10", supplier: "imprenta", name: "Imprenta Express", number: "IE-552", amountMinor: 52_000, description: "Catálogos" }, // escalada: autorización del mes ya usada
+  // Gastos recurrentes autorizados (aprobación automática, una por periodo).
+  { key: "ap-0922", date: "2026-09-22", time: "08:15", supplier: "agua", name: "Agua Pura Express", number: "AP-0922", amountMinor: 4_800, description: "Botellones de agua" },
+  { key: "mv-0924", date: "2026-09-24", time: "17:30", supplier: "mensajeria", name: "Mensajería Veloz", number: "MV-0924", amountMinor: 9_500, description: "Mensajería urbana" },
+  { key: "fo-0925", date: "2026-09-25", time: "07:50", supplier: "frutas", name: "Frutas de Oficina", number: "FO-0925", amountMinor: 7_240, description: "Canasta de frutas semanal" },
+  { key: "if-0926", date: "2026-09-26", time: "06:00", supplier: "internet", name: "Internet Fibra Plus", number: "IF-0926", amountMinor: 12_990, description: "Internet 500 Mbps, septiembre" },
+  { key: "ea-0929", date: "2026-09-29", time: "09:40", supplier: "electricidad", name: "Electricidad Andina", number: "EA-0929", amountMinor: 31_875, description: "Energía, septiembre" },
+  { key: "ap-1001", date: "2026-10-01", time: "08:12", supplier: "agua", name: "Agua Pura Express", number: "AP-1001", amountMinor: 4_800, description: "Botellones de agua" },
+  { key: "fo-1001", date: "2026-10-01", time: "07:45", supplier: "frutas", name: "Frutas de Oficina", number: "FO-1001", amountMinor: 7_240, description: "Canasta de frutas semanal" },
+  { key: "cc-1001", date: "2026-10-01", time: "10:30", supplier: "coworking", name: "Coworking Central", number: "CC-1001", amountMinor: 125_000, description: "Membresía de oficina, octubre" },
+  { key: "mv-1002", date: "2026-10-02", time: "17:20", supplier: "mensajeria", name: "Mensajería Veloz", number: "MV-1002", amountMinor: 9_500, description: "Mensajería urbana" },
+  { key: "if-1003", date: "2026-10-03", time: "06:00", supplier: "internet", name: "Internet Fibra Plus", number: "IF-1003", amountMinor: 12_990, description: "Internet 500 Mbps, octubre" },
+  { key: "ap-1006", date: "2026-10-06", time: "08:20", supplier: "agua", name: "Agua Pura Express", number: "AP-1006", amountMinor: 4_800, description: "Botellones de agua" },
+  { key: "fo-1007", date: "2026-10-07", time: "07:55", supplier: "frutas", name: "Frutas de Oficina", number: "FO-1007", amountMinor: 7_240, description: "Canasta de frutas semanal" },
+  { key: "mv-1008", date: "2026-10-08", time: "17:10", supplier: "mensajeria", name: "Mensajería Veloz", number: "MV-1008", amountMinor: 9_500, description: "Mensajería urbana" },
+  { key: "ea-1009", date: "2026-10-09", time: "09:35", supplier: "electricidad", name: "Electricidad Andina", number: "EA-1009", amountMinor: 30_420, description: "Energía, octubre" },
+  { key: "ap-1013", date: "2026-10-13", time: "08:05", supplier: "agua", name: "Agua Pura Express", number: "AP-1013", amountMinor: 4_800, description: "Botellones de agua" },
+  { key: "fo-1014", date: "2026-10-14", time: "07:40", supplier: "frutas", name: "Frutas de Oficina", number: "FO-1014", amountMinor: 7_240, description: "Canasta de frutas semanal" },
+  { key: "mv-1015", date: "2026-10-15", time: "17:25", supplier: "mensajeria", name: "Mensajería Veloz", number: "MV-1015", amountMinor: 9_500, description: "Mensajería urbana" },
+  { key: "fo-1017-extra", date: "2026-10-17", time: "11:15", supplier: "frutas", name: "Frutas de Oficina", number: "FO-1017", amountMinor: 8_900, description: "Pedido extra para evento" }, // escalada: la autorización semanal ya se usó
+  // Un correo que no es una factura: nunca se aprueba, se escala.
+  { key: "tn-promo", date: "2026-10-17", time: "15:05", supplier: null, name: "Tienda Natura", number: null, amountMinor: null, description: "Promoción de temporada: 30% de descuento", warnings: [{ code: "NOT_AN_INVOICE", message: "El modelo indicó que el documento no parece una factura" }] }, // escalada
 ];
 
 // Recibos de pagos ya realizados (cargos con tarjeta): no se evalúan.
@@ -208,7 +243,7 @@ async function buildContext(seed: InvoiceSeed | (typeof RECEIPTS)[number], suppl
     contractMatch,
     ...values,
     missingFields: InvoiceMissingFieldSchema.options.filter((field) => values[field] === null),
-    extractionWarnings: [],
+    extractionWarnings: ("warnings" in seed && seed.warnings ? seed.warnings : []).map((w) => ({ ...w, field: null })),
     evidence: [],
   });
 }
