@@ -5,11 +5,12 @@
  * Runs in: server and tests (LLM and readers are injected).
  * Triggered by: the invoice pipeline (A-03) and the manual upload (A-05).
  * Receives → Returns: group documents + email metadata + ContextMeta → ExtractionResult.
- * Talks to: read-document.ts, prompt.ts, to-invoice-context.ts, ExtractDeps.
+ * Talks to: read-document.ts, prompt.ts, to-invoice-context.ts, to-receipt-facts.ts, ExtractDeps.
  */
 import { buildExtractionPrompt } from "./prompt";
 import { RawExtractionSchema, type RawExtraction } from "./raw-extraction.schema";
 import { readDocument, type ReaderDeps, type SourceDocument } from "./read-document";
+import { toReceiptFacts, type ReceiptFacts } from "./to-receipt-facts";
 import {
   toInvoiceContext,
   type ContextMeta,
@@ -25,7 +26,8 @@ export type ExtractDeps = ReaderDeps & {
 };
 
 export type ExtractionResult =
-  | { ok: true; context: InvoiceContext; transcripts: DocumentTranscript[] }
+  // receipt ≠ null: el documento acredita un pago ya hecho y no debe evaluarse para pagar.
+  | { ok: true; context: InvoiceContext; receipt: ReceiptFacts | null; transcripts: DocumentTranscript[] }
   | { ok: false; stage: "read" | "llm" | "validation" | "context"; error: string };
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -65,5 +67,5 @@ export async function extractInvoice(
 
   const result = toInvoiceContext(raw, transcripts, input.meta, input.metadata, input.identity);
   if (!result.ok) return { ok: false, stage: "context", error: result.error };
-  return { ok: true, context: result.context, transcripts };
+  return { ok: true, context: result.context, receipt: toReceiptFacts(raw, transcripts), transcripts };
 }

@@ -124,7 +124,9 @@ async function InvoicesData() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {inv.decision === null ? (
+                      {inv.documentKind === "receipt" ? (
+                        <Badge variant="outline">Pagado (recibo)</Badge>
+                      ) : inv.decision === null ? (
                         <span className="text-xs text-muted-foreground">sin decisión</span>
                       ) : (
                         <Badge variant={DECISION[inv.decision.decision].variant}>

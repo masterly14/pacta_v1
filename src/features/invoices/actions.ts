@@ -27,6 +27,9 @@ function describe(result: ProcessResult): FormActionState {
       ? { ok: false, message: "No se pudo leer la factura con IA. Quedó como fallida en el inbox; revisa el archivo o inténtalo de nuevo." }
       : { ok: false, message: "La factura se extrajo pero no se pudo evaluar. Reintenta en unos segundos." };
   }
+  if ("receipt" in result || ("skipped" in result && result.skipped === "receipt")) {
+    return { ok: true, message: "Es un recibo de un pago ya realizado: se registró sin evaluarlo para pago." };
+  }
   if ("skipped" in result) return { ok: true, message: "Esta factura ya estaba procesada." };
   const reasons = result.decision.reasonCodes.filter((c) => c !== "HUMAN_APPROVAL_REQUIRED").join(", ");
   return { ok: true, message: `Factura procesada · ${OUTCOME_LABEL[result.decision.decision]} · ${reasons}` };

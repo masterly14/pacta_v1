@@ -1,7 +1,8 @@
 /**
  * Purpose: process one invoice end to end (A-03/A-12): AI extraction → supplier and contract
  *   resolution → persist in `invoices` → B's evaluateInvoice(). Idempotent per document group;
- *   any failure leaves a visible, retryable state and never an approval.
+ *   any failure leaves a visible, retryable state and never an approval. A receipt (payment
+ *   already made) is stored as a fact and never evaluated, so it can never be paid twice.
  * Runs in: server (Node).
  * Triggered by: process-email.ts (each invoice candidate of an email) and the manual upload action.
  * Receives → Returns: (ProcessInvoiceInput, { extract }) → ProcessResult.
@@ -32,7 +33,8 @@ export type ProcessInvoiceInput = {
 
 export type ProcessResult =
   | { ok: true; invoiceId: string; decision: PaymentDecision }
-  | { ok: true; invoiceId: string; skipped: "already_decided" | "in_progress" }
+  | { ok: true; invoiceId: string; receipt: true }
+  | { ok: true; invoiceId: string; skipped: "already_decided" | "in_progress" | "receipt" }
   | { ok: false; invoiceId: string; stage: "extraction" | "decision"; error: string };
 
 const MAX_ERROR_LENGTH = 500;
@@ -50,7 +52,7 @@ function errorText(stage: string, error: unknown): string {
 type Claim =
   | { kind: "process"; invoiceId: string }
   | { kind: "evaluate"; invoiceId: string; context: InvoiceContext }
-  | { kind: "skip"; invoiceId: string; reason: "already_decided" | "in_progress" };
+  | { kind: "skip"; invoiceId: string; reason: "already_decided" | "in_progress" | "receipt" };
 
 async function claimInvoice(input: ProcessInvoiceInput): Promise<Claim> {
   const existing = input.documentGroupId === null
@@ -85,6 +87,8 @@ async function claimInvoice(input: ProcessInvoiceInput): Promise<Claim> {
     throw new Error("La factura pertenece a otra organización");
   }
   if (existing.extractionStatus === "extracted" && existing.contextJson !== null) {
+    // Un recibo nunca llega a evaluarse, tampoco en un reintento.
+    if (existing.documentKind === "receipt") return { kind: "skip", reason: "receipt", invoiceId: existing.id };
     const decided = await db.paymentDecision.findFirst({ where: { organizationId: existing.organizationId, invoiceId: existing.id }, select: { id: true } });
     if (decided !== null) return { kind: "skip", reason: "already_decided", invoiceId: existing.id };
     return { kind: "evaluate", invoiceId: existing.id, context: InvoiceContextSchema.parse(existing.contextJson) };
@@ -126,6 +130,7 @@ export async function processInvoice(input: ProcessInvoiceInput, deps: { extract
     // A-04: el proveedor y el contrato los resuelve código determinístico, no el modelo.
     const identity = await resolveIdentity(input.organizationId, extracted.context);
     context = InvoiceContextSchema.parse({ ...extracted.context, ...identity });
+    const receipt = extracted.receipt;
 
     await db.invoice.update({
       where: { id: invoiceId },
@@ -141,9 +146,17 @@ export async function processInvoice(input: ProcessInvoiceInput, deps: { extract
         invoiceDate: toDbDate(context.invoiceDate),
         dueDate: toDbDate(context.dueDate),
         contextJson: context as Prisma.InputJsonValue,
+        documentKind: receipt === null ? "invoice" : "receipt",
+        paidOn: toDbDate(receipt?.paidOn ?? null),
+        paymentMethod: receipt?.paymentMethod ?? null,
         processedAt: new Date(),
       },
     });
+    if (receipt !== null) {
+      // Pago ya realizado fuera de Pacta: se muestra en el dashboard, no se decide.
+      console.info("[invoices/pipeline] recibo registrado sin evaluar", { invoiceId });
+      return { ok: true, invoiceId, receipt: true };
+    }
   }
 
   try {
