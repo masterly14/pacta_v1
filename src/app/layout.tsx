@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { clerkAppearance, clerkLocalization } from "@/lib/clerk";
 import "./globals.css";
+import "./landing.css";
 
 const raleway = Raleway({
   subsets: ["latin"],

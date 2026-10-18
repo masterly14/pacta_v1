@@ -1,45 +1,41 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import type { Metadata } from "next";
+import { Geist } from "next/font/google";
 import { auth } from "@clerk/nextjs/server";
 import { connection } from "next/server";
-import { buttonVariants } from "@/components/ui/button";
+import { LandingPage } from "@/components/landing/landing-page";
 
-async function HomeActions() {
+const geist = Geist({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+export const metadata: Metadata = {
+  title: "Pacta",
+  description:
+    "Pacta conoce las obligaciones programadas de tu empresa, identifica cuándo vencen, reúne la evidencia y paga. Si nota algo raro, te avisa.",
+};
+
+async function Landing() {
   await connection();
   const { userId } = await auth();
 
-  if (userId) {
-    return (
-      <Link href="/platform/invoices" className={buttonVariants()}>
-        Abrir plataforma
-      </Link>
-    );
-  }
-
   return (
-    <div className="flex gap-3">
-      <Link href="/sign-in" className={buttonVariants()}>
-        Iniciar sesión
-      </Link>
-      <Link href="/sign-up" className={buttonVariants({ variant: "outline" })}>
-        Crear cuenta
-      </Link>
-    </div>
+    <LandingPage
+      className={geist.className}
+      enterHref={userId ? "/platform" : "/sign-in"}
+    />
   );
 }
 
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-24 text-center">
-      <h1 className="text-4xl font-semibold tracking-tight">Pacta</h1>
-      <p className="max-w-md text-muted-foreground">
-        Agente de IA para facturas: decide si pagar, frenar o escalar a una
-        persona según las reglas de la empresa. Proyecto de hackathon, no mueve
-        dinero real.
-      </p>
-      <Suspense fallback={<div className="h-8" aria-hidden />}>
-        <HomeActions />
-      </Suspense>
-    </main>
+    <Suspense
+      fallback={
+        <LandingPage className={geist.className} enterHref="/sign-in" />
+      }
+    >
+      <Landing />
+    </Suspense>
   );
 }

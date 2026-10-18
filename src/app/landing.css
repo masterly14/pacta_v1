@@ -1,0 +1,201 @@
+.landing {
+  background: #f7f6f4;
+  color: #111;
+  overflow-x: hidden;
+}
+
+.landing a {
+  color: #111;
+  text-decoration: none;
+}
+
+.landing a:hover {
+  color: #e8501c;
+}
+
+.landing a:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 3px;
+}
+
+.landing a.lift:hover,
+.landing a.lift-strong:hover,
+.landing a.lift-white:hover {
+  color: #fff;
+}
+
+.landing a.lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.landing a.lift-strong:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.landing a.lift-soft:hover {
+  transform: translateY(-2px);
+}
+
+.landing a.ink:hover {
+  color: #111;
+}
+
+.landing a.lift-white:hover {
+  transform: translateY(-2px);
+}
+
+.landing [data-rx] {
+  animation: pacta-land-rx 18s ease-in-out infinite;
+}
+
+@keyframes pacta-land-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes pacta-land-rise {
+  from {
+    opacity: 0;
+    transform: translateY(90px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pacta-land-fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pacta-land-rx {
+  0%,
+  100% {
+    transform: translateX(-12vw);
+  }
+  50% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pacta-land-rx2 {
+  0%,
+  100% {
+    transform: translateX(-6vw);
+  }
+  50% {
+    transform: translateX(3vw);
+  }
+}
+
+@keyframes pacta-land-dash {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
+@keyframes pacta-land-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(230, 62, 16, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(230, 62, 16, 0);
+  }
+}
+
+@keyframes pacta-land-lit {
+  0%,
+  14%,
+  100% {
+    background: #fff;
+    color: #111;
+    border-color: #d9d5d0;
+  }
+  2%,
+  10% {
+    background: #e63e10;
+    color: #fff;
+    border-color: #e63e10;
+  }
+}
+
+@keyframes pacta-land-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes pacta-land-shift {
+  0%,
+  100% {
+    background-position: 0 0;
+  }
+  50% {
+    background-position: 100% 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .landing [data-nl] {
+    display: none !important;
+  }
+  .landing [data-rk] {
+    width: 260px !important;
+    right: -20px !important;
+    bottom: 40px !important;
+  }
+  .landing [data-rx] {
+    animation-name: pacta-land-rx2 !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .landing [data-rk] {
+    width: 200px !important;
+    right: -40px !important;
+    bottom: 20px !important;
+    opacity: 0.9;
+  }
+  .landing [data-mock] {
+    width: 94% !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .landing [data-pill] {
+    flex-direction: column !important;
+    border-radius: 28px !important;
+  }
+  .landing [data-pill] > * {
+    width: 100% !important;
+    box-sizing: border-box;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing *,
+  .landing *::before,
+  .landing *::after {
+    animation: none !important;
+  }
+}
