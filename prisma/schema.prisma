@@ -44,6 +44,14 @@ model Organization {
   notificationRecipients NotificationRecipient[]
   inboundChannelMessages InboundChannelMessage[]
   archivedInvoices       ArchivedInvoice[]
+  paymentObligations      PaymentObligation[]
+  obligationOccurrences   ObligationOccurrence[]
+  obligationDecisions     ObligationLineDecision[]
+  obligationRequests      ObligationApprovalRequest[]
+  obligationEvents        ObligationScheduleEvent[]
+  obligationPayments      ObligationSimulatedPayment[]
+  obligationConfirmations ObligationConfirmation[]
+  demoClock               DemoClock?
 
   // Vertical A
   contracts Contract[]
@@ -723,4 +731,199 @@ model ArchivedInvoice {
 
   @@unique([organizationId, invoiceId])
   @@map("archived_invoices")
+}
+
+// ---------------------------------------------------------------------------
+// Core proactivo: obligaciones recurrentes (nómina) — platform-core
+// Importes en unidades menores como BigInt: una nómina en COP supera el rango de Int4.
+// ---------------------------------------------------------------------------
+
+enum ObligationKind {
+  payroll
+  fiscal
+}
+
+enum ObligationStatus {
+  draft
+  active
+  paused
+}
+
+enum OccurrenceStatus {
+  scheduled
+  collecting_evidence
+  evaluated
+  in_approval
+  ready_to_execute
+  simulated_executed
+  held
+  failed
+  cancelled
+}
+
+/// Plantilla versionada de una obligación recurrente. Una versión no se edita: un cambio crea otra fila.
+/// Una plantilla no activa nunca opera en automático (la regla `obligacion_autorizada` escala).
+model PaymentObligation {
+  id             String           @id @default(cuid())
+  organizationId String           @map("organization_id")
+  obligationId   String           @map("obligation_id") // id estable de la obligación entre versiones
+  version        Int
+  kind           ObligationKind
+  status         ObligationStatus @default(draft)
+  template       Json // ObligationTemplate validada con Zod
+  schedule       Json // Schedule (calendario de pago) validado con Zod
+  createdBy      String           @map("created_by")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  activatedBy    String?          @map("activated_by")
+  activatedAt    DateTime?        @map("activated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, obligationId, version])
+  @@index([organizationId, status])
+  @@map("payment_obligations")
+}
+
+/// Una obligación en un periodo concreto. Única por (organización, obligación, inicio de periodo): idempotencia del tick.
+model ObligationOccurrence {
+  id                String           @id @default(cuid())
+  organizationId    String           @map("organization_id")
+  obligationId      String           @map("obligation_id")
+  obligationVersion Int              @map("obligation_version")
+  periodStart       DateTime         @map("period_start") @db.Date
+  periodEnd         DateTime         @map("period_end") @db.Date
+  dueDate           DateTime         @map("due_date") @db.Date
+  status            OccurrenceStatus @default(scheduled)
+  asOf              DateTime?        @map("as_of") @db.Timestamptz(6) // instante de la última evaluación
+  evidenceSha       String?          @map("evidence_sha")
+  evaluation        Json? // resultado de la última evaluación (conteos, hallazgos de corrida)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization                 @relation(fields: [organizationId], references: [id])
+  decisions    ObligationLineDecision[]
+  requests     ObligationApprovalRequest[]
+  payments     ObligationSimulatedPayment[]
+
+  @@unique([organizationId, obligationId, periodStart])
+  @@index([organizationId, status, dueDate])
+  @@map("obligation_occurrences")
+}
+
+/// Decisión sobre una línea de pago. Solo inserción (trigger): una reevaluación o una resolución humana crean otra fila.
+model ObligationLineDecision {
+  id              String                 @id @default(cuid())
+  organizationId  String                 @map("organization_id")
+  occurrenceId    String                 @map("occurrence_id")
+  lineId          String                 @map("line_id")
+  counterpartyRef String                 @map("counterparty_ref")
+  displayName     String                 @map("display_name")
+  lineType        String                 @map("line_type")
+  amountMinor     BigInt?                @map("amount_minor")
+  currency        String?                @db.Char(3)
+  decision        PaymentDecisionOutcome
+  decisionSource  PaymentDecisionSource  @map("decision_source")
+  reasonCodes     Json                   @map("reason_codes")
+  rules           Json
+  decisionKey     String                 @map("decision_key") // occurrenceId + lineId + hash de la evidencia
+  evidenceSha     String                 @map("evidence_sha")
+  actorId         String?                @map("actor_id")
+  comment         String?
+  evaluatedAt     DateTime               @map("evaluated_at") @db.Timestamptz(6)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization               @relation(fields: [organizationId], references: [id])
+  occurrence   ObligationOccurrence       @relation(fields: [occurrenceId], references: [id])
+  request      ObligationApprovalRequest? @relation("LineApprovalTrigger")
+
+  @@index([organizationId, occurrenceId, lineId, createdAt])
+  @@index([organizationId, counterpartyRef, createdAt])
+  @@map("obligation_line_decisions")
+}
+
+/// Bandeja humana de una línea que escaló. Una pendiente por línea (índice parcial en la migración).
+model ObligationApprovalRequest {
+  id             String                @id @default(cuid())
+  organizationId String                @map("organization_id")
+  occurrenceId   String                @map("occurrence_id")
+  lineId         String                @map("line_id")
+  decisionId     String                @unique @map("decision_id") // decisión que escaló
+  status         ApprovalRequestStatus @default(pending)
+  requestedAt    DateTime              @default(now()) @map("requested_at") @db.Timestamptz(6)
+  resolvedAt     DateTime?             @map("resolved_at") @db.Timestamptz(6)
+  resolvedBy     String?               @map("resolved_by")
+  comment        String?
+
+  organization Organization           @relation(fields: [organizationId], references: [id])
+  occurrence   ObligationOccurrence   @relation(fields: [occurrenceId], references: [id])
+  decision     ObligationLineDecision @relation("LineApprovalTrigger", fields: [decisionId], references: [id])
+
+  @@index([organizationId, status, requestedAt])
+  @@map("obligation_approval_requests")
+}
+
+/// Fase del calendario ya reclamada por un tick. El índice único hace idempotente al cron: reclamar dos veces es imposible.
+model ObligationScheduleEvent {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  obligationId   String   @map("obligation_id")
+  periodStart    DateTime @map("period_start") @db.Date
+  phase          String // prepare | alert_early | alert_urgent | execute
+  claimedAt      DateTime @default(now()) @map("claimed_at") @db.Timestamptz(6)
+  asOf           DateTime @map("as_of") @db.Timestamptz(6) // instante lógico del tick (reloj de demo o real)
+  result         Json?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, obligationId, periodStart, phase])
+  @@map("obligation_schedule_events")
+}
+
+/// Pago SIMULADO de una línea: a lo sumo uno por línea de una ocurrencia. No mueve dinero.
+model ObligationSimulatedPayment {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  occurrenceId   String   @map("occurrence_id")
+  lineId         String   @map("line_id")
+  decisionId     String   @map("decision_id")
+  amountMinor    BigInt   @map("amount_minor")
+  currency       String   @db.Char(3)
+  executedAt     DateTime @map("executed_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  occurrence   ObligationOccurrence @relation(fields: [occurrenceId], references: [id])
+
+  @@unique([occurrenceId, lineId])
+  @@map("obligation_simulated_payments")
+}
+
+/// Último monto y última cuenta CONFIRMADOS por contraparte (lo que leen la regla de variación y la de cuenta estable).
+/// Lo escribe una aprobación (automática ejecutada o humana), nunca el historial por sí solo.
+model ObligationConfirmation {
+  id                   String   @id @default(cuid())
+  organizationId       String   @map("organization_id")
+  obligationId         String   @map("obligation_id")
+  counterpartyRef      String   @map("counterparty_ref")
+  beneficiaryReference String?  @map("beneficiary_reference") // enmascarada ****1234
+  amountMinor          BigInt   @map("amount_minor")
+  confirmedPeriod      DateTime @map("confirmed_period") @db.Date
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, obligationId, counterpartyRef])
+  @@map("obligation_confirmations")
+}
+
+/// Reloj de demo por organización. Solo se usa con PACTA_SHOW_DEV_TOOLS=true; sin fila rige el reloj del sistema.
+model DemoClock {
+  organizationId String   @id @map("organization_id")
+  now            DateTime @db.Timestamptz(6)
+  updatedBy      String   @map("updated_by")
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("demo_clock")
 }
