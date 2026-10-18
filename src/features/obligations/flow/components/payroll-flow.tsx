@@ -151,7 +151,7 @@ function Inner({ info, controls, backHref }: { info: PayrollScenarioInfo | undef
       if (!state.ok) return setError(state.error);
       setEvaluation(state.evaluation);
       const fresh = state.evaluation.result;
-      if (fresh.held) return setNotice("La corrida quedó retenida (fondos insuficientes): no se paga nada.");
+      if (fresh.status === "held") return setNotice("La corrida quedó retenida (fondos insuficientes): no se paga nada.");
       const payable = fresh.lines.filter(
         (l) => l.amountMinor !== null && !paidLineIds.includes(l.lineId) && (l.decision === "approved" || (l.decision === "requires_approval" && resolution[l.lineId] === "approved_by_human")),
       );
@@ -169,7 +169,7 @@ function Inner({ info, controls, backHref }: { info: PayrollScenarioInfo | undef
     { id: "rules", title: "Plantilla de nómina", icon: "rules", summary: evaluation === null ? "Sin leer" : effectiveRules?.active ? `Activa · v${evaluation.template.version}` : "En borrador", status: st(evaluation === null ? "idle" : effectiveRules?.active ? "done" : "attention"), x: 330, y: 0 },
     { id: "clock", title: "Reloj de demo", icon: "clock", summary: evaluation === null ? "—" : (evaluation.stages[stageIndex]?.stage ?? "—"), status: st(evaluation === null ? "idle" : "done"), x: 660, y: 0 },
     { id: "lines", title: "Líneas de la corrida", icon: "lines", summary: evaluation === null ? "—" : `${evaluation.lines.length} líneas · ${evaluation.evidence.expectedCount} esperados`, status: st(evaluation === null ? "idle" : "done"), x: 990, y: 0 },
-    { id: "evaluate", title: "Evaluar nómina", icon: "evaluate", summary: result ? `${result.counts.approved} aprobadas · ${result.counts.requires_approval} a revisar · ${result.counts.blocked} bloqueadas` : "Sin evaluar", status: st(evaluation === null ? "idle" : result ? (result.held ? "blocked" : "done") : "ready"), x: 0, y: 220 },
+    { id: "evaluate", title: "Evaluar nómina", icon: "evaluate", summary: result ? `${result.counts.approved} aprobadas · ${result.counts.requires_approval} a revisar · ${result.counts.blocked} bloqueadas` : "Sin evaluar", status: st(evaluation === null ? "idle" : result ? (result.status === "held" ? "blocked" : "done") : "ready"), x: 0, y: 220 },
     { id: "approvals", title: "Aprobaciones", icon: "approvals", summary: result ? (unresolved.length > 0 ? `${unresolved.length} por resolver` : "Sin pendientes") : "Sin resultado", status: st(!result ? "idle" : unresolved.length > 0 ? "attention" : "done"), x: 330, y: 220 },
     { id: "payment", title: "Pago", icon: "payment", summary: paidLineIds.length > 0 ? `${paidLineIds.length} líneas pagadas` : "Nada pagado", status: st(paidLineIds.length > 0 ? "done" : result ? "ready" : "idle"), x: 660, y: 220 },
   ];
@@ -334,13 +334,13 @@ function RunSummary({ result }: { result: PayrollEvaluation["result"] }) {
         <Badge>{result.counts.approved} aprobadas</Badge>
         <Badge variant="secondary">{result.counts.requires_approval} a revisar</Badge>
         <Badge variant="destructive">{result.counts.blocked} bloqueadas</Badge>
-        {result.held && <Badge variant="destructive">Corrida retenida</Badge>}
+        {result.status === "held" && <Badge variant="destructive">Corrida retenida</Badge>}
       </div>
       {result.runFindings.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-muted-foreground">
           {result.runFindings.map((f, i) => (
             <li key={`${f.ruleId}-${i}`}>
-              <span className="font-medium text-foreground">{RUN_RULE_LABEL[f.ruleId] ?? f.ruleId}:</span> {f.explanation}
+              <span className="font-medium text-foreground">{RUN_RULE_LABEL[f.ruleId] ?? f.ruleId}:</span> {REASON_LABEL[f.reasonCode]}{f.counterpartyRef !== null && ` (${f.counterpartyRef})`}
             </li>
           ))}
         </ul>
@@ -381,7 +381,7 @@ function LineList({
             <details className="text-xs text-muted-foreground">
               <summary className="cursor-pointer">Reglas evaluadas</summary>
               <ul className="mt-1 flex flex-col gap-0.5">
-                {line.rulesEvaluated.map((r, i) => (
+                {line.rules.map((r, i) => (
                   <li key={`${r.ruleId}-${i}`}>
                     {r.result === "pass" ? "✓" : "✗"} {RULE_LABEL[r.ruleId] ?? r.ruleId}
                     {r.result !== "pass" && <span> — {r.explanation}</span>}
