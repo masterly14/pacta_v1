@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { platformNav } from "./nav";
 
 function isCurrent(pathname: string, href: string) {
+  // /platform es el resumen: solo activo en su propia ruta, no en cada subpágina.
+  if (href === "/platform") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

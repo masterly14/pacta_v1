@@ -8,7 +8,7 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
       <aside className="hidden w-56 shrink-0 flex-col border-r md:flex">
         <div className="px-4 py-5">
           <Link
-            href="/platform/invoices"
+            href="/platform"
             className="text-base font-semibold tracking-tight"
           >
             Pacta
