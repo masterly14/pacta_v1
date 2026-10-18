@@ -105,7 +105,7 @@ describe.skipIf(!url)("policies server (integration)", async () => {
     expect(await server.createPolicyVersion(actor, { autoApprovalLimitMinor: 50_000, monthlyBudgetMinor: 900_000 })).toMatchObject({ ok: true });
     const versions = await prisma.paymentPolicy.findMany({ where: { organizationId: ORG }, orderBy: { version: "asc" } });
     expect(versions.map((p) => [p.version, p.autoApprovalLimitMinor])).toEqual([[1, 200_000], [2, 50_000]]);
-    expect(await prisma.auditEvent.count({ where: { eventType: "payment_policy.version_created" } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { eventType: "politica_pago.version_creada" } })).toBe(1);
   });
 
   it("refuses an authorization for another organization's supplier", async () => {

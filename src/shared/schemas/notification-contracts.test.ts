@@ -8,16 +8,16 @@ function validIntent(overrides: Record<string, unknown> = {}) {
   return {
     schemaVersion: 1,
     notificationId: "ntf_1",
-    idempotencyKey: "approval_requested:req_1",
+    idempotencyKey: "aprobacion_solicitada:req_1",
     organizationId: "org_demo",
-    eventType: "approval_requested",
+    eventType: "aprobacion_solicitada",
     recipientId: "rcp_1",
     createdAt: "2026-10-17T16:00:00Z",
     invoiceId: "inv_1",
     decisionId: "dec_1",
     approvalRequestId: "req_1",
-    decision: "requires_approval",
-    reasonCodes: ["HUMAN_APPROVAL_REQUIRED"],
+    decision: "requiere_aprobacion",
+    reasonCodes: ["REQUIERE_APROBACION_HUMANA"],
     policyVersion: 3,
     amountMinor: 123450,
     currency: "USD",
@@ -49,15 +49,15 @@ describe("NotificationIntentSchema", () => {
   });
 
   it("exige coherencia evento/decisión", () => {
-    assert.equal(NotificationIntentSchema.safeParse(validIntent({ decision: "approved" })).success, false);
+    assert.equal(NotificationIntentSchema.safeParse(validIntent({ decision: "aprobada" })).success, false);
     assert.equal(NotificationIntentSchema.safeParse(validIntent({ approvalRequestId: null })).success, false);
-    assert.equal(NotificationIntentSchema.safeParse(validIntent({ eventType: "decision_blocked", decision: "approved" })).success, false);
-    assert.equal(NotificationIntentSchema.safeParse(validIntent({ eventType: "approval_resolved", decision: "requires_approval" })).success, false);
+    assert.equal(NotificationIntentSchema.safeParse(validIntent({ eventType: "decision_bloqueada", decision: "aprobada" })).success, false);
+    assert.equal(NotificationIntentSchema.safeParse(validIntent({ eventType: "aprobacion_resuelta", decision: "requiere_aprobacion" })).success, false);
   });
 
   it("rechaza reasonCodes vacíos o duplicados", () => {
     assert.equal(NotificationIntentSchema.safeParse(validIntent({ reasonCodes: [] })).success, false);
-    assert.equal(NotificationIntentSchema.safeParse(validIntent({ reasonCodes: ["DUPLICATE_INVOICE", "DUPLICATE_INVOICE"] })).success, false);
+    assert.equal(NotificationIntentSchema.safeParse(validIntent({ reasonCodes: ["FACTURA_DUPLICADA", "FACTURA_DUPLICADA"] })).success, false);
   });
 });
 
@@ -82,7 +82,7 @@ describe("parseWhatsAppWebhook", () => {
       kind: "delivery_status",
       channel: "whatsapp",
       providerMessageId: "wamid.STATUS1",
-      status: "delivered",
+      status: "entregado",
       occurredAt: "2025-10-09T08:53:20.000Z",
       error: null,
     });
@@ -94,7 +94,7 @@ describe("parseWhatsAppWebhook", () => {
   });
 
   it("normaliza respuestas de texto y botones como evidencia, con contexto", () => {
-    for (const [payload, expectedPayload] of [[fx.textReply, null], [fx.quickReplyButton, "approve:req_1"], [fx.interactiveButtonReply, "reject:req_1"]] as const) {
+    for (const [payload, expectedPayload] of [[fx.textReply, null], [fx.quickReplyButton, "pagar:req_1"], [fx.interactiveButtonReply, "rechazar:req_1"]] as const) {
       const result = parseWhatsAppWebhook(payload, fx.PHONE_NUMBER_ID);
       assert.equal(result.ok, true);
       if (!result.ok) return;
@@ -142,8 +142,8 @@ describe("eventos canónicos", () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     const event = result.events[0]!;
-    assert.equal(inboundEventKey(event), "whatsapp:status:wamid.STATUS1:delivered");
-    assert.notEqual(inboundEventKey(event), inboundEventKey({ ...event, status: "read" } as typeof event));
+    assert.equal(inboundEventKey(event), "whatsapp:status:wamid.STATUS1:entregado");
+    assert.notEqual(inboundEventKey(event), inboundEventKey({ ...event, status: "leido" } as typeof event));
     assert.equal(InboundChannelEventSchema.safeParse(event).success, true);
   });
 });

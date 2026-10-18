@@ -85,7 +85,7 @@ async function loadAuthorizations(tx: Tx, invoice: InvoiceContext, now: Date): P
     const approvalsInCurrentPeriod = await tx.paymentDecision.count({
       where: {
         authorizationId: auth.id,
-        decision: "approved",
+        decision: "aprobada",
         ...(period === null ? {} : { invoiceDate: { gte: toDbDate(period.start), lte: toDbDate(period.end) } }),
       },
     });
@@ -133,7 +133,7 @@ async function loadPriorDecisions(tx: Tx, invoice: InvoiceContext): Promise<Engi
   }));
 }
 
-// Otras facturas con el mismo archivo (sha256) cuya última decisión no es `blocked`.
+// Otras facturas con el mismo archivo (sha256) cuya última decisión no es `bloqueada`.
 // Una copia aún sin decisión no cuenta: si no, la primera factura se bloquearía por la segunda.
 async function loadDocumentDuplicates(tx: Tx, invoice: InvoiceContext): Promise<string[]> {
   if (invoice.documentId === null) return [];
@@ -163,7 +163,7 @@ async function loadDocumentDuplicates(tx: Tx, invoice: InvoiceContext): Promise<
   });
   const latest = new Map<string, string>();
   for (const d of decisions) if (!latest.has(d.invoiceId)) latest.set(d.invoiceId, d.decision);
-  return invoiceIds.filter((id) => latest.has(id) && latest.get(id) !== "blocked");
+  return invoiceIds.filter((id) => latest.has(id) && latest.get(id) !== "bloqueada");
 }
 
 // Presupuesto consumido = aprobaciones del mes calendario UTC en la moneda de la política.
@@ -171,7 +171,7 @@ async function loadDocumentDuplicates(tx: Tx, invoice: InvoiceContext): Promise<
 async function loadBudgetUsed(tx: Tx, organizationId: string, currency: string, now: Date): Promise<number> {
   const { start, endExclusive } = monthBoundsUtc(now);
   const result = await tx.paymentDecision.aggregate({
-    where: { organizationId, decision: "approved", currency, evaluatedAt: { gte: start, lt: endExclusive } },
+    where: { organizationId, decision: "aprobada", currency, evaluatedAt: { gte: start, lt: endExclusive } },
     _sum: { amountMinor: true },
   });
   return result._sum.amountMinor ?? 0;

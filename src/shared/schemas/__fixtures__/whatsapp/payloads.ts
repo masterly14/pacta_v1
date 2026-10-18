@@ -54,7 +54,7 @@ export const quickReplyButton = envelope({
       id: "wamid.MSG2",
       timestamp: "1760000300",
       type: "button",
-      button: { payload: "approve:req_1", text: "Aprobar" },
+      button: { payload: "pagar:req_1", text: "Pagar" },
       context: { from: "15550001111", id: "wamid.OUT1" },
     },
   ],
@@ -68,7 +68,7 @@ export const interactiveButtonReply = envelope({
       id: "wamid.MSG3",
       timestamp: "1760000400",
       type: "interactive",
-      interactive: { type: "button_reply", button_reply: { id: "reject:req_1", title: "Rechazar" } },
+      interactive: { type: "button_reply", button_reply: { id: "rechazar:req_1", title: "Rechazar" } },
     },
   ],
 });

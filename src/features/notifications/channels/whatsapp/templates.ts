@@ -1,13 +1,18 @@
 import type { NotificationEventType, NotificationIntent } from "@/shared/schemas/notification";
+import { DECISION_LABEL, describeReasons } from "../../copy";
+import { REPLY_ACTIONS, buildReplyPayload, type ReplyAction } from "../../inbound/reply-reference";
 
 // Registro de plantillas WhatsApp por evento. Los nombres deben coincidir con las plantillas
-// APROBADAS en Meta Business Manager (bloqueo externo antes de enviar de verdad).
-// Cada plantilla: {{1}} proveedor, {{2}} nº factura, {{3}} importe, {{4}} códigos de motivo; botón URL → dashboard.
+// APROBADAS en Meta Business Manager (idioma `es`). Texto exacto a registrar: ver
+// `WHATSAPP_TEMPLATE_TEXT` al final de este archivo.
 
 export type WhatsAppTemplateDefinition = {
   name: string;
   languageCode: string;
   bodyParams: (intent: NotificationIntent) => string[];
+  // `quick_reply`: tres botones que devuelven `acción:solicitud` (pista, nunca autorización).
+  // `url`: un botón al dashboard con la ruta como sufijo.
+  button: "quick_reply" | "url";
 };
 
 const MAX_TEXT_LENGTH = 60;
@@ -46,23 +51,61 @@ export function formatAmountMinor(amountMinor: number | null, currency: string |
   return `${whole}${digits > 0 ? `.${fraction}` : ""} ${currency}`;
 }
 
+// {{1}} proveedor, {{2}} nº factura, {{3}} importe, {{4}} motivo (texto fijo del catálogo).
 function commonParams(intent: NotificationIntent): string[] {
   return [
     sanitizeUntrustedText(intent.supplierName),
     sanitizeUntrustedText(intent.invoiceNumber),
     formatAmountMinor(intent.amountMinor, intent.currency),
-    intent.reasonCodes.join(", "), // enum cerrado: seguro
+    describeReasons(intent.reasonCodes),
   ];
 }
 
+// {{1}} proveedor, {{2}} nº factura, {{3}} importe, {{4}} estado, {{5}} motivo.
+function statusParams(intent: NotificationIntent): string[] {
+  const [supplier, invoice, amount, reason] = commonParams(intent) as [string, string, string, string];
+  return [supplier, invoice, amount, DECISION_LABEL[intent.decision], reason];
+}
+
 export const WHATSAPP_TEMPLATES: Record<NotificationEventType, WhatsAppTemplateDefinition> = {
-  approval_requested: { name: "pacta_approval_requested", languageCode: "es", bodyParams: commonParams },
-  approval_resolved: { name: "pacta_approval_resolved", languageCode: "es", bodyParams: commonParams },
-  decision_blocked: { name: "pacta_decision_status", languageCode: "es", bodyParams: commonParams },
-  decision_approved_simulated: { name: "pacta_decision_status", languageCode: "es", bodyParams: commonParams },
+  aprobacion_solicitada: { name: "pacta_aprobacion_requerida", languageCode: "es", bodyParams: commonParams, button: "quick_reply" },
+  aprobacion_resuelta: { name: "pacta_aprobacion_resuelta", languageCode: "es", bodyParams: statusParams, button: "url" },
+  decision_bloqueada: { name: "pacta_estado_factura", languageCode: "es", bodyParams: statusParams, button: "url" },
+  decision_aprobada_simulada: { name: "pacta_estado_factura", languageCode: "es", bodyParams: statusParams, button: "url" },
 };
 
 // Sufijo del botón URL dinámico: la ruta sin la barra inicial.
 export function deepLinkSuffix(intent: NotificationIntent): string {
   return intent.deepLinkPath.replace(/^\//, "");
 }
+
+// Carga de cada botón de respuesta rápida, en el orden en que se registran en la plantilla
+// (índices 0, 1, 2 = Pagar, Rechazar, Más detalles). Exige una solicitud de aprobación.
+export function quickReplyPayloads(intent: NotificationIntent): { index: "0" | "1" | "2"; action: ReplyAction; payload: string }[] {
+  const approvalRequestId = intent.approvalRequestId;
+  if (approvalRequestId === null) {
+    throw new Error("Los botones de respuesta exigen approvalRequestId");
+  }
+  const indexes = ["0", "1", "2"] as const;
+  return REPLY_ACTIONS.map((action, position) => ({
+    index: indexes[position]!,
+    action,
+    payload: buildReplyPayload(action, approvalRequestId),
+  }));
+}
+
+// Texto exacto que debe registrarse en Meta Business Manager (categoría Utilidad, idioma Español).
+export const WHATSAPP_TEMPLATE_TEXT = {
+  pacta_aprobacion_requerida: {
+    body: "Una factura necesita tu aprobación.\n\nProveedor: {{1}}\nFactura: {{2}}\nImporte: {{3}}\nMotivo: {{4}}\n\nElige una opción:",
+    buttons: ["Pagar", "Rechazar", "Más detalles"], // respuesta rápida
+  },
+  pacta_aprobacion_resuelta: {
+    body: "Una persona resolvió una solicitud de aprobación.\n\nProveedor: {{1}}\nFactura: {{2}}\nImporte: {{3}}\nEstado: {{4}}\nMotivo: {{5}}",
+    buttons: ["Ver en Pacta"], // URL dinámica: <APP_URL>/{{1}}
+  },
+  pacta_estado_factura: {
+    body: "Actualización de una factura.\n\nProveedor: {{1}}\nFactura: {{2}}\nImporte: {{3}}\nEstado: {{4}}\nMotivo: {{5}}",
+    buttons: ["Ver en Pacta"], // URL dinámica: <APP_URL>/{{1}}
+  },
+} as const;

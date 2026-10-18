@@ -6,16 +6,16 @@ import { WHATSAPP_TEMPLATES, deepLinkSuffix, formatAmountMinor, sanitizeUntruste
 const intent: NotificationIntent = {
   schemaVersion: 1,
   notificationId: "ntf_1",
-  idempotencyKey: "approval_requested:req_1",
+  idempotencyKey: "aprobacion_solicitada:req_1",
   organizationId: "org_demo",
-  eventType: "approval_requested",
+  eventType: "aprobacion_solicitada",
   recipientId: "rcp_1",
   createdAt: "2026-10-17T16:00:00Z",
   invoiceId: "inv_1",
   decisionId: "dec_1",
   approvalRequestId: "req_1",
-  decision: "requires_approval",
-  reasonCodes: ["HUMAN_APPROVAL_REQUIRED", "RECURRENCE_NOT_AUTHORIZED"],
+  decision: "requiere_aprobacion",
+  reasonCodes: ["REQUIERE_APROBACION_HUMANA", "RECURRENCIA_NO_AUTORIZADA"],
   policyVersion: 3,
   amountMinor: 123450,
   currency: "USD",
@@ -32,9 +32,9 @@ describe("plantillas WhatsApp", () => {
   });
 
   it("construye parámetros deterministas", () => {
-    const params = WHATSAPP_TEMPLATES.approval_requested.bodyParams(intent);
-    expect(params).toEqual(["Nube Hosting LLC", "F-001", "1234.50 USD", "HUMAN_APPROVAL_REQUIRED, RECURRENCE_NOT_AUTHORIZED"]);
-    expect(WHATSAPP_TEMPLATES.approval_requested.bodyParams(intent)).toEqual(params);
+    const params = WHATSAPP_TEMPLATES.aprobacion_solicitada.bodyParams(intent);
+    expect(params).toEqual(["Nube Hosting LLC", "F-001", "1234.50 USD", "Pago recurrente no autorizado"]);
+    expect(WHATSAPP_TEMPLATES.aprobacion_solicitada.bodyParams(intent)).toEqual(params);
   });
 
   it("usa la escala de cada moneda y no inventa desconocidos", () => {
@@ -66,7 +66,7 @@ describe("contrato de salida Graph API", () => {
       to: "573001112233",
       type: "template",
       template: {
-        name: "pacta_approval_requested",
+        name: "pacta_aprobacion_requerida",
         language: { code: "es" },
         components: [
           { type: "body", parameters: [{ type: "text", text: "Nube Hosting LLC" }] },

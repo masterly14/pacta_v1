@@ -73,7 +73,7 @@ export function makePriorDecision(overrides: Partial<EnginePriorDecision> = {}):
     invoiceNumber: "VER-2026-09",
     amountMinor: 2000,
     invoiceDate: "2026-09-01",
-    decision: "approved",
+    decision: "aprobada",
     ...overrides,
   };
 }

@@ -18,7 +18,7 @@ import { INVOICE_MIME_TYPES, MAX_ATTACHMENT_BYTES } from "./gmail/download-gmail
 import { reprocessEmailInvoice } from "./pipeline/process-email";
 import { processInvoice, type ProcessResult } from "./pipeline/process-invoice";
 
-const OUTCOME_LABEL = { approved: "✅ aprobada", blocked: "🔴 bloqueada", requires_approval: "🟡 requiere aprobación" } as const;
+const OUTCOME_LABEL = { aprobada: "✅ aprobada", bloqueada: "🔴 bloqueada", requiere_aprobacion: "🟡 requiere aprobación" } as const;
 const MAX_TEXT_LENGTH = 50_000;
 
 function describe(result: ProcessResult): FormActionState {
@@ -28,7 +28,7 @@ function describe(result: ProcessResult): FormActionState {
       : { ok: false, message: "La factura se extrajo pero no se pudo evaluar. Reintenta en unos segundos." };
   }
   if ("skipped" in result) return { ok: true, message: "Esta factura ya estaba procesada." };
-  const reasons = result.decision.reasonCodes.filter((c) => c !== "HUMAN_APPROVAL_REQUIRED").join(", ");
+  const reasons = result.decision.reasonCodes.filter((c) => c !== "REQUIERE_APROBACION_HUMANA").join(", ");
   return { ok: true, message: `Factura procesada · ${OUTCOME_LABEL[result.decision.decision]} · ${reasons}` };
 }
 

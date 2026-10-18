@@ -31,17 +31,17 @@ function invoiceWithContract(amountMinor: number) {
 describe("contract match → decide()", () => {
   it("escalates an authorized invoice whose amount contradicts the contract", () => {
     const result = decide(invoiceWithContract(2400), makeFacts()); // dentro de la autorización (25.00)
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("CONTRACT_MISMATCH");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("CONTRATO_NO_COINCIDE");
   });
 
   it("approves an authorized invoice that also matches its contract", () => {
-    expect(decide(invoiceWithContract(2000), makeFacts()).decision).toBe("approved");
+    expect(decide(invoiceWithContract(2000), makeFacts()).decision).toBe("aprobada");
   });
 
   it("never approves on a matching contract alone, without an authorization", () => {
     const result = decide(invoiceWithContract(2000), makeFacts({ authorizations: [] }));
-    expect(result.decision).not.toBe("approved");
-    expect(result.reasonCodes).toEqual(expect.arrayContaining([expect.stringMatching(/NOT_AUTHORIZED/)]));
+    expect(result.decision).not.toBe("aprobada");
+    expect(result.reasonCodes).toEqual(expect.arrayContaining([expect.stringMatching(/NO_AUTORIZAD/)]));
   });
 });

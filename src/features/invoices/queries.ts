@@ -56,7 +56,7 @@ export async function getInvoiceDetail(organizationId: string, invoiceId: string
     orderBy: { evaluatedAt: "desc" },
   });
   const pendingRequest = await db.approvalRequest.findFirst({
-    where: { organizationId, invoiceId, status: "pending" },
+    where: { organizationId, invoiceId, status: "pendiente" },
     select: { id: true },
   });
 

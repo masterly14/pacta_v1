@@ -32,15 +32,17 @@ model Organization {
   ignoredItems     IgnoredInboundItem[]
 
   // Vertical B
-  suppliers             Supplier[]
-  paymentPolicies       PaymentPolicy[]
-  paymentAuthorizations PaymentAuthorization[]
-  paymentDecisions      PaymentDecision[]
-  approvalRequests      ApprovalRequest[]
-  bankImportBatches     BankImportBatch[]
-  bankTransactions      BankTransaction[]
-  auditEvents           AuditEvent[]
-  invoices              Invoice[]
+  suppliers              Supplier[]
+  paymentPolicies        PaymentPolicy[]
+  paymentAuthorizations  PaymentAuthorization[]
+  paymentDecisions       PaymentDecision[]
+  approvalRequests       ApprovalRequest[]
+  bankImportBatches      BankImportBatch[]
+  bankTransactions       BankTransaction[]
+  auditEvents            AuditEvent[]
+  invoices               Invoice[]
+  notificationRecipients NotificationRecipient[]
+  inboundChannelMessages InboundChannelMessage[]
 
   // Vertical A
   contracts Contract[]
@@ -111,21 +113,21 @@ enum PaymentFrequency {
 }
 
 enum PaymentDecisionOutcome {
-  approved
-  blocked
-  requires_approval
+  aprobada
+  bloqueada
+  requiere_aprobacion
 }
 
 enum PaymentDecisionSource {
-  automatic
-  human
+  automatica
+  humana
 }
 
 enum ApprovalRequestStatus {
-  pending
-  approved
-  rejected
-  cancelled
+  pendiente
+  aprobada
+  rechazada
+  cancelada
 }
 
 /// Catálogo de proveedores. Estar en el catálogo NO implica autorización.
@@ -217,13 +219,13 @@ model ApprovalPermission {
 }
 
 /// Cada PaymentDecision validada. Solo inserción: una reevaluación crea otra fila.
-/// @db-guarantee CHECK payment_decisions_actor_check: automatic => actorId null;
-///   human => actorId y approvalRequestId no null.
-/// @db-guarantee CHECK payment_decisions_approved_check: approved => policyVersion, amountMinor y currency no null.
+/// @db-guarantee CHECK payment_decisions_actor_check: automatica => actorId null;
+///   humana => actorId y approvalRequestId no null.
+/// @db-guarantee CHECK payment_decisions_approved_check: aprobada => policyVersion, amountMinor y currency no null.
 /// @db-guarantee UNIQUE parcial payment_decisions_one_approved_per_invoice: (organizationId, invoiceId)
-///   WHERE decision = 'approved' — una factura se aprueba y reserva presupuesto a lo sumo una vez.
+///   WHERE decision = 'aprobada' — una factura se aprueba y reserva presupuesto a lo sumo una vez.
 /// @db-guarantee TRIGGER payment_decisions_append_only: rechaza UPDATE y DELETE.
-/// @db-guarantee CHECK payment_decisions_authorization_check: authorizationId solo en decisiones approved
+/// @db-guarantee CHECK payment_decisions_authorization_check: authorizationId solo en decisiones aprobada
 ///   (migración 20261017195842_add_decision_invoice_date_and_authorization).
 model PaymentDecision {
   id                String                 @id @default(cuid())
@@ -262,13 +264,13 @@ model PaymentDecision {
 
 /// Bandeja de intervención humana.
 /// @db-guarantee UNIQUE parcial approval_requests_one_pending_per_invoice: (organizationId, invoiceId)
-///   WHERE status = 'pending'.
+///   WHERE status = 'pendiente'.
 model ApprovalRequest {
   id             String                @id @default(cuid())
   organizationId String                @map("organization_id")
   invoiceId      String                @map("invoice_id")
   decisionId     String                @unique @map("decision_id") // decisión que escaló
-  status         ApprovalRequestStatus @default(pending)
+  status         ApprovalRequestStatus @default(pendiente)
   requestedAt    DateTime              @default(now()) @map("requested_at") @db.Timestamptz(6)
   resolvedAt     DateTime?             @map("resolved_at") @db.Timestamptz(6)
   resolvedBy     String?               @map("resolved_by")
@@ -616,4 +618,70 @@ model Invoice {
   @@index([organizationId, extractionStatus])
   @@index([gmailInboundMessageId])
   @@map("invoices")
+}
+
+enum NotificationChannel {
+  whatsapp
+  slack
+  email
+}
+
+enum NotificationRecipientStatus {
+  active
+  disabled
+}
+
+enum InboundMessageContext {
+  solicitud_citada // la respuesta cita una solicitud pendiente de la organización
+  unica_pendiente // sin cita explícita; hay exactamente una solicitud pendiente (inferencia)
+  ambigua // varias solicitudes pendientes y ninguna citada
+  sin_aprobaciones_abiertas // no hay solicitudes pendientes
+  solicitud_no_pendiente // cita una solicitud inexistente, ajena o ya resuelta
+}
+
+/// Destinatario de notificaciones (p. ej. administrador). Su dirección identifica a la organización
+/// de un mensaje entrante; una dirección desconocida o deshabilitada se omite.
+/// @db-guarantee UNIQUE (channel, address): una dirección pertenece a una sola organización.
+model NotificationRecipient {
+  id             String                      @id
+  organizationId String                      @map("organization_id")
+  channel        NotificationChannel
+  address        String // WhatsApp: E.164 solo dígitos, sin '+'
+  status         NotificationRecipientStatus @default(active)
+  verifiedAt     DateTime?                   @map("verified_at") @db.Timestamptz(6)
+  createdBy      String                      @map("created_by")
+  createdAt      DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  messages     InboundChannelMessage[]
+
+  @@unique([channel, address])
+  @@index([organizationId])
+  @@map("notification_recipients")
+}
+
+/// Mensaje entrante de un canal de notificación. Evidencia NO confiable: nunca resuelve una
+/// aprobación. `eventKey` único = idempotencia frente a reintentos del proveedor.
+model InboundChannelMessage {
+  id                       String                @id
+  organizationId           String                @map("organization_id")
+  recipientId              String                @map("recipient_id")
+  channel                  NotificationChannel
+  eventKey                 String                @unique @map("event_key")
+  providerMessageId        String                @map("provider_message_id")
+  replyToProviderMessageId String?               @map("reply_to_provider_message_id")
+  text                     String?
+  buttonPayload            String?               @map("button_payload")
+  claimedAction            String?               @map("claimed_action") // pista del botón; no autoriza
+  context                  InboundMessageContext
+  approvalRequestId        String?               @map("approval_request_id")
+  receivedAt               DateTime              @map("received_at") @db.Timestamptz(6)
+  createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  recipient    NotificationRecipient @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, receivedAt])
+  @@index([approvalRequestId])
+  @@map("inbound_channel_messages")
 }

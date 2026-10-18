@@ -21,9 +21,9 @@ const selectClass =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 const EXPECTED = {
-  approved: { label: "aprobada", variant: "default" },
-  blocked: { label: "bloqueada", variant: "destructive" },
-  requires_approval: { label: "requiere aprobación", variant: "secondary" },
+  aprobada: { label: "aprobada", variant: "default" },
+  bloqueada: { label: "bloqueada", variant: "destructive" },
+  requiere_aprobacion: { label: "requiere aprobación", variant: "secondary" },
 } as const;
 
 function ScenarioButton({ id, label, expected }: (typeof DEMO_SCENARIOS)[number]) {

@@ -24,9 +24,9 @@ export const metadata: Metadata = { title: "Facturas" };
 export const maxDuration = 60;
 
 const DECISION = {
-  approved: { label: "aprobada", variant: "default" },
-  blocked: { label: "bloqueada", variant: "destructive" },
-  requires_approval: { label: "requiere aprobación", variant: "secondary" },
+  aprobada: { label: "aprobada", variant: "default" },
+  bloqueada: { label: "bloqueada", variant: "destructive" },
+  requiere_aprobacion: { label: "requiere aprobación", variant: "secondary" },
 } as const;
 const EXTRACTION = {
   pending: { label: "pendiente", variant: "outline" },
@@ -129,7 +129,7 @@ async function InvoicesData() {
                       ) : (
                         <Badge variant={DECISION[inv.decision.decision].variant}>
                           {DECISION[inv.decision.decision].label}
-                          {inv.decision.decisionSource === "human" ? " · persona" : ""}
+                          {inv.decision.decisionSource === "humana" ? " · persona" : ""}
                         </Badge>
                       )}
                     </TableCell>

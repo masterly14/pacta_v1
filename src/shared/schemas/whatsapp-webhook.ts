@@ -96,10 +96,10 @@ export type WhatsAppWebhookParseResult =
   | { ok: false; reason: "invalid_envelope" };
 
 const DELIVERY_STATUS_MAP = {
-  sent: "sent",
-  delivered: "delivered",
-  read: "read",
-  failed: "failed",
+  sent: "enviado",
+  delivered: "entregado",
+  read: "leido",
+  failed: "fallido",
 } as const;
 
 function unixSecondsToIso(value: string): string | null {

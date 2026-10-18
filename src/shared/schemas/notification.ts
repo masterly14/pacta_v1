@@ -18,13 +18,13 @@ export const NotificationChannelSchema = z.enum(["whatsapp", "slack", "email"]);
 
 // Lista cerrada: añadir un evento es un cambio de contrato.
 export const NotificationEventTypeSchema = z.enum([
-  "approval_requested", // factura en `requires_approval`: acción humana pendiente
-  "approval_resolved", // un humano aprobó o bloqueó la solicitud
-  "decision_blocked", // bloqueo absoluto (duplicado, presupuesto)
-  "decision_approved_simulated", // aprobada automáticamente PARA PAGO SIMULADO (no es pago)
+  "aprobacion_solicitada", // factura en `requiere_aprobacion`: acción humana pendiente
+  "aprobacion_resuelta", // un humano aprobó o bloqueó la solicitud
+  "decision_bloqueada", // bloqueo absoluto (duplicado, presupuesto)
+  "decision_aprobada_simulada", // aprobada automáticamente PARA PAGO SIMULADO (no es pago)
 ]);
 
-export const NotificationDeliveryStatusSchema = z.enum(["queued", "sent", "delivered", "read", "failed"]);
+export const NotificationDeliveryStatusSchema = z.enum(["en_cola", "enviado", "entregado", "leido", "fallido"]);
 
 export const NotificationRecipientStatusSchema = z.enum(["active", "disabled"]);
 
@@ -77,27 +77,27 @@ export const NotificationIntentSchema = z
     if ((n.amountMinor === null) !== (n.currency === null)) {
       ctx.addIssue({ code: "custom", path: ["currency"], message: "amountMinor y currency van juntos o ambos null" });
     }
-    if (n.eventType === "approval_requested") {
-      if (n.decision !== "requires_approval") {
-        ctx.addIssue({ code: "custom", path: ["decision"], message: "approval_requested exige decision 'requires_approval'" });
+    if (n.eventType === "aprobacion_solicitada") {
+      if (n.decision !== "requiere_aprobacion") {
+        ctx.addIssue({ code: "custom", path: ["decision"], message: "aprobacion_solicitada exige decision 'requiere_aprobacion'" });
       }
       if (n.approvalRequestId === null) {
-        ctx.addIssue({ code: "custom", path: ["approvalRequestId"], message: "approval_requested exige approvalRequestId" });
+        ctx.addIssue({ code: "custom", path: ["approvalRequestId"], message: "aprobacion_solicitada exige approvalRequestId" });
       }
     }
-    if (n.eventType === "approval_resolved") {
-      if (n.decision === "requires_approval") {
-        ctx.addIssue({ code: "custom", path: ["decision"], message: "approval_resolved exige 'approved' o 'blocked'" });
+    if (n.eventType === "aprobacion_resuelta") {
+      if (n.decision === "requiere_aprobacion") {
+        ctx.addIssue({ code: "custom", path: ["decision"], message: "aprobacion_resuelta exige 'aprobada' o 'bloqueada'" });
       }
       if (n.approvalRequestId === null) {
-        ctx.addIssue({ code: "custom", path: ["approvalRequestId"], message: "approval_resolved exige approvalRequestId" });
+        ctx.addIssue({ code: "custom", path: ["approvalRequestId"], message: "aprobacion_resuelta exige approvalRequestId" });
       }
     }
-    if (n.eventType === "decision_blocked" && n.decision !== "blocked") {
-      ctx.addIssue({ code: "custom", path: ["decision"], message: "decision_blocked exige decision 'blocked'" });
+    if (n.eventType === "decision_bloqueada" && n.decision !== "bloqueada") {
+      ctx.addIssue({ code: "custom", path: ["decision"], message: "decision_bloqueada exige decision 'bloqueada'" });
     }
-    if (n.eventType === "decision_approved_simulated" && n.decision !== "approved") {
-      ctx.addIssue({ code: "custom", path: ["decision"], message: "decision_approved_simulated exige decision 'approved'" });
+    if (n.eventType === "decision_aprobada_simulada" && n.decision !== "aprobada") {
+      ctx.addIssue({ code: "custom", path: ["decision"], message: "decision_aprobada_simulada exige decision 'aprobada'" });
     }
   });
 
