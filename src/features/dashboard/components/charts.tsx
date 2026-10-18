@@ -311,22 +311,8 @@ export function BarList({ items, barClassName = "bg-foreground/80" }: { items: r
 }
 
 // ---------------------------------------------------------------------------
-// Entrada escalonada de tarjetas y leyenda
+// Leyenda
 // ---------------------------------------------------------------------------
-
-export function Reveal({ children, delay = 0, className }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const reduced = useReducedMotion();
-  return (
-    <motion.div
-      className={className}
-      initial={reduced ? false : { opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: EASE }}
-    >
-      {children}
-    </motion.div>
-  );
-}
 
 function Legend({ items }: { items: readonly { label: string; className: string }[] }) {
   return (

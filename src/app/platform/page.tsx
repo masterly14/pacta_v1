@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatMinor } from "@/features/contracts/money";
-import { AnimatedNumber, BarList, Donut, RadialGauge, Reveal, Sparkline, StackedBars } from "@/features/dashboard/components/charts";
+import { AnimatedNumber, BarList, Donut, RadialGauge, Sparkline, StackedBars } from "@/features/dashboard/components/charts";
 import { formatAmounts } from "@/features/dashboard/components/labels";
 import { getDashboard, type Dashboard } from "@/features/dashboard/server";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
@@ -86,24 +86,24 @@ async function DashboardData() {
   return (
     <>
       <KpiRow dashboard={dashboard} />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Reveal delay={0.2} className="lg:col-span-2">
+      <div className="stagger grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
           <DecisionsTrendCard dashboard={dashboard} />
-        </Reveal>
-        <Reveal delay={0.25}>
+        </div>
+        <div>
           <DecisionMixCard dashboard={dashboard} />
-        </Reveal>
+        </div>
       </div>
-      <Reveal delay={0.3}>
+      <div>
         <OutsidePaymentsCard dashboard={dashboard} />
-      </Reveal>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Reveal delay={0.35}>
+      </div>
+      <div className="stagger grid gap-6 lg:grid-cols-3">
+        <div>
           <SafetyCard dashboard={dashboard} />
-        </Reveal>
-        <Reveal delay={0.4} className="lg:col-span-2">
+        </div>
+        <div className="lg:col-span-2">
           <SubscriptionsCard dashboard={dashboard} />
-        </Reveal>
+        </div>
       </div>
     </>
   );
@@ -118,14 +118,14 @@ function KpiRow({ dashboard }: { dashboard: Dashboard }) {
   const receivedTotal = trends.receivedByDay.reduce((sum, d) => sum + d.count, 0);
   const budgetPercent = budget === null || budget.monthlyBudgetMinor === 0 ? null : (budget.usedMinor / budget.monthlyBudgetMinor) * 100;
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Reveal delay={0}>
+    <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div>
         <KpiCard label={`Facturas recibidas · ${trends.days} días`}>
           <AnimatedNumber value={receivedTotal} className="text-3xl font-semibold tracking-tight" />
           <Sparkline values={trends.receivedByDay.map((d) => d.count)} className="mt-3 text-sky-500" />
         </KpiCard>
-      </Reveal>
-      <Reveal delay={0.05}>
+      </div>
+      <div>
         <KpiCard label={`Autonomía · ${dashboard.month}`}>
           {decisions.autonomyRate === null ? (
             <span className="text-3xl font-semibold tracking-tight">—</span>
@@ -136,8 +136,8 @@ function KpiRow({ dashboard }: { dashboard: Dashboard }) {
             {decisions.total === 0 ? "Sin facturas decididas este mes." : `${decisions.autoApproved} de ${decisions.total} aprobadas sin intervención humana.`}
           </p>
         </KpiCard>
-      </Reveal>
-      <Reveal delay={0.1}>
+      </div>
+      <div>
         <KpiCard label="Presupuesto del mes">
           {budget === null || budgetPercent === null ? (
             <p className="text-sm text-muted-foreground">
@@ -156,8 +156,8 @@ function KpiRow({ dashboard }: { dashboard: Dashboard }) {
             </div>
           )}
         </KpiCard>
-      </Reveal>
-      <Reveal delay={0.15}>
+      </div>
+      <div>
         <Link href="/platform/approvals" className="group block h-full">
           <KpiCard label="Aprobaciones pendientes" interactive>
             <AnimatedNumber
@@ -171,7 +171,7 @@ function KpiRow({ dashboard }: { dashboard: Dashboard }) {
             </p>
           </KpiCard>
         </Link>
-      </Reveal>
+      </div>
     </div>
   );
 }
@@ -406,7 +406,7 @@ function DashboardSkeleton() {
           <div key={i} className="h-36 animate-pulse rounded-xl border bg-muted/40" />
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="stagger grid gap-6 lg:grid-cols-3">
         <div className="h-80 animate-pulse rounded-xl border bg-muted/40 lg:col-span-2" />
         <div className="h-80 animate-pulse rounded-xl border bg-muted/40" />
       </div>
