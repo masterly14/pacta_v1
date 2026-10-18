@@ -85,6 +85,7 @@ export type ProcessCanvasProps = {
   panelTitle: string;
   panel: React.ReactNode;
   backHref: string;
+  wide?: boolean;
 };
 
 export function ProcessCanvas(props: ProcessCanvasProps) {
@@ -95,7 +96,7 @@ export function ProcessCanvas(props: ProcessCanvasProps) {
   );
 }
 
-function Canvas({ title, steps, edges, selectedId, onSelect, controls, panelTitle, panel, backHref }: ProcessCanvasProps) {
+function Canvas({ title, steps, edges, selectedId, onSelect, controls, panelTitle, panel, backHref, wide = false }: ProcessCanvasProps) {
   const nodes = useMemo<StepNode[]>(
     () => steps.map((step) => ({ id: step.id, type: "step", position: { x: step.x, y: step.y }, data: { step, selected: step.id === selectedId }, draggable: false })),
     [steps, selectedId],
@@ -106,7 +107,7 @@ function Canvas({ title, steps, edges, selectedId, onSelect, controls, panelTitl
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-white">
-      <div className="absolute inset-0 sm:right-[27rem]">
+      <div className={cn("absolute inset-0", wide ? "sm:right-[36rem]" : "sm:right-[27rem]")}>
         <ReactFlow
           nodes={nodes}
           edges={rfEdges}
@@ -137,7 +138,7 @@ function Canvas({ title, steps, edges, selectedId, onSelect, controls, panelTitl
 
       <section
         aria-label={panelTitle}
-        className={`${overlay} absolute right-3 bottom-3 left-3 flex max-h-[50vh] flex-col gap-3 overflow-y-auto rounded-xl p-3 sm:top-20 sm:right-4 sm:bottom-4 sm:left-auto sm:max-h-none sm:w-[26rem]`}
+        className={cn(overlay, "absolute right-3 bottom-3 left-3 flex max-h-[50vh] flex-col gap-3 overflow-y-auto rounded-xl p-3 sm:top-20 sm:right-4 sm:bottom-4 sm:left-auto sm:max-h-none", wide ? "sm:w-[35rem]" : "sm:w-[26rem]")}
       >
         <h2 className="text-sm font-semibold">{panelTitle}</h2>
         {panel}

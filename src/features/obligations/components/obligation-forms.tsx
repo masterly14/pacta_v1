@@ -34,7 +34,7 @@ export function DraftForm({ scenarios, today, defaultSchedule = DEFAULT_SCHEDULE
   return (
     <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-5">
       <div className="flex max-w-sm flex-col gap-1.5">
-        <Label htmlFor="scenario">Fuente de RR. HH. (simulada)</Label>
+        <Label htmlFor="scenario">Fuente de RR. HH.</Label>
         <select id="scenario" name="scenario" className={selectClass} defaultValue={defaultScenario}>
           {scenarios.map((name) => (
             <option key={name} value={name}>
@@ -42,7 +42,6 @@ export function DraftForm({ scenarios, today, defaultSchedule = DEFAULT_SCHEDULE
             </option>
           ))}
         </select>
-        <p className="text-xs text-muted-foreground">Datos ficticios con la forma de la API de Buk (Colombia). No es una conexión real.</p>
       </div>
       <ScheduleEditor today={today} defaultValue={schedule} onChange={setSchedule} />
       <input type="hidden" name="schedule" value={JSON.stringify(schedule)} />

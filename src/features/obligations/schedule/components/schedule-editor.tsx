@@ -21,7 +21,7 @@ const PHASE_LABEL: Record<SchedulePhase, string> = {
   prepare: "Preparar corrida",
   alert_early: "Aviso temprano",
   alert_urgent: "Aviso urgente",
-  execute: "Ejecutar (simulado)",
+  execute: "Pagar",
 };
 
 const dateFormat = new Intl.DateTimeFormat("es-CO", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -169,7 +169,7 @@ export function ScheduleEditor({ defaultValue = DEFAULT_SCHEDULE, today, earlyAl
       <div className="flex flex-col gap-3">
         <h3 className="text-sm font-medium">Próximos vencimientos</h3>
         <p className="text-xs text-muted-foreground">
-          Festivos de Colombia: datos de fixture, por verificar. Las horas son las 09:00 de Bogotá. Nada de esto mueve dinero.
+          Festivos de Colombia por verificar. Las horas son las 09:00 de Bogotá.
         </p>
         <ol className="flex flex-col gap-3">
           {preview.map(({ due, phases }) => (
