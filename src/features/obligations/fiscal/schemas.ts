@@ -42,6 +42,8 @@ export const FiscalReasonCodeSchema = z.enum([
   "DEADLINE_PASSED",
   "DEADLINE_AT_RISK",
   "FUNDS_INSUFFICIENT",
+  // Nuevo (no está en el PR #58): el total supera la provisión que fijó la organización.
+  "PROVISION_EXCEEDED",
 ]);
 
 export const FiscalOutcomeSchema = z.enum(["approved", "requires_approval", "blocked"]);
@@ -78,6 +80,10 @@ export const FiscalTemplateSchema = z
     taxes: z.array(FiscalTemplateTaxSchema).min(1),
     varianceToleranceBps: z.int().nonnegative().max(10_000), // 1000 = 10 %
     runCapMinor: PositiveAmountMinorSchema,
+    // Provisión de la organización: "reservar X % de los ingresos para impuestos". Plan de caja,
+    // no cálculo tributario: solo dimensiona la reserva y puede escalar, nunca fija el monto a pagar.
+    // null = la organización no definió provisión.
+    provisionBps: z.int().positive().max(10_000).nullable(),
     evidenceMaxAgeDays: z.int().positive().max(365),
     earlyAlertDays: z.int().positive().max(90), // T-7
     urgentAlertDays: z.int().positive().max(90), // T-3
@@ -131,6 +137,14 @@ export const AccountingSnapshotSchema = z
     dataOrigin: DataOriginSchema,
     currency: CurrencyCodeSchema,
     capturedAt: UtcInstantSchema,
+    // Ingresos del último mes cerrado según la contabilidad. null = no los reporta.
+    income: z
+      .strictObject({
+        periodStart: CalendarDateSchema,
+        periodEnd: CalendarDateSchema,
+        amountMinor: AmountMinorSchema,
+      })
+      .nullable(),
     items: z.array(AccountingItemSchema),
   })
   .superRefine((snapshot, ctx) => {

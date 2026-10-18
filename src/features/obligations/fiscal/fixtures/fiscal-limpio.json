@@ -18,6 +18,7 @@
       { "fiscalType": "social_security", "authorizedPaymentReference": "PILA-****7781" }
     ],
     "varianceToleranceBps": 1000,
+    "provisionBps": 3000,
     "runCapMinor": 1500000000,
     "evidenceMaxAgeDays": 7,
     "earlyAlertDays": 7,
@@ -32,6 +33,7 @@
     "dataOrigin": "fixture",
     "currency": "COP",
     "capturedAt": "2026-11-05T12:00:00Z",
+    "income": { "periodStart": "2026-10-01", "periodEnd": "2026-10-31", "amountMinor": 5200000000 },
     "items": [
       {
         "fiscalType": "vat",

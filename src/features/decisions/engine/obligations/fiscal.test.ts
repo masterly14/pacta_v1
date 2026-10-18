@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { loadFiscalScenario, parseFiscalScenario, FISCAL_SCENARIO_NAMES } from "@/features/obligations/fiscal/fixture-source";
 import { FiscalLineDecisionSchema, type FiscalScenario, type FiscalType } from "@/features/obligations/fiscal/schemas";
-import { decideFiscalRun, fiscalAlerts, FISCAL_LINE_RULE_IDS, type FiscalRunInput } from "./fiscal";
+import { decideFiscalRun, fiscalAlerts, fiscalProvision, FISCAL_LINE_RULE_IDS, type FiscalRunInput } from "./fiscal";
 
 function inputOf(scenario: FiscalScenario, overrides: Partial<FiscalRunInput> = {}): FiscalRunInput {
   return { template: scenario.template, snapshot: scenario.snapshot, settlements: scenario.settlements, run: scenario.run, asOf: scenario.asOf, ...overrides };
@@ -221,6 +221,49 @@ describe("fiscal engine — run rules", () => {
     expect(result.held).toBe(false);
     expect(result.lines.find((l) => l.fiscalType === "withholding")?.decision).toBe("approved");
     expect(result.lines.find((l) => l.fiscalType === "social_security")?.decision).toBe("approved");
+  });
+});
+
+describe("organization provision — reserve X % of income", () => {
+  it("computes the reserve from income and the organization's percentage", () => {
+    const scenario = clean();
+    expect(fiscalProvision(inputOf(scenario))).toEqual({
+      incomeMinor: 5200000000,
+      provisionBps: 3000,
+      reserveMinor: 1560000000, // 30 % de COP 52.000.000
+      totalDraftMinor: 1107000000,
+      gapMinor: 0,
+    });
+  });
+
+  it("drafts above the reserve → requires_approval, never blocked or approved", () => {
+    const scenario = clean((s) => {
+      s.template.provisionBps = 1000; // reserva COP 5.200.000 < total COP 11.070.000
+    });
+    for (const decision of decideFiscalRun(inputOf(scenario)).lines) {
+      expect(decision.decision).toBe("requires_approval");
+      expect(decision.reasonCodes).toContain("PROVISION_EXCEEDED");
+    }
+    expect(fiscalProvision(inputOf(scenario)).gapMinor).toBe(1107000000 - 520000000);
+  });
+
+  it("a provision rule without reported income → requires_approval", () => {
+    const scenario = clean((s) => {
+      s.snapshot.income = null;
+    });
+    for (const decision of decideFiscalRun(inputOf(scenario)).lines) {
+      expect(decision.decision).toBe("requires_approval");
+      expect(decision.reasonCodes).toContain("INSUFFICIENT_DATA");
+    }
+  });
+
+  it("no provision rule → the run is decided by the other rules only", () => {
+    const scenario = clean((s) => {
+      s.template.provisionBps = null;
+      s.snapshot.income = null;
+    });
+    expect(decideFiscalRun(inputOf(scenario)).lines.every((l) => l.decision === "approved")).toBe(true);
+    expect(fiscalProvision(inputOf(scenario)).reserveMinor).toBeNull();
   });
 });
 
