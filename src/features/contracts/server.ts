@@ -6,13 +6,15 @@
  *   page (reads) and, later, the invoice context builder (findContractMatch).
  * Receives → Returns: (ContractActor, validated input) → ContractResult; organizationId →
  *   overview; (organizationId, invoice facts) → ContractMatch | null.
- * Talks to: db (src/lib/db.ts) — Contract, Supplier (read only), AuditEvent;
- *   ./permissions.ts, ./match-contract.ts, ./overlap.ts.
+ * Talks to: db (src/lib/db.ts) — Contract, ContractFlowVersion, Supplier (read only), AuditEvent;
+ *   ./permissions.ts, ./match-contract.ts, ./overlap.ts, ./flow/template.ts, ./flow/hash.ts.
  */
 import type { Prisma, Contract } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { Workspace } from "@/shared/auth/ensure-workspace";
 import type { ContractMatch } from "@/shared/schemas/invoice-context";
+import { hashGraph } from "./flow/hash";
+import { templateGraph } from "./flow/template";
 import { matchContract, type ContractMatchInvoiceFacts, type MatchableContract } from "./match-contract";
 import { findOverlap } from "./overlap";
 import { checkCanManageContracts, type ContractActor } from "./permissions";
@@ -80,7 +82,10 @@ export async function getContractsOverview(organizationId: string) {
     db.contract.findMany({
       where: { organizationId },
       orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-      include: { supplier: { select: { name: true } } },
+      include: {
+        supplier: { select: { name: true } },
+        flowVersions: { where: { status: { in: ["active", "draft"] } }, select: { version: true, status: true } },
+      },
     }),
     db.supplier.findMany({ where: { organizationId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
@@ -90,6 +95,8 @@ export async function getContractsOverview(organizationId: string) {
     contracts: contracts.map((contract) => ({
       ...toMatchable(contract),
       supplierName: contract.supplier.name,
+      activeFlowVersion: contract.flowVersions.find((v) => v.status === "active")?.version ?? null,
+      hasDraft: contract.flowVersions.some((v) => v.status === "draft"),
       description: contract.description,
       createdBy: contract.createdBy,
       createdAt: contract.createdAt.toISOString(),
@@ -163,6 +170,38 @@ export async function createContract(actor: ContractActor, input: ContractInput)
         createdBy: actor.userId,
       },
     });
+    // Versión 1 activa: el grafo lineal equivalente a los términos planos que se acaban de registrar.
+    const graph = templateGraph({
+      frequency: input.frequency,
+      validFrom: input.validFrom,
+      validTo: input.validTo,
+      currency: input.currency,
+      agreedAmountMinor: input.agreedAmountMinor,
+      beneficiaryAccountRef: input.beneficiaryAccountRef,
+    });
+    const flow = await tx.contractFlowVersion.create({
+      data: {
+        organizationId: actor.organizationId,
+        contractId: contract.id,
+        version: 1,
+        graph: graph as unknown as Prisma.InputJsonValue,
+        graphSha256: hashGraph(graph),
+        status: "active",
+        createdBy: actor.userId,
+        activatedBy: actor.userId,
+        activatedAt: new Date(),
+      },
+    });
+    await tx.auditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        entityType: "contract_flow",
+        entityId: flow.id,
+        eventType: "flow.activated",
+        actorId: actor.userId,
+        payload: { contractId: contract.id, version: 1, graphSha256: flow.graphSha256 },
+      },
+    });
     await audit(tx, actor, contract.id, "contract.created", { ...input, supplierName: supplier.name });
     return { ok: true, message: `Contrato con ${supplier.name} registrado.`, contractId: contract.id };
   });
@@ -179,6 +218,14 @@ export async function terminateContract(actor: ContractActor, contractId: string
       data: { status: "terminated", terminatedAt: new Date(), terminatedBy: actor.userId },
     });
     if (count === 0) return false;
+    // Un contrato terminado no deja un flujo activo ni un borrador pendiente.
+    await tx.contractFlowVersion.updateMany({
+      where: { contractId, organizationId: actor.organizationId, status: "active" },
+      data: { status: "superseded" },
+    });
+    await tx.contractFlowVersion.deleteMany({
+      where: { contractId, organizationId: actor.organizationId, status: "draft" },
+    });
     await audit(tx, actor, contractId, "contract.terminated", {});
     return true;
   });
