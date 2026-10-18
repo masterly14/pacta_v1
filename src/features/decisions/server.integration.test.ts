@@ -118,11 +118,11 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     const auth = await seedAuthorization(PAPELERIA, "****4821");
     const result = await evaluateInvoice(invoice());
 
-    expect(result.decision).toBe("approved");
+    expect(result.decision).toBe("aprobada");
     const row = await prisma.paymentDecision.findUniqueOrThrow({ where: { id: result.decisionId } });
-    expect(row).toMatchObject({ authorizationId: auth.id, invoiceDate: date("2026-10-05"), decisionSource: "automatic" });
+    expect(row).toMatchObject({ authorizationId: auth.id, invoiceDate: date("2026-10-05"), decisionSource: "automatica" });
     expect(await prisma.approvalRequest.count()).toBe(0);
-    expect(await prisma.auditEvent.count({ where: { entityId: result.decisionId, eventType: "payment_decision.created" } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { entityId: result.decisionId, eventType: "decision_pago.creada" } })).toBe(1);
   });
 
   it("is idempotent: re-evaluating an approved invoice returns the same decision", async () => {
@@ -139,29 +139,29 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     await seedPolicy();
     await seedAuthorization(PAPELERIA, "****4821");
     const inv = invoice({ amountMinor: 15_000 }); // supera el máximo autorizado (100.00)
-    expect((await evaluateInvoice(inv)).decision).toBe("requires_approval");
-    expect((await evaluateInvoice(inv)).decision).toBe("requires_approval");
+    expect((await evaluateInvoice(inv)).decision).toBe("requiere_aprobacion");
+    expect((await evaluateInvoice(inv)).decision).toBe("requiere_aprobacion");
     expect(await prisma.paymentDecision.count({ where: { invoiceId: inv.invoiceId } })).toBe(2);
-    expect(await prisma.approvalRequest.count({ where: { invoiceId: inv.invoiceId, status: "pending" } })).toBe(1);
+    expect(await prisma.approvalRequest.count({ where: { invoiceId: inv.invoiceId, status: "pendiente" } })).toBe(1);
   });
 
   it("cancels the pending request when a re-evaluation no longer needs a person", async () => {
     await seedPolicy();
     const inv = invoice();
-    expect((await evaluateInvoice(inv)).decision).toBe("requires_approval"); // sin autorización
+    expect((await evaluateInvoice(inv)).decision).toBe("requiere_aprobacion"); // sin autorización
     await seedAuthorization(PAPELERIA, "****4821");
-    expect((await evaluateInvoice(inv)).decision).toBe("approved");
-    expect(await prisma.approvalRequest.findFirstOrThrow({ where: { invoiceId: inv.invoiceId } })).toMatchObject({ status: "cancelled" });
+    expect((await evaluateInvoice(inv)).decision).toBe("aprobada");
+    expect(await prisma.approvalRequest.findFirstOrThrow({ where: { invoiceId: inv.invoiceId } })).toMatchObject({ status: "cancelada" });
   });
 
   it("lets a monthly authorization cover one invoice per calendar month of the invoice date", async () => {
     await seedPolicy();
     await seedAuthorization(PAPELERIA, "****4821");
-    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-10-05" }))).decision).toBe("approved");
+    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-10-05" }))).decision).toBe("aprobada");
     const sameMonth = await evaluateInvoice(invoice({ invoiceDate: "2026-10-20" }));
-    expect(sameMonth.decision).toBe("requires_approval");
-    expect(sameMonth.rulesEvaluated.find((r) => r.ruleId === "supplier_authorized")?.explanation).toContain("already covered");
-    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-11-05" }))).decision).toBe("approved");
+    expect(sameMonth.decision).toBe("requiere_aprobacion");
+    expect(sameMonth.rulesEvaluated.find((r) => r.ruleId === "proveedor_autorizado")?.explanation).toContain("already covered");
+    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-11-05" }))).decision).toBe("aprobada");
   });
 
   it("blocks a confirmed duplicate (same supplier and normalized number)", async () => {
@@ -169,8 +169,8 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     await seedAuthorization(PAPELERIA, "****4821");
     await evaluateInvoice(invoice({ invoiceNumber: "PC-1042" }));
     const copy = await evaluateInvoice(invoice({ invoiceNumber: "pc 1042", invoiceDate: "2026-11-05" }));
-    expect(copy.decision).toBe("blocked");
-    expect(copy.reasonCodes).toContain("DUPLICATE_INVOICE");
+    expect(copy.decision).toBe("bloqueada");
+    expect(copy.reasonCodes).toContain("FACTURA_DUPLICADA");
   });
 
   it("approves exactly one of many concurrent invoices competing for the last budget", async () => {
@@ -181,17 +181,17 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     const results = await Promise.all(
       months.map((m) => evaluateInvoice(invoice({ amountMinor: 5_000, invoiceDate: `2026-${m}-10` }))),
     );
-    expect(results.filter((r) => r.decision === "approved")).toHaveLength(1);
-    for (const r of results.filter((r) => r.decision !== "approved")) {
-      expect(r.decision).toBe("blocked");
-      expect(r.reasonCodes).toContain("BUDGET_INSUFFICIENT");
+    expect(results.filter((r) => r.decision === "aprobada")).toHaveLength(1);
+    for (const r of results.filter((r) => r.decision !== "aprobada")) {
+      expect(r.decision).toBe("bloqueada");
+      expect(r.reasonCodes).toContain("PRESUPUESTO_INSUFICIENTE");
     }
   });
 
   it("escalates when the organization has no policy", async () => {
     await seedAuthorization(PAPELERIA, "****4821");
     const result = await evaluateInvoice(invoice());
-    expect(result.decision).toBe("requires_approval");
+    expect(result.decision).toBe("requiere_aprobacion");
     expect(result.policyVersion).toBeNull();
   });
 
@@ -202,7 +202,7 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     await seedAuthorization(PAPELERIA, "****4821");
     const result = await evaluateInvoice(invoice());
     expect(result.policyVersion).toBeNull();
-    expect(result.decision).toBe("requires_approval");
+    expect(result.decision).toBe("requiere_aprobacion");
   });
 
   it("runs every simulator scenario to its expected result against demo-like data", async () => {
@@ -225,7 +225,7 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
       const shown = scenario.reasons.some((code) => (result.reasonCodes as string[]).includes(code));
       expect({ scenario: scenario.id, reasons: result.reasonCodes, shown }).toMatchObject({ scenario: scenario.id, shown: true });
       if (scenario.id !== "papeleria_duplicate") {
-        expect({ scenario: scenario.id, reasons: result.reasonCodes }).not.toMatchObject({ reasons: expect.arrayContaining(["DUPLICATE_INVOICE"]) });
+        expect({ scenario: scenario.id, reasons: result.reasonCodes }).not.toMatchObject({ reasons: expect.arrayContaining(["FACTURA_DUPLICADA"]) });
       }
     }
   });
@@ -243,15 +243,15 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     };
 
     const ok = await run({ invoiceNumber: "PC-77", amount: "45.90", beneficiaryAccountReference: "****4821" });
-    expect(ok.decision).toBe("approved");
+    expect(ok.decision).toBe("aprobada");
 
     const unknownSupplier = await run({ supplierId: "", invoiceNumber: "X-1", amount: "10.00", beneficiaryAccountReference: "****1111" });
-    expect(unknownSupplier.decision).toBe("requires_approval");
-    expect(unknownSupplier.reasonCodes).toContain("INSUFFICIENT_DATA");
+    expect(unknownSupplier.decision).toBe("requiere_aprobacion");
+    expect(unknownSupplier.reasonCodes).toContain("DATOS_INSUFICIENTES");
 
     const noAmount = await run({ invoiceNumber: "PC-78", beneficiaryAccountReference: "****4821", invoiceDate: "2026-11-05" });
-    expect(noAmount.decision).toBe("requires_approval");
-    expect(noAmount.rulesEvaluated.find((r) => r.ruleId === "budget_available")?.result).toBe("unknown");
+    expect(noAmount.decision).toBe("requiere_aprobacion");
+    expect(noAmount.rulesEvaluated.find((r) => r.ruleId === "presupuesto_disponible")?.result).toBe("desconocido");
 
     await prisma.supplier.create({ data: { id: "sup_foreign", organizationId: OTHER_ORG, name: "Ajeno", normalizedName: "ajeno" } });
     expect(await buildCustomInvoice(form({ supplierId: "sup_foreign", amount: "1.00" }), ORG, new Date())).toEqual({ ok: false, error: "Proveedor no encontrado." });

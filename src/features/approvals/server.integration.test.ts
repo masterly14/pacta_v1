@@ -73,8 +73,8 @@ describe.skipIf(!url)("resolveApprovalRequest (integration)", async () => {
   async function escalate(overrides: Partial<InvoiceContext> = {}) {
     const inv = invoice(overrides);
     const decision = await evaluateInvoice(inv);
-    expect(decision.decision).toBe("requires_approval");
-    const request = await prisma.approvalRequest.findFirstOrThrow({ where: { invoiceId: inv.invoiceId, status: "pending" } });
+    expect(decision.decision).toBe("requiere_aprobacion");
+    const request = await prisma.approvalRequest.findFirstOrThrow({ where: { invoiceId: inv.invoiceId, status: "pendiente" } });
     return { inv, requestId: request.id };
   }
 
@@ -108,19 +108,19 @@ describe.skipIf(!url)("resolveApprovalRequest (integration)", async () => {
     const { inv, requestId } = await escalate();
     expect(await resolveApprovalRequest(ana, approve(requestId, { comment: "Confirmado por teléfono" }))).toMatchObject({ ok: true });
 
-    const human = await prisma.paymentDecision.findFirstOrThrow({ where: { invoiceId: inv.invoiceId, decisionSource: "human" } });
-    expect(human).toMatchObject({ decision: "approved", actorId: "user_ana", approvalRequestId: requestId, amountMinor: 150_000 });
+    const human = await prisma.paymentDecision.findFirstOrThrow({ where: { invoiceId: inv.invoiceId, decisionSource: "humana" } });
+    expect(human).toMatchObject({ decision: "aprobada", actorId: "user_ana", approvalRequestId: requestId, amountMinor: 150_000 });
     expect(await prisma.paymentDecision.count({ where: { invoiceId: inv.invoiceId } })).toBe(2); // la automática no se edita
-    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "approved", resolvedBy: "user_ana", comment: "Confirmado por teléfono" });
-    expect(await prisma.auditEvent.count({ where: { entityId: requestId, eventType: "approval_request.approved" } })).toBe(1);
+    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "aprobada", resolvedBy: "user_ana", comment: "Confirmado por teléfono" });
+    expect(await prisma.auditEvent.count({ where: { entityId: requestId, eventType: "solicitud_aprobacion.aprobada" } })).toBe(1);
   });
 
   it("rejects an escalated invoice as a blocked human decision", async () => {
     const { inv, requestId } = await escalate();
     expect(await resolveApprovalRequest(ana, { ...approve(requestId), action: "reject", comment: "No reconocemos el cargo" })).toMatchObject({ ok: true });
-    const human = await prisma.paymentDecision.findFirstOrThrow({ where: { invoiceId: inv.invoiceId, decisionSource: "human" } });
-    expect(human.decision).toBe("blocked");
-    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "rejected" });
+    const human = await prisma.paymentDecision.findFirstOrThrow({ where: { invoiceId: inv.invoiceId, decisionSource: "humana" } });
+    expect(human.decision).toBe("bloqueada");
+    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "rechazada" });
   });
 
   it("demo story: approve + authorize monthly → same-month invoice escalates → next month auto-approves", async () => {
@@ -132,11 +132,11 @@ describe.skipIf(!url)("resolveApprovalRequest (integration)", async () => {
 
     const auth = await prisma.paymentAuthorization.findFirstOrThrow({ where: { supplierId: NUBE } });
     expect(auth).toMatchObject({ sourceApprovalRequestId: requestId, authorizedBy: "user_ana", status: "active" });
-    const human = await prisma.paymentDecision.findFirstOrThrow({ where: { decisionSource: "human" } });
+    const human = await prisma.paymentDecision.findFirstOrThrow({ where: { decisionSource: "humana" } });
     expect(human.authorizationId).toBe(auth.id); // consume el periodo de octubre
 
-    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-10-25" }))).decision).toBe("requires_approval");
-    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-11-05" }))).decision).toBe("approved");
+    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-10-25" }))).decision).toBe("requiere_aprobacion");
+    expect((await evaluateInvoice(invoice({ invoiceDate: "2026-11-05" }))).decision).toBe("aprobada");
   });
 
   it("re-evaluates against rules changed while waiting: a hard block wins over a human approval", async () => {
@@ -147,9 +147,9 @@ describe.skipIf(!url)("resolveApprovalRequest (integration)", async () => {
     });
     const result = await resolveApprovalRequest(ana, approve(requestId));
     expect(result).toMatchObject({ ok: true });
-    expect((result as { message: string }).message).toContain("BUDGET_INSUFFICIENT");
-    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "rejected" });
-    expect(await prisma.paymentDecision.count({ where: { decision: "approved" } })).toBe(0);
+    expect((result as { message: string }).message).toContain("PRESUPUESTO_INSUFICIENTE");
+    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "rechazada" });
+    expect(await prisma.paymentDecision.count({ where: { decision: "aprobada" } })).toBe(0);
   });
 
   it("refuses approvals above the approver's limit or without permission, writing nothing", async () => {
@@ -158,8 +158,8 @@ describe.skipIf(!url)("resolveApprovalRequest (integration)", async () => {
     const noPermission: PolicyActor = { ...ana, permission: null };
     expect(await resolveApprovalRequest(lowLimit, approve(requestId))).toMatchObject({ ok: false, error: "El monto supera tu límite de aprobación." });
     expect(await resolveApprovalRequest(noPermission, approve(requestId))).toMatchObject({ ok: false });
-    expect(await prisma.paymentDecision.count({ where: { decisionSource: "human" } })).toBe(0);
-    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "pending" });
+    expect(await prisma.paymentDecision.count({ where: { decisionSource: "humana" } })).toBe(0);
+    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "pendiente" });
   });
 
   it("refuses an authorization that does not cover the invoice, creating nothing", async () => {
@@ -169,7 +169,7 @@ describe.skipIf(!url)("resolveApprovalRequest (integration)", async () => {
     }));
     expect(result).toMatchObject({ ok: false, error: "La cuenta de la autorización debe ser la de esta factura." });
     expect(await prisma.paymentAuthorization.count()).toBe(0);
-    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "pending" });
+    expect(await prisma.approvalRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ status: "pendiente" });
   });
 
   it("refuses to resolve twice, another organization's request, or a non-policy currency", async () => {
@@ -180,6 +180,6 @@ describe.skipIf(!url)("resolveApprovalRequest (integration)", async () => {
 
     const eur = await escalate({ currency: "EUR", amountMinor: 50_000 });
     expect(await resolveApprovalRequest(ana, approve(eur.requestId))).toMatchObject({ ok: false });
-    expect(await prisma.paymentDecision.count({ where: { invoiceId: eur.inv.invoiceId, decision: "approved" } })).toBe(0);
+    expect(await prisma.paymentDecision.count({ where: { invoiceId: eur.inv.invoiceId, decision: "aprobada" } })).toBe(0);
   });
 });

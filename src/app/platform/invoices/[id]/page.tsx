@@ -23,11 +23,11 @@ export const metadata: Metadata = { title: "Factura" };
 export const maxDuration = 60;
 
 const DECISION = {
-  approved: { label: "aprobada (pago simulado)", variant: "default" },
-  blocked: { label: "bloqueada", variant: "destructive" },
-  requires_approval: { label: "requiere aprobación", variant: "secondary" },
+  aprobada: { label: "aprobada (pago simulado)", variant: "default" },
+  bloqueada: { label: "bloqueada", variant: "destructive" },
+  requiere_aprobacion: { label: "requiere aprobación", variant: "secondary" },
 } as const;
-const RESULT_ICON = { pass: "✅", fail: "❌", unknown: "❔" } as const;
+const RESULT_ICON = { cumple: "✅", incumple: "❌", desconocido: "❔" } as const;
 const MATCH = { matched: "confirmado", ambiguous: "ambiguo (lo confirma una persona)", not_found: "no reconocido" } as const;
 const CONTRACT = { matched: "coincide", mismatch: "con diferencias", ambiguous: "ambiguo", not_found: "sin contrato" } as const;
 
@@ -92,7 +92,7 @@ function InvoiceView({ invoice }: { invoice: InvoiceDetail }) {
               ? invoice.extractionStatus === "failed"
                 ? "La lectura con IA falló: no hay decisión y nunca se aprueba por defecto."
                 : "Aún sin decisión."
-              : `${latest.decisionSource === "human" ? "Resuelta por una persona" : "Automática"} · ${latest.evaluatedAt.slice(0, 16).replace("T", " ")} UTC · política v${latest.policyVersion ?? "—"}`}
+              : `${latest.decisionSource === "humana" ? "Resuelta por una persona" : "Automática"} · ${latest.evaluatedAt.slice(0, 16).replace("T", " ")} UTC · política v${latest.policyVersion ?? "—"}`}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -122,7 +122,7 @@ function InvoiceView({ invoice }: { invoice: InvoiceDetail }) {
                 {latest.rulesEvaluated.map((rule) => (
                   <li key={rule.ruleId}>
                     {RESULT_ICON[rule.result]} <span className="font-mono">{rule.ruleId}</span>
-                    {rule.result !== "pass" && <span className="text-muted-foreground"> · {rule.explanation}</span>}
+                    {rule.result !== "cumple" && <span className="text-muted-foreground"> · {rule.explanation}</span>}
                   </li>
                 ))}
               </ul>
@@ -213,7 +213,7 @@ function InvoiceView({ invoice }: { invoice: InvoiceDetail }) {
             <ul className="flex flex-col gap-1 text-sm">
               {invoice.decisions.map((d) => (
                 <li key={d.decisionId}>
-                  {d.evaluatedAt.slice(0, 16).replace("T", " ")} · {DECISION[d.decision].label} · {d.decisionSource === "human" ? "persona" : "automática"}
+                  {d.evaluatedAt.slice(0, 16).replace("T", " ")} · {DECISION[d.decision].label} · {d.decisionSource === "humana" ? "persona" : "automática"}
                 </li>
               ))}
             </ul>

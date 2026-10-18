@@ -22,12 +22,12 @@ import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/
 export const metadata: Metadata = { title: "Auditoría" };
 
 const DECISION = {
-  approved: { label: "aprobada", variant: "default" },
-  blocked: { label: "bloqueada", variant: "destructive" },
-  requires_approval: { label: "requiere aprobación", variant: "secondary" },
+  aprobada: { label: "aprobada", variant: "default" },
+  bloqueada: { label: "bloqueada", variant: "destructive" },
+  requiere_aprobacion: { label: "requiere aprobación", variant: "secondary" },
 } as const;
-const RESULT_ICON = { pass: "✅", fail: "❌", unknown: "❔" } as const;
-const SOURCE_LABEL = { automatic: "automática", human: "humana" } as const;
+const RESULT_ICON = { cumple: "✅", incumple: "❌", desconocido: "❔" } as const;
+const SOURCE_LABEL = { automatica: "automática", humana: "humana" } as const;
 
 export default function AuditPage() {
   return (
@@ -132,7 +132,7 @@ async function AuditData() {
                           {d.rulesEvaluated.map((rule) => (
                             <li key={rule.ruleId}>
                               {RESULT_ICON[rule.result]} <span className="font-mono">{rule.ruleId}</span>
-                              {rule.result !== "pass" && <span className="text-muted-foreground"> · {rule.explanation}</span>}
+                              {rule.result !== "cumple" && <span className="text-muted-foreground"> · {rule.explanation}</span>}
                             </li>
                           ))}
                         </ul>

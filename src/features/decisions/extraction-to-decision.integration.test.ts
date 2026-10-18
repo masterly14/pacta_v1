@@ -117,21 +117,21 @@ describe.skipIf(!url)("A extraction → B evaluateInvoice (integration)", async 
   it("escalates while the supplier is not resolved yet (A-04 pending): never approves", async () => {
     const { context, decision } = await extractAndEvaluate(raw());
     expect(context.supplierMatchStatus).toBe("not_found");
-    expect(decision.decision).toBe("requires_approval");
-    expect(decision.reasonCodes).toContain("INSUFFICIENT_DATA");
+    expect(decision.decision).toBe("requiere_aprobacion");
+    expect(decision.reasonCodes).toContain("DATOS_INSUFICIENTES");
   });
 
   it("auto-approves an extracted invoice once the supplier is confirmed and authorized", async () => {
     const { context, decision } = await extractAndEvaluate(raw(), confirmed);
     expect(context).toMatchObject({ amountMinor: 150_050, currency: "USD", beneficiaryAccountReference: "****7890", name: "Hosting Delta SAS" });
-    expect(decision.decision).toBe("approved");
+    expect(decision.decision).toBe("aprobada");
     const row = await prisma.paymentDecision.findUniqueOrThrow({ where: { id: decision.decisionId } });
     expect(JSON.stringify(row.invoiceContext)).not.toContain("1234567890"); // la cuenta completa nunca se guarda
   });
 
   it("escalates when the model flags embedded instructions, even with everything else valid", async () => {
     const { decision } = await extractAndEvaluate(raw({ injectionSuspected: true }), confirmed);
-    expect(decision.decision).toBe("requires_approval");
-    expect(decision.rulesEvaluated.find((r) => r.ruleId === "no_extraction_warnings")?.result).toBe("fail");
+    expect(decision.decision).toBe("requiere_aprobacion");
+    expect(decision.rulesEvaluated.find((r) => r.ruleId === "sin_advertencias_extraccion")?.result).toBe("fail");
   });
 });
