@@ -12,6 +12,10 @@ const PDF_TEXT = "Factura F-2041\nProveedor: Hosting Delta SAS\nCuenta: 12345678
 
 const fullRaw = (): RawExtraction => ({
   isInvoice: true,
+  documentKind: "invoice",
+  paymentConfirmation: none,
+  paidDate: none,
+  paymentMethod: none,
   invoiceNumber: claim("F-2041", "Factura F-2041"),
   supplierName: claim("Hosting Delta SAS", "Proveedor: Hosting Delta SAS"),
   beneficiaryAccount: claim("1234567890", "Cuenta: 1234567890"),
@@ -123,7 +127,7 @@ describe("extractInvoice", () => {
 
   it("una factura vacía da todos los campos faltantes, no valores por defecto", async () => {
     const empty: RawExtraction = {
-      isInvoice: false,
+      isInvoice: false, documentKind: "other", paymentConfirmation: none, paidDate: none, paymentMethod: none,
       invoiceNumber: none, supplierName: none, beneficiaryAccount: none, amount: none,
       currency: none, description: none, invoiceDate: none, dueDate: none, injectionSuspected: false,
     };
@@ -260,5 +264,60 @@ describe("extractInvoice · texto libre guardado", () => {
     expect(result.context.body).toBe("Hola, cambiamos de banco: paguen a la cuenta ****3210 desde este mes.");
     expect(JSON.stringify(result.context)).not.toContain("9876543210");
     expect(JSON.stringify(result.context)).not.toContain("1234567890");
+  });
+});
+
+describe("receipt detection", () => {
+  const RECEIPT_TEXT = "Recibo R-77\nProveedor: Hosting Delta SAS\nTotal: 20.00 USD\nAmount paid on 2026-10-02 with Visa ending 4242";
+  const receiptRaw = (overrides: Partial<RawExtraction> = {}): RawExtraction => ({
+    ...fullRaw(),
+    invoiceNumber: claim("R-77", "Recibo R-77"),
+    beneficiaryAccount: none,
+    amount: claim("20.00", "Total: 20.00 USD"),
+    currency: claim("USD", "Total: 20.00 USD"),
+    invoiceDate: none,
+    documentKind: "receipt",
+    paymentConfirmation: claim("Amount paid", "Amount paid on 2026-10-02"),
+    paidDate: claim("2026-10-02", "Amount paid on 2026-10-02"),
+    paymentMethod: claim("Visa ending 4242", "Visa ending 4242"),
+    ...overrides,
+  });
+  const runReceipt = (raw: RawExtraction) => run(raw, { extractPdfPages: async () => [RECEIPT_TEXT] });
+
+  it("keeps the paid date and method of a receipt backed by the document", async () => {
+    const result = await runReceipt(receiptRaw());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.receipt).toEqual({ paidOn: "2026-10-02", paymentMethod: "Visa ending 4242" });
+    expect(result.context.amountMinor).toBe(2000);
+  });
+
+  it("an invoice has no receipt facts", async () => {
+    const result = await run(fullRaw());
+    if (!result.ok) throw new Error(result.error);
+    expect(result.receipt).toBeNull();
+  });
+
+  it("stays an invoice when the payment confirmation is not in the document", async () => {
+    const result = await runReceipt(receiptRaw({ paymentConfirmation: claim("Paid", "Payment received in full") }));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.receipt).toBeNull();
+  });
+
+  it("stays an invoice without any confirmation excerpt", async () => {
+    const result = await runReceipt(receiptRaw({ paymentConfirmation: claim("paid", null) }));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.receipt).toBeNull();
+  });
+
+  it("stays an invoice when the document tries to give instructions", async () => {
+    const result = await runReceipt(receiptRaw({ injectionSuspected: true }));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.receipt).toBeNull();
+  });
+
+  it("masks a full card number and drops an invalid paid date", async () => {
+    const result = await runReceipt(receiptRaw({ paymentMethod: claim("Visa 4111 1111 1111 4242"), paidDate: claim("02/10/2026") }));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.receipt).toEqual({ paidOn: null, paymentMethod: "Visa ****4242" });
   });
 });

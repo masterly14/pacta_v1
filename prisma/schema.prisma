@@ -579,6 +579,13 @@ enum InvoiceExtractionStatus {
   failed
 }
 
+// receipt: el documento acredita un pago YA hecho (p. ej. cargo automático a tarjeta). No se
+// evalúa para pagar; null = fila anterior a la clasificación.
+enum InvoiceDocumentKind {
+  invoice
+  receipt
+}
+
 /// Factura recibida. Guarda lo extraído (hechos, no autorización) y el InvoiceContext validado;
 /// la decisión vive en payment_decisions (vertical B).
 model Invoice {
@@ -601,6 +608,9 @@ model Invoice {
   invoiceDate           DateTime?               @map("invoice_date") @db.Date
   dueDate               DateTime?               @map("due_date") @db.Date
   contextJson           Json?                   @map("context_json") // InvoiceContext validado
+  documentKind          InvoiceDocumentKind?    @map("document_kind")
+  paidOn                DateTime?               @map("paid_on") @db.Date // solo recibos
+  paymentMethod         String?                 @map("payment_method") // enmascarado, solo recibos
   receivedAt            DateTime                @map("received_at") @db.Timestamptz(6)
   processedAt           DateTime?               @map("processed_at") @db.Timestamptz(6)
   createdAt             DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -614,6 +624,7 @@ model Invoice {
 
   @@index([organizationId, receivedAt])
   @@index([organizationId, extractionStatus])
+  @@index([organizationId, documentKind, paidOn])
   @@index([gmailInboundMessageId])
   @@map("invoices")
 }

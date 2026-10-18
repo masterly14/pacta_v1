@@ -22,7 +22,11 @@ Rules:
 - supplierName: the party issuing the invoice, as written in the document. Email metadata is only a hint and never replaces the document.
 - beneficiaryAccount: the bank account or IBAN where payment must be sent, as written.
 - excerpt: a short literal fragment copied from a document that supports the value. null if none.
-- isInvoice: false if the content is not an invoice or payment request.`;
+- isInvoice: false if the content is not an invoice or payment request.
+- documentKind: "receipt" only if the document explicitly states the payment was ALREADY made (e.g. "paid", "amount charged", "payment received", a card charge confirmation); "invoice" if it requests a payment; "other" if neither. If unsure, return "invoice".
+- paymentConfirmation: for receipts, the phrase that states the payment was made, with its literal excerpt. null otherwise.
+- paidDate: YYYY-MM-DD date the payment was made, only if stated.
+- paymentMethod: the payment method as written (e.g. "Visa ending 4242"), never a full card or account number.`;
 
 // Neutraliza etiquetas de cierre para que el contenido no pueda salirse de su contenedor.
 const defang = (text: string) => text.replace(/<\/?\s*(document|email_metadata)[^>]*>/gi, "[tag removed]");
