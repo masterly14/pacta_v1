@@ -1,0 +1,176 @@
+{
+  "fixture": true,
+  "scenario": "aprendizaje-sin-historia",
+  "period": "2026-12",
+  "note": "Verdad de terreno de las anomalías sembradas. NO la lee el aprendizaje: solo el backtest y las pruebas.",
+  "lines": [
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724001:salary",
+      "counterpartyRef": "buk:employee:1001",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724001:bonus",
+      "counterpartyRef": "buk:employee:1001",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724002:salary",
+      "counterpartyRef": "buk:employee:1002",
+      "lineType": "salary",
+      "label": "anomalous",
+      "kind": "bonus_over_pattern"
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724002:bonus",
+      "counterpartyRef": "buk:employee:1002",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724003:salary",
+      "counterpartyRef": "buk:employee:1003",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724003:bonus",
+      "counterpartyRef": "buk:employee:1003",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724004:salary",
+      "counterpartyRef": "buk:employee:1004",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724004:bonus",
+      "counterpartyRef": "buk:employee:1004",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724005:salary",
+      "counterpartyRef": "buk:employee:1005",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724005:bonus",
+      "counterpartyRef": "buk:employee:1005",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724006:salary",
+      "counterpartyRef": "buk:employee:1006",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724006:bonus",
+      "counterpartyRef": "buk:employee:1006",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724007:salary",
+      "counterpartyRef": "buk:employee:1007",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724007:bonus",
+      "counterpartyRef": "buk:employee:1007",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724008:salary",
+      "counterpartyRef": "buk:employee:1008",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724008:bonus",
+      "counterpartyRef": "buk:employee:1008",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724009:salary",
+      "counterpartyRef": "buk:employee:1009",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724009:bonus",
+      "counterpartyRef": "buk:employee:1009",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724010:salary",
+      "counterpartyRef": "buk:employee:1010",
+      "lineType": "salary",
+      "label": "anomalous",
+      "kind": "off_cycle_raise"
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724010:bonus",
+      "counterpartyRef": "buk:employee:1010",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724011:salary",
+      "counterpartyRef": "buk:employee:1011",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724011:bonus",
+      "counterpartyRef": "buk:employee:1011",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724012:salary",
+      "counterpartyRef": "buk:employee:1012",
+      "lineType": "salary",
+      "label": "clean",
+      "kind": null
+    },
+    {
+      "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724012:bonus",
+      "counterpartyRef": "buk:employee:1012",
+      "lineType": "bonus",
+      "label": "clean",
+      "kind": null
+    }
+  ]
+}

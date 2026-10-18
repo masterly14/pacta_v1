@@ -1,34 +1,25 @@
 /**
- * Purpose: motor determinista de nómina (platform-core §7.1): decide cada línea de una corrida de
- *   pago (aprobada, bloqueada o requiere aprobación) y la corrida completa. `approved` significa
- *   aprobado para pago SIMULADO. El LLM no decide; las señales sin verificar solo suben la cautela.
- * Runs in: servidor, navegador y tests (puro: sin I/O, reloj, red ni IA; `asOf` viene en la ocurrencia).
- * Triggered by: el flujo de nómina de obligaciones y sus pruebas contra los escenarios de Buk.
- * Receives → Returns: { template, occurrence, lines, dataset } → PayrollRunResult con reglas por línea.
- * Talks to: src/shared/schemas/{obligation-config,obligation-context,payment-decision}.ts.
+ * Purpose: motor determinístico de la nómina proactiva (platform-core §7.1). Cada línea de pago pasa por once reglas en
+ *   orden fijo y luego por cuatro reglas de corrida. Todas se evalúan aunque una falle; el resultado y los motivos salen
+ *   de TypeScript, nunca de un modelo. `approved` = aprobada para pago SIMULADO.
+ * Runs in: servidor y pruebas (puro: sin E/S, sin IA, sin reloj; `asOf` viene en la ocurrencia).
+ * Triggered by: obligations/runner.ts (preparar, reevaluar, ejecutar) y la aprobación humana de una línea.
+ * Receives → Returns: decidePayrollRun({ plantilla, ocurrencia, líneas, dataset, hallazgos aprendidos? }) → PayrollRunResult.
+ * Talks to: schemas compartidos (tipos), contracts/money#formatMinor, learning/types (solo tipos).
+ * Regla de seguridad: desconocido o ambiguo nunca es `approved`; los hallazgos aprendidos solo pueden escalar.
  */
+import { formatMinor } from "@/features/contracts/money";
+import type { LearnedFinding } from "@/features/obligations/learning/types";
 import type { ObligationTemplate, PayrollDataset, PayrollEmployee } from "@/shared/schemas/obligation-config";
-import type { ObligationContext, OccurrenceContext, OccurrenceStatus } from "@/shared/schemas/obligation-context";
+import type { ObligationContext, OccurrenceContext } from "@/shared/schemas/obligation-context";
 import type { ReasonCode } from "@/shared/schemas/payment-decision";
 
-export type PayrollDecision = "approved" | "blocked" | "requires_approval";
-type Effect = "requires_approval" | "blocked";
+export type PayrollOutcome = "approved" | "blocked" | "requires_approval";
 
 export type PayrollRuleEvaluation = {
   ruleId: string;
-  result: "pass" | "fail";
+  result: "pass" | "fail" | "unknown";
   reasonCode: ReasonCode | null;
-  effect: Effect | null;
-  explanation: string;
-};
-
-export type PayrollRunRuleId = "obligacion_autorizada" | "evidencia_vigente" | "corrida_completa" | "fondos_suficientes";
-
-export type PayrollRunFinding = {
-  ruleId: PayrollRunRuleId;
-  reasonCode: ReasonCode;
-  effect: Effect;
-  counterpartyRef: string | null;
   explanation: string;
 };
 
@@ -38,21 +29,26 @@ export type PayrollLineDecision = {
   displayName: string;
   lineType: ObligationContext["lineType"];
   amountMinor: number | null;
-  decision: PayrollDecision;
+  currency: string | null;
+  decision: PayrollOutcome;
   reasonCodes: ReasonCode[];
-  rulesEvaluated: PayrollRuleEvaluation[];
-  dataOrigin: "fixture";
-  isSimulated: true;
+  rules: PayrollRuleEvaluation[];
+};
+
+export type PayrollRunFinding = {
+  ruleId: "obligacion_autorizada" | "evidencia_vigente" | "corrida_completa" | "fondos_suficientes";
+  reasonCode: ReasonCode;
+  effect: "requires_approval" | "blocked";
+  counterpartyRef: string | null;
 };
 
 export type PayrollRunResult = {
   occurrenceId: string;
   asOf: string;
-  occurrenceStatus: Extract<OccurrenceStatus, "ready_to_execute" | "in_approval" | "held">;
-  counts: Record<PayrollDecision, number>;
+  status: "ready_to_execute" | "in_approval" | "held";
+  counts: Record<PayrollOutcome, number>;
   runFindings: PayrollRunFinding[];
   lines: PayrollLineDecision[];
-  held: boolean;
 };
 
 export type PayrollRunInput = {
@@ -60,178 +56,252 @@ export type PayrollRunInput = {
   occurrence: OccurrenceContext;
   lines: readonly ObligationContext[];
   dataset: PayrollDataset;
+  /** Hallazgos del perfil histórico por `lineId`. Solo escalan; una línea sin entrada no tiene hallazgos. */
+  learned?: ReadonlyMap<string, readonly LearnedFinding[]>;
 };
 
-type Finding = { ruleId: string; code: ReasonCode; effect: Effect; explanation: string };
+type Eval = PayrollRuleEvaluation & { hardBlock: boolean };
 
-// Orden fijo de las reglas de línea; el de los códigos en la decisión sigue este orden.
-export const PAYROLL_LINE_RULE_IDS = [
-  "datos_completos",
-  "linea_esperada",
-  "empleado_activo",
-  "empleado_sin_licencia",
-  "cuenta_estable",
-  "variacion_aceptable",
-  "beneficios_esperados",
-  "sin_linea_duplicada",
-  "sin_senales_pendientes",
-] as const;
+const pass = (ruleId: string, explanation: string): Eval => ({ ruleId, result: "pass", reasonCode: null, explanation, hardBlock: false });
+const fail = (ruleId: string, reasonCode: ReasonCode, explanation: string, hardBlock = false): Eval => ({ ruleId, result: "fail", reasonCode, explanation, hardBlock });
+const unknown = (ruleId: string, reasonCode: ReasonCode, explanation: string): Eval => ({ ruleId, result: "unknown", reasonCode, explanation, hardBlock: false });
 
-// Campos cuyo faltante hace insuficiente la línea. Los `lastConfirmed*` los trata su propia regla.
+/** Campos cuyo faltante hace insuficiente la línea. Los `lastConfirmed*` los trata su propia regla. */
 const ESSENTIAL_MISSING = new Set(["beneficiaryAccountReference", "amountMinor", "currency"]);
-const DAY_MS = 86_400_000;
 
-function lineFindings(
+const money = (amountMinor: number, currency: string | null) => formatMinor(amountMinor, currency ?? "COP");
+
+function lineRules(
   line: ObligationContext,
   employee: PayrollEmployee | null,
   dataset: PayrollDataset,
   template: ObligationTemplate,
-  sameOccurrence: readonly ObligationContext[],
-): Finding[] {
-  const out: Finding[] = [];
-  const add = (ruleId: string, code: ReasonCode, effect: Effect, explanation: string) => out.push({ ruleId, code, effect, explanation });
+  all: readonly ObligationContext[],
+  learned: readonly LearnedFinding[],
+): Eval[] {
+  const out: Eval[] = [];
 
-  if (line.currency !== null && line.currency !== template.currency) {
-    add("datos_completos", "CURRENCY_NOT_SUPPORTED", "requires_approval", `La línea está en ${line.currency}; la plantilla paga en ${template.currency}.`);
-  }
-  if (line.amountMinor === null || line.missingFields.some((field) => ESSENTIAL_MISSING.has(field))) {
-    add("datos_completos", "INSUFFICIENT_DATA", "requires_approval", "Falta el monto, la moneda o la cuenta de la línea.");
-  }
+  // 1 · moneda de la plantilla
+  out.push(
+    line.currency !== null && line.currency !== template.currency
+      ? fail("moneda_soportada", "CURRENCY_NOT_SUPPORTED", `La línea viene en ${line.currency} y la plantilla paga en ${template.currency}; no se convierte moneda.`)
+      : pass("moneda_soportada", `La moneda coincide con la de la plantilla (${template.currency}).`),
+  );
 
-  if (!employee) add("linea_esperada", "EMPLOYEE_NOT_FOUND", "requires_approval", "La contraparte no figura en la nómina de la organización.");
+  // 2 · datos esenciales
+  const missing = line.missingFields.filter((field) => ESSENTIAL_MISSING.has(field));
+  out.push(
+    line.amountMinor === null || missing.length > 0
+      ? fail("datos_esenciales", "INSUFFICIENT_DATA", `Faltan datos esenciales: ${(line.amountMinor === null ? ["importe", ...missing] : missing).join(", ")}.`)
+      : pass("datos_esenciales", "La línea trae importe, moneda y cuenta."),
+  );
 
-  // Una línea ordinaria de alguien retirado se bloquea; la liquidación final nunca se aprueba sola.
+  // 3 · la persona existe en la planilla
+  out.push(employee ? pass("linea_esperada", "La persona está en la planilla de RR. HH.") : fail("linea_esperada", "EMPLOYEE_NOT_FOUND", "La persona no aparece en la planilla de RR. HH."));
+
+  // 4 · empleado activo. Bloquea en línea ordinaria; la liquidación final escala y nunca se aprueba sola.
   if (employee?.status === "terminated") {
-    if (line.lineType === "final_settlement") add("empleado_activo", "EMPLOYEE_TERMINATED", "requires_approval", "Liquidación final de un empleado retirado: requiere aprobación humana.");
-    else add("empleado_activo", "EMPLOYEE_TERMINATED", "blocked", "El empleado figura como retirado; no se paga una línea ordinaria.");
+    out.push(
+      line.lineType === "final_settlement"
+        ? fail("empleado_activo", "EMPLOYEE_TERMINATED", "Es la liquidación final de una persona retirada: la decide una persona.")
+        : fail("empleado_activo", "EMPLOYEE_TERMINATED", "La persona figura como retirada y tiene un pago ordinario: bloqueado.", true),
+    );
   } else if (line.lineType === "final_settlement") {
-    add("empleado_activo", "INSUFFICIENT_DATA", "requires_approval", "Hay una liquidación final pero el empleado no figura como retirado.");
+    out.push(fail("empleado_activo", "INSUFFICIENT_DATA", "Hay una liquidación final de alguien que figura activo: no cuadra."));
+  } else {
+    out.push(employee ? pass("empleado_activo", "La persona figura activa.") : unknown("empleado_activo", "EMPLOYEE_NOT_FOUND", "No se pudo comprobar el estado laboral."));
   }
 
-  if (employee?.status === "on_leave") add("empleado_sin_licencia", "INSUFFICIENT_DATA", "requires_approval", "El empleado está en licencia; se confirma el monto antes de pagar.");
+  // 5 · sin licencia o incapacidad en el periodo
+  out.push(
+    employee?.status === "on_leave"
+      ? fail("empleado_sin_licencia", "INSUFFICIENT_DATA", "Tiene una licencia o incapacidad que cruza el periodo: una persona confirma el monto.")
+      : pass("empleado_sin_licencia", "Sin licencias en el periodo."),
+  );
 
+  // 6 · cuenta estable
   if (line.lastConfirmedBeneficiaryReference === null) {
-    add("cuenta_estable", "INSUFFICIENT_DATA", "requires_approval", "No hay una cuenta confirmada previamente con la que comparar.");
+    out.push(unknown("cuenta_estable", "INSUFFICIENT_DATA", "No hay una cuenta confirmada anterior con la que comparar."));
   } else if (line.beneficiaryAccountReference !== line.lastConfirmedBeneficiaryReference) {
-    add("cuenta_estable", "BENEFICIARY_CHANGED", "requires_approval", "La cuenta de pago cambió respecto a la última confirmada. Un cambio de cuenta nunca se aprueba solo.");
+    out.push(
+      fail(
+        "cuenta_estable",
+        "BENEFICIARY_CHANGED",
+        `La cuenta cambió de ${line.lastConfirmedBeneficiaryReference} a ${line.beneficiaryAccountReference ?? "desconocida"}: un cambio legítimo existe, pero no se aprueba solo.`,
+      ),
+    );
+  } else {
+    out.push(pass("cuenta_estable", `La cuenta ${line.beneficiaryAccountReference} es la última confirmada.`));
   }
 
-  // Solo el salario tiene un monto confirmado recurrente con el que comparar.
+  // 7 · variación frente al último monto confirmado (solo salario: es la clase con monto recurrente)
   if (line.lineType === "salary" && line.amountMinor !== null) {
     if (line.lastConfirmedAmountMinor === null) {
-      add("variacion_aceptable", "INSUFFICIENT_DATA", "requires_approval", "No hay un salario confirmado previamente con el que comparar.");
-    } else if (Math.abs(line.amountMinor - line.lastConfirmedAmountMinor) * 10_000 > template.varianceToleranceBps * line.lastConfirmedAmountMinor) {
-      add("variacion_aceptable", "VARIANCE_EXCEEDED", "requires_approval", "El salario varía más de la tolerancia respecto al último confirmado.");
+      out.push(unknown("variacion_aceptable", "INSUFFICIENT_DATA", "No hay un monto confirmado anterior con el que comparar."));
+    } else {
+      const delta = Math.abs(line.amountMinor - line.lastConfirmedAmountMinor);
+      if (delta * 10_000 > template.varianceToleranceBps * line.lastConfirmedAmountMinor) {
+        const bps = Math.round((delta * 10_000) / line.lastConfirmedAmountMinor);
+        out.push(
+          fail(
+            "variacion_aceptable",
+            "VARIANCE_EXCEEDED",
+            `${money(line.amountMinor, line.currency)} frente a ${money(line.lastConfirmedAmountMinor, line.currency)} confirmados: ${(bps / 100).toFixed(1)} % de variación (tolerancia ${(template.varianceToleranceBps / 100).toFixed(1)} %).`,
+          ),
+        );
+      } else {
+        out.push(pass("variacion_aceptable", "La variación está dentro de la tolerancia de la plantilla."));
+      }
     }
+  } else {
+    out.push(pass("variacion_aceptable", "No aplica a esta clase de línea."));
   }
 
+  // 8 · beneficios esperados en el mes (prima)
   if (employee) {
-    const expected = dataset.benefits.filter(
-      (benefit) => benefit.counterpartyRef === line.counterpartyRef && benefit.periodStart >= line.periodStart && benefit.periodStart <= line.periodEnd,
-    );
+    const expected = dataset.benefits.filter((b) => b.counterpartyRef === line.counterpartyRef && b.periodStart >= line.periodStart && b.periodStart <= line.periodEnd);
     if (line.lineType === "salary") {
-      for (const benefit of expected) {
-        const present = sameOccurrence.some((other) => other.counterpartyRef === line.counterpartyRef && other.lineType === benefit.lineType);
-        if (!present) add("beneficios_esperados", "BENEFIT_MISMATCH", "requires_approval", "Este mes corresponde un beneficio (p. ej. prima) que no viene en la corrida.");
-      }
+      const absent = expected.filter((b) => !all.some((other) => other.counterpartyRef === line.counterpartyRef && other.lineType === b.lineType));
+      out.push(
+        absent.length > 0
+          ? fail("beneficios_esperados", "BENEFIT_MISMATCH", "Este mes toca prima y la liquidación no la trae.")
+          : pass("beneficios_esperados", "Los beneficios esperados del mes están presentes."),
+      );
     } else if (line.lineType === "bonus" || line.lineType === "severance") {
-      if (!expected.some((benefit) => benefit.lineType === line.lineType && benefit.expectedAmountMinor === line.amountMinor)) {
-        add("beneficios_esperados", "BENEFIT_MISMATCH", "requires_approval", "El beneficio no coincide con el esperado (concepto o monto).");
-      }
+      const matches = expected.some((b) => b.lineType === line.lineType && b.expectedAmountMinor === line.amountMinor);
+      out.push(
+        matches
+          ? pass("beneficios_esperados", "El beneficio coincide con el monto esperado.")
+          : fail("beneficios_esperados", "BENEFIT_MISMATCH", "El beneficio no coincide con el monto que esperaba el calendario de beneficios."),
+      );
+    } else {
+      out.push(pass("beneficios_esperados", "No aplica a esta clase de línea."));
     }
+  } else {
+    out.push(pass("beneficios_esperados", "Sin persona en planilla no se evalúan beneficios."));
   }
 
-  const index = sameOccurrence.findIndex((other) => other.lineId === line.lineId);
-  if (sameOccurrence.slice(0, index).some((other) => other.counterpartyRef === line.counterpartyRef && other.lineType === line.lineType)) {
-    add("sin_linea_duplicada", "DUPLICATE_LINE", "blocked", "La misma contraparte ya tiene una línea de esta clase en la corrida.");
-  }
+  // 9 · sin línea duplicada
+  const index = all.findIndex((other) => other.lineId === line.lineId);
+  const duplicated = all.slice(0, index).some((other) => other.counterpartyRef === line.counterpartyRef && other.lineType === line.lineType);
+  out.push(duplicated ? fail("sin_linea_duplicada", "DUPLICATE_LINE", "La misma persona y clase de pago ya aparece antes en la corrida: bloqueada.", true) : pass("sin_linea_duplicada", "No hay otra línea igual en la corrida."));
 
-  // Una señal sin resolver solo sube la cautela; verificarla es una acción humana.
-  if (line.signals.some((signal) => signal.status === "proposed" || signal.status === "verified")) {
-    add("sin_senales_pendientes", "SIGNAL_PENDING_REVIEW", "requires_approval", "Hay una novedad del correo o de Buk pendiente de revisión.");
+  // 10 · sin señales pendientes (un correo o webhook solo puede aumentar la cautela)
+  const pending = line.signals.filter((signal) => signal.status === "proposed" || signal.status === "verified");
+  out.push(
+    pending.length > 0
+      ? fail("sin_senales_pendientes", "SIGNAL_PENDING_REVIEW", `Hay ${pending.length} novedad(es) pendiente(s) sobre esta persona; una persona las revisa antes de pagar.`)
+      : pass("sin_senales_pendientes", "Sin novedades pendientes."),
+  );
+
+  // 11 · patrón histórico (aprendido): solo escala
+  if (learned.length > 0) {
+    for (const finding of learned) out.push(fail(finding.ruleId, finding.reasonCode, finding.explanation));
+  } else {
+    out.push(pass("patron_historico", "Sin desviaciones frente al historial (o sin historial suficiente)."));
   }
   return out;
 }
 
-const unique = <T>(values: T[]): T[] => [...new Set(values)];
-
-function evaluationsOf(findings: Finding[]): PayrollRuleEvaluation[] {
-  return PAYROLL_LINE_RULE_IDS.flatMap((ruleId): PayrollRuleEvaluation[] => {
-    const own = findings.filter((finding) => finding.ruleId === ruleId);
-    if (own.length === 0) return [{ ruleId, result: "pass", reasonCode: null, effect: null, explanation: "Cumple." }];
-    return own.map((finding) => ({ ruleId, result: "fail", reasonCode: finding.code, effect: finding.effect, explanation: finding.explanation }));
-  });
-}
+const unique = <T>(values: T[]) => [...new Set(values)];
 
 export function decidePayrollRun(input: PayrollRunInput): PayrollRunResult {
   const { template, occurrence, lines, dataset } = input;
   const employees = new Map(dataset.employees.map((employee) => [employee.counterpartyRef, employee]));
 
-  const results: PayrollLineDecision[] = lines.map((line) => {
-    const findings = lineFindings(line, employees.get(line.counterpartyRef) ?? null, dataset, template, lines);
+  // Reglas de corrida
+  const total = lines.reduce((sum, line) => sum + (line.amountMinor ?? 0), 0);
+  const runEvals: { eval: Eval; finding: PayrollRunFinding | null }[] = [];
+
+  const authorized = template.status === "active" && template.activatedAt !== null && total <= template.runCapMinor;
+  runEvals.push({
+    eval: authorized
+      ? pass("obligacion_autorizada", "La plantilla está activa y el total no supera su tope.")
+      : fail(
+          "obligacion_autorizada",
+          "OBLIGATION_NOT_AUTHORIZED",
+          template.status !== "active" || template.activatedAt === null
+            ? "La plantilla no está activa: ninguna persona la autorizó todavía."
+            : `El total ${money(total, template.currency)} supera el tope de la plantilla ${money(template.runCapMinor, template.currency)}.`,
+        ),
+    finding: authorized ? null : { ruleId: "obligacion_autorizada", reasonCode: "OBLIGATION_NOT_AUTHORIZED", effect: "requires_approval", counterpartyRef: null },
+  });
+
+  const ageMs = occurrence.evidenceCapturedAt ? Date.parse(occurrence.asOf) - Date.parse(occurrence.evidenceCapturedAt) : Number.POSITIVE_INFINITY;
+  const fresh = ageMs <= template.evidenceMaxAgeDays * 86_400_000;
+  runEvals.push({
+    eval: fresh
+      ? pass("evidencia_vigente", `La lectura de RR. HH. tiene menos de ${template.evidenceMaxAgeDays} día(s).`)
+      : fail("evidencia_vigente", "STALE_EVIDENCE", `La lectura de RR. HH. es más vieja que ${template.evidenceMaxAgeDays} día(s) (o no existe).`),
+    finding: fresh ? null : { ruleId: "evidencia_vigente", reasonCode: "STALE_EVIDENCE", effect: "requires_approval", counterpartyRef: null },
+  });
+
+  const omitted = occurrence.expectedCounterparties.filter((ref) => !lines.some((line) => line.counterpartyRef === ref && line.lineType === "salary"));
+  if (omitted.length === 0) {
+    runEvals.push({ eval: pass("corrida_completa", "Todas las personas activas tienen su línea."), finding: null });
+  } else {
+    for (const ref of omitted) {
+      runEvals.push({
+        eval: fail("corrida_completa", "PAYROLL_OMISSION", `Falta la línea de salario de ${ref}.`),
+        finding: { ruleId: "corrida_completa", reasonCode: "PAYROLL_OMISSION", effect: "requires_approval", counterpartyRef: ref },
+      });
+    }
+  }
+
+  const lineResults: PayrollLineDecision[] = lines.map((line) => {
+    const evals = lineRules(line, employees.get(line.counterpartyRef) ?? null, dataset, template, lines, input.learned?.get(line.lineId) ?? []);
+    const blocked = evals.some((e) => e.hardBlock);
+    const escalated = evals.some((e) => e.result !== "pass");
     return {
       lineId: line.lineId,
       counterpartyRef: line.counterpartyRef,
       displayName: line.displayName,
       lineType: line.lineType,
       amountMinor: line.amountMinor,
-      decision: findings.some((f) => f.effect === "blocked") ? "blocked" : findings.length > 0 ? "requires_approval" : "approved",
-      reasonCodes: unique(findings.map((f) => f.code)),
-      rulesEvaluated: evaluationsOf(findings),
-      dataOrigin: "fixture",
-      isSimulated: true,
+      currency: line.currency,
+      decision: blocked ? "blocked" : escalated ? "requires_approval" : "approved",
+      reasonCodes: unique(evals.flatMap((e) => (e.reasonCode ? [e.reasonCode] : []))),
+      rules: evals.map((e) => ({ ruleId: e.ruleId, result: e.result, reasonCode: e.reasonCode, explanation: e.explanation })),
     };
   });
 
-  const run: PayrollRunFinding[] = [];
-  const total = lines.reduce((sum, line) => sum + (line.amountMinor ?? 0), 0);
-  if (template.status !== "active" || template.activatedAt === null) {
-    run.push({ ruleId: "obligacion_autorizada", reasonCode: "OBLIGATION_NOT_AUTHORIZED", effect: "requires_approval", counterpartyRef: null, explanation: "La plantilla de nómina no está activada por una persona autorizada." });
-  } else if (total > template.runCapMinor) {
-    run.push({ ruleId: "obligacion_autorizada", reasonCode: "OBLIGATION_NOT_AUTHORIZED", effect: "requires_approval", counterpartyRef: null, explanation: "El total de la corrida supera el tope autorizado." });
-  }
-
-  const ageMs = occurrence.evidenceCapturedAt ? Date.parse(occurrence.asOf) - Date.parse(occurrence.evidenceCapturedAt) : Number.POSITIVE_INFINITY;
-  if (ageMs > template.evidenceMaxAgeDays * DAY_MS) {
-    run.push({ ruleId: "evidencia_vigente", reasonCode: "STALE_EVIDENCE", effect: "requires_approval", counterpartyRef: null, explanation: "La evidencia de Buk es más antigua que lo permitido por la plantilla." });
-  }
-
-  for (const expected of occurrence.expectedCounterparties) {
-    if (!lines.some((line) => line.counterpartyRef === expected && line.lineType === "salary")) {
-      run.push({ ruleId: "corrida_completa", reasonCode: "PAYROLL_OMISSION", effect: "requires_approval", counterpartyRef: expected, explanation: `Falta la línea de salario de ${expected}, que figura como activo.` });
+  const runFindings: PayrollRunFinding[] = runEvals.flatMap((r) => (r.finding ? [r.finding] : []));
+  for (const result of lineResults) {
+    for (const { eval: e, finding } of runEvals) {
+      result.rules.push({ ruleId: e.ruleId, result: e.result, reasonCode: e.reasonCode, explanation: e.explanation });
+      if (finding && result.decision !== "blocked") {
+        result.decision = "requires_approval";
+        if (!result.reasonCodes.includes(finding.reasonCode)) result.reasonCodes.push(finding.reasonCode);
+      }
     }
   }
 
-  // Las reglas de corrida afectan a todas las líneas: las que escalan suben toda línea no bloqueada.
-  for (const result of results) {
-    if (result.decision === "blocked") continue;
-    for (const finding of run) {
-      result.decision = "requires_approval";
-      if (!result.reasonCodes.includes(finding.reasonCode)) result.reasonCodes.push(finding.reasonCode);
-    }
-  }
-
-  // Los fondos libres deben cubrir todo lo que podría pagarse; si no, se bloquea toda la corrida.
-  const payable = results.filter((r) => r.decision !== "blocked").reduce((sum, r) => sum + (r.amountMinor ?? 0), 0);
+  // fondos suficientes: lo libre debe cubrir todo lo que podría pagarse (líneas no bloqueadas)
+  const payable = lineResults.filter((r) => r.decision !== "blocked").reduce((sum, r) => sum + (r.amountMinor ?? 0), 0);
   const free = occurrence.fundsAvailableMinor === null || occurrence.fundsReservedMinor === null ? null : occurrence.fundsAvailableMinor - occurrence.fundsReservedMinor;
-  if (free === null || payable > free) {
-    run.push({ ruleId: "fondos_suficientes", reasonCode: "FUNDS_INSUFFICIENT", effect: "blocked", counterpartyRef: null, explanation: free === null ? "Se desconocen los fondos libres." : "Los fondos libres no cubren la corrida." });
-    for (const result of results) {
+  const enough = free !== null && payable <= free;
+  for (const result of lineResults) {
+    result.rules.push(
+      enough
+        ? { ruleId: "fondos_suficientes", result: "pass", reasonCode: null, explanation: `Los fondos libres cubren ${money(payable, template.currency)}.` }
+        : {
+            ruleId: "fondos_suficientes",
+            result: "fail",
+            reasonCode: "FUNDS_INSUFFICIENT",
+            explanation: free === null ? "No se conocen los fondos disponibles: no se paga." : `Se necesitan ${money(payable, template.currency)} y hay ${money(free, template.currency)} libres.`,
+          },
+    );
+  }
+  if (!enough) {
+    runFindings.push({ ruleId: "fondos_suficientes", reasonCode: "FUNDS_INSUFFICIENT", effect: "blocked", counterpartyRef: null });
+    for (const result of lineResults) {
       result.decision = "blocked";
       if (!result.reasonCodes.includes("FUNDS_INSUFFICIENT")) result.reasonCodes.push("FUNDS_INSUFFICIENT");
     }
   }
 
-  const counts: Record<PayrollDecision, number> = { approved: 0, blocked: 0, requires_approval: 0 };
-  for (const result of results) counts[result.decision]++;
-  const held = run.some((finding) => finding.effect === "blocked");
-  return {
-    occurrenceId: occurrence.occurrenceId,
-    asOf: occurrence.asOf,
-    occurrenceStatus: held ? "held" : counts.requires_approval > 0 ? "in_approval" : "ready_to_execute",
-    counts,
-    runFindings: run,
-    lines: results,
-    held,
-  };
+  const counts: Record<PayrollOutcome, number> = { approved: 0, blocked: 0, requires_approval: 0 };
+  for (const result of lineResults) counts[result.decision]++;
+  const status = runFindings.some((finding) => finding.effect === "blocked") ? "held" : counts.requires_approval > 0 ? "in_approval" : "ready_to_execute";
+  return { occurrenceId: occurrence.occurrenceId, asOf: occurrence.asOf, status, counts, runFindings, lines: lineResults };
 }

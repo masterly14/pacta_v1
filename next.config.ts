@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
     "/api/mock/buk/*": ["./src/features/obligations/fixtures/buk/payloads/**/*"],
     // El flujo de nómina lee los mismos payloads desde sus server actions.
     "/obligations/*": ["./src/features/obligations/fixtures/buk/payloads/**/*"],
+    "/api/cron/obligations": ["./src/features/obligations/fixtures/buk/payloads/**/*"],
+    "/platform/runs": ["./src/features/obligations/fixtures/buk/payloads/**/*"],
+    "/platform/obligations": ["./src/features/obligations/fixtures/buk/payloads/**/*"],
   },
   allowedDevOrigins: ["localhost:3000", "378a-200-3-154-136.ngrok-free.app"],
 };
