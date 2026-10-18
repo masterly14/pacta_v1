@@ -107,7 +107,7 @@ export async function associateTransactions(
         entityType: "supplier",
         entityId: link.supplierId,
         actorId: actor?.userId ?? null,
-        eventType: "bank_transactions.linked",
+        eventType: "transacciones_bancarias.vinculadas",
         payload: { key: link.key, count, method: "exact", importBatchId },
       });
     }
@@ -134,7 +134,7 @@ export async function associateTransactions(
           entityType: "supplier",
           entityId: supplier.id,
           actorId: null,
-          eventType: "supplier.auto_created",
+          eventType: "proveedor.creado_automaticamente",
           payload: { name: supplier.name, normalizedName, key: suggestion.key, transactionCount: Math.max(count, 1), requestedBy: actor.userId, importBatchId },
         });
       }
@@ -144,7 +144,7 @@ export async function associateTransactions(
           entityType: "supplier",
           entityId: supplier.id,
           actorId: null,
-          eventType: "bank_transactions.linked",
+          eventType: "transacciones_bancarias.vinculadas",
           payload: { key: suggestion.key, count, method: "auto_created", importBatchId },
         });
       }
@@ -210,7 +210,7 @@ export async function confirmSuggestion(
         entityType: "supplier",
         entityId: supplier.id,
         actorId: actor.userId,
-        eventType: "supplier.created_from_bank",
+        eventType: "proveedor.creado_desde_banco",
         payload: { name: supplier.name, normalizedName: supplier.normalizedName, key: request.key, transactionCount: Math.max(linkedCount, 1) },
       });
     }
@@ -219,7 +219,7 @@ export async function confirmSuggestion(
         entityType: "supplier",
         entityId: supplier.id,
         actorId: actor.userId,
-        eventType: "bank_transactions.linked",
+        eventType: "transacciones_bancarias.vinculadas",
         payload: { key: request.key, count: linkedCount, method: "confirmed", importBatchId: null },
       });
     }

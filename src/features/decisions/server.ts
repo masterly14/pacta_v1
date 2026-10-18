@@ -12,6 +12,7 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { notifyDecision } from "@/features/notifications/dispatch";
 import { InvoiceContextSchema } from "@/shared/schemas/invoice-context";
 import { PaymentDecisionSchema, type PaymentDecision } from "@/shared/schemas/payment-decision";
 import { decide } from "./engine/decide";
@@ -26,8 +27,8 @@ function toDbDate(calendarDate: string): Date {
 
 // La autorización que cubrió una aprobación es la evidencia de la regla de límite.
 function coveringAuthorizationId(decision: PaymentDecision): string | null {
-  if (decision.decision !== "approved") return null;
-  const rule = decision.rulesEvaluated.find((r) => r.ruleId === "within_authorization_limit");
+  if (decision.decision !== "aprobada") return null;
+  const rule = decision.rulesEvaluated.find((r) => r.ruleId === "dentro_limite_autorizacion");
   return rule?.evidenceReferences.find((e) => e.type === "payment_authorization")?.id ?? null;
 }
 
@@ -40,14 +41,14 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
   const invoice = InvoiceContextSchema.parse(input);
   const organizationId = invoice.organizationId;
 
-  return db.$transaction(async (tx) => {
+  const decision = await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM organizations WHERE id = ${organizationId} FOR UPDATE`;
     if (locked.length === 0) {
       throw new Error(`Organización ${organizationId} no existe`);
     }
 
     const alreadyApproved = await tx.paymentDecision.findFirst({
-      where: { organizationId, invoiceId: invoice.invoiceId, decision: "approved" },
+      where: { organizationId, invoiceId: invoice.invoiceId, decision: "aprobada" },
       select: { payload: true },
     });
     if (alreadyApproved !== null) {
@@ -68,7 +69,7 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
         currency: invoice.currency,
         invoiceDate: invoice.invoiceDate === null ? null : toDbDate(invoice.invoiceDate),
         decision: decision.decision,
-        decisionSource: "automatic",
+        decisionSource: "automatica",
         reasonCodes: decision.reasonCodes,
         rulesEvaluated: decision.rulesEvaluated as Prisma.InputJsonValue,
         payload: decision as Prisma.InputJsonValue,
@@ -80,17 +81,17 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
     });
 
     const pending = await tx.approvalRequest.findFirst({
-      where: { organizationId, invoiceId: invoice.invoiceId, status: "pending" },
+      where: { organizationId, invoiceId: invoice.invoiceId, status: "pendiente" },
       select: { id: true },
     });
-    if (decision.decision === "requires_approval" && pending === null) {
+    if (decision.decision === "requiere_aprobacion" && pending === null) {
       await tx.approvalRequest.create({
         data: { organizationId, invoiceId: invoice.invoiceId, decisionId: decision.decisionId },
       });
     }
     // Una reevaluación que ya no necesita persona (aprobada o bloqueada) cierra la solicitud.
-    if (decision.decision !== "requires_approval" && pending !== null) {
-      await tx.approvalRequest.update({ where: { id: pending.id }, data: { status: "cancelled", resolvedAt: new Date() } });
+    if (decision.decision !== "requiere_aprobacion" && pending !== null) {
+      await tx.approvalRequest.update({ where: { id: pending.id }, data: { status: "cancelada", resolvedAt: new Date() } });
     }
 
     await tx.auditEvent.create({
@@ -98,7 +99,7 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
         organizationId,
         entityType: "payment_decision",
         entityId: decision.decisionId,
-        eventType: "payment_decision.created",
+        eventType: "decision_pago.creada",
         actorId: null,
         payload: {
           invoiceId: invoice.invoiceId,
@@ -111,6 +112,10 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
 
     return decision;
   }, TRANSACTION_OPTIONS);
+
+  // Tras el commit: avisar por los canales configurados es best-effort y nunca altera la decisión ya guardada.
+  await notifyDecision(decision.decisionId);
+  return decision;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +151,7 @@ export async function listRecentDecisions(organizationId: string, take = 50) {
 
 export async function listPendingApprovals(organizationId: string) {
   const rows = await db.approvalRequest.findMany({
-    where: { organizationId, status: "pending" },
+    where: { organizationId, status: "pendiente" },
     orderBy: { requestedAt: "asc" },
     include: { decision: { include: { supplier: { select: { name: true } } } } },
   });

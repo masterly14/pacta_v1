@@ -120,7 +120,7 @@ describe.skipIf(!url)("invoice pipeline (integration)", async () => {
 
   it("manual upload: extracts, resolves the supplier and auto-approves an authorized invoice", async () => {
     const result = await processInvoice(manualInput("inv_manual_1"), { extract: fakeModel(raw()) });
-    expect(result).toMatchObject({ ok: true, invoiceId: "inv_manual_1", decision: { decision: "approved" } });
+    expect(result).toMatchObject({ ok: true, invoiceId: "inv_manual_1", decision: { decision: "aprobada" } });
     const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: "inv_manual_1" } });
     expect(invoice).toMatchObject({ extractionStatus: "extracted", supplierId: PAPELERIA, supplierMatchStatus: "matched", amountMinor: 4590, source: "dashboard" });
     expect(await prisma.paymentDecision.count({ where: { invoiceId: "inv_manual_1" } })).toBe(1);
@@ -144,7 +144,7 @@ describe.skipIf(!url)("invoice pipeline (integration)", async () => {
     expect(await prisma.gmailInboundMessage.findUniqueOrThrow({ where: { id: "in_1" } })).toMatchObject({ processingStatus: "processed" });
     // Misma autorización mensual: la primera se aprueba y la segunda del mes escala.
     const decisions = result.results.map((r) => ("decision" in r ? r.decision.decision : null)).sort();
-    expect(decisions).toEqual(["approved", "requires_approval"]);
+    expect(decisions).toEqual(["aprobada", "requiere_aprobacion"]);
   });
 
   it("is idempotent: reprocessing an email or a decided group creates nothing new", async () => {
@@ -165,7 +165,7 @@ describe.skipIf(!url)("invoice pipeline (integration)", async () => {
     expect(await prisma.paymentDecision.count()).toBe(0);
 
     const retried = await reprocessEmailInvoice("inv_grp_a", ORG, { blob: fakeBlob, extract: () => fakeModel(raw()) });
-    expect(retried).toMatchObject({ ok: true, decision: { decision: "approved" } });
+    expect(retried).toMatchObject({ ok: true, decision: { decision: "aprobada" } });
     expect(await prisma.invoice.findUniqueOrThrow({ where: { id: "inv_grp_a" } })).toMatchObject({ extractionStatus: "extracted", extractionError: null });
   });
 
@@ -173,7 +173,7 @@ describe.skipIf(!url)("invoice pipeline (integration)", async () => {
     const result = await processInvoice(manualInput("inv_manual_2"), {
       extract: fakeModel(raw({ supplierName: claim("Papeleria Centrall", "Proveedor: Papelería Central") })),
     });
-    expect(result).toMatchObject({ ok: true, decision: { decision: "requires_approval" } });
+    expect(result).toMatchObject({ ok: true, decision: { decision: "requiere_aprobacion" } });
     expect(await prisma.invoice.findUniqueOrThrow({ where: { id: "inv_manual_2" } })).toMatchObject({ supplierMatchStatus: "ambiguous", supplierId: null });
   });
 

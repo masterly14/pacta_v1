@@ -23,6 +23,14 @@ const UrlButtonComponentSchema = z.strictObject({
   parameters: z.array(TextParameterSchema).length(1),
 });
 
+// Botón de respuesta rápida: la carga vuelve en el webhook como `button.payload`.
+const QuickReplyButtonComponentSchema = z.strictObject({
+  type: z.literal("button"),
+  sub_type: z.literal("quick_reply"),
+  index: z.enum(["0", "1", "2"]),
+  parameters: z.array(z.strictObject({ type: z.literal("payload"), payload: z.string().min(1).max(256) })).length(1),
+});
+
 export const WhatsAppOutboundMessageSchema = z.strictObject({
   messaging_product: z.literal("whatsapp"),
   recipient_type: z.literal("individual"),
@@ -31,7 +39,7 @@ export const WhatsAppOutboundMessageSchema = z.strictObject({
   template: z.strictObject({
     name: z.string().regex(/^[a-z0-9_]{1,512}$/),
     language: z.strictObject({ code: z.string().regex(/^[a-z]{2}(_[A-Z]{2})?$/) }),
-    components: z.array(z.union([BodyComponentSchema, UrlButtonComponentSchema])),
+    components: z.array(z.union([BodyComponentSchema, UrlButtonComponentSchema, QuickReplyButtonComponentSchema])),
   }),
 });
 

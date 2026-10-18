@@ -167,7 +167,7 @@ export async function createPolicyVersion(actor: PolicyActor, input: PolicyInput
           createdBy: actor.userId,
         },
       });
-      await audit(tx, actor, "payment_policy", policy.id, "payment_policy.version_created", {
+      await audit(tx, actor, "payment_policy", policy.id, "politica_pago.version_creada", {
         version: policy.version,
         autoApprovalLimitMinor: input.autoApprovalLimitMinor,
         monthlyBudgetMinor: input.monthlyBudgetMinor,

@@ -13,16 +13,16 @@ import type { RuleOutcome } from "./rules";
 import { makeAuthorization, makeFacts, makeInvoice, makePriorDecision } from "./test-fixtures";
 
 const ALL_RULE_IDS = [
-  "essential_fields_present",
-  "no_extraction_warnings",
-  "currency_supported",
-  "not_duplicate",
-  "supplier_authorized",
-  "beneficiary_matches_authorization",
-  "within_authorization_limit",
-  "within_policy_auto_limit",
-  "contract_consistent",
-  "budget_available",
+  "campos_esenciales_presentes",
+  "sin_advertencias_extraccion",
+  "moneda_soportada",
+  "no_es_duplicada",
+  "proveedor_autorizado",
+  "beneficiario_coincide_con_autorizacion",
+  "dentro_limite_autorizacion",
+  "dentro_limite_politica_auto",
+  "contrato_consistente",
+  "presupuesto_disponible",
 ];
 
 function rule(decision: PaymentDecision, ruleId: string) {
@@ -34,12 +34,12 @@ function rule(decision: PaymentDecision, ruleId: string) {
 describe("decide — approval path", () => {
   it("approves a fully authorized invoice within limits and budget", () => {
     const result = decide(makeInvoice(), makeFacts());
-    expect(result.decision).toBe("approved");
-    expect(result.reasonCodes).toEqual(["AUTO_APPROVAL_RULES_PASSED"]);
-    expect(result.rulesEvaluated.every((r) => r.result === "pass")).toBe(true);
+    expect(result.decision).toBe("aprobada");
+    expect(result.reasonCodes).toEqual(["REGLAS_AUTOAPROBACION_CUMPLIDAS"]);
+    expect(result.rulesEvaluated.every((r) => r.result === "cumple")).toBe(true);
     expect(result.policyVersion).toBe(3);
     expect(result.matchedPolicyIds).toEqual(["pol_demo"]);
-    expect(result.decisionSource).toBe("automatic");
+    expect(result.decisionSource).toBe("automatica");
     expect(result.isSimulated).toBe(true);
     expect(result.evidenceReferences).toContainEqual({ type: "payment_authorization", id: "auth_vercel", description: null });
   });
@@ -57,90 +57,90 @@ describe("decide — approval path", () => {
 
   it("approves when the amount exactly uses the remaining budget", () => {
     const result = decide(makeInvoice(), makeFacts({ budgetUsedMinor: 1_000_000 - 2000 }));
-    expect(result.decision).toBe("approved");
+    expect(result.decision).toBe("aprobada");
   });
 });
 
 describe("decide — hard blocks", () => {
   it("blocks a confirmed duplicate (same supplier and invoice number, already approved)", () => {
     const result = decide(makeInvoice(), makeFacts({ priorDecisions: [makePriorDecision({ invoiceNumber: "VER-2026-10" })] }));
-    expect(result.decision).toBe("blocked");
-    expect(result.reasonCodes).toContain("DUPLICATE_INVOICE");
+    expect(result.decision).toBe("bloqueada");
+    expect(result.reasonCodes).toContain("FACTURA_DUPLICADA");
   });
 
   it("blocks a duplicate even when the earlier copy is still pending approval", () => {
-    const prior = makePriorDecision({ invoiceNumber: "VER-2026-10", decision: "requires_approval" });
-    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [prior] })).decision).toBe("blocked");
+    const prior = makePriorDecision({ invoiceNumber: "VER-2026-10", decision: "requiere_aprobacion" });
+    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [prior] })).decision).toBe("bloqueada");
   });
 
   it("blocks the same document resubmitted under another file name", () => {
     const result = decide(makeInvoice(), makeFacts({ documentDuplicateInvoiceIds: ["inv_first_copy"] }));
-    expect(result.decision).toBe("blocked");
-    expect(rule(result, "not_duplicate").evidenceReferences[0]).toMatchObject({ type: "invoice", id: "inv_first_copy" });
+    expect(result.decision).toBe("bloqueada");
+    expect(rule(result, "no_es_duplicada").evidenceReferences[0]).toMatchObject({ type: "invoice", id: "inv_first_copy" });
   });
 
   it("blocks when the monthly budget is exhausted, never approves", () => {
     const result = decide(makeInvoice(), makeFacts({ budgetUsedMinor: 1_000_000 }));
-    expect(result.decision).toBe("blocked");
-    expect(result.reasonCodes).toContain("BUDGET_INSUFFICIENT");
+    expect(result.decision).toBe("bloqueada");
+    expect(result.reasonCodes).toContain("PRESUPUESTO_INSUFICIENTE");
   });
 
   it("blocks when the invoice exceeds the remaining budget by one cent", () => {
-    expect(decide(makeInvoice(), makeFacts({ budgetUsedMinor: 1_000_000 - 1999 })).decision).toBe("blocked");
+    expect(decide(makeInvoice(), makeFacts({ budgetUsedMinor: 1_000_000 - 1999 })).decision).toBe("bloqueada");
   });
 
   it("reports every problem when a hard block coincides with escalations", () => {
     const result = decide(makeInvoice(), makeFacts({ budgetUsedMinor: 1_000_000, authorizations: [], recurrenceSuggested: false }));
-    expect(result.decision).toBe("blocked");
-    expect(result.reasonCodes).toEqual(expect.arrayContaining(["BUDGET_INSUFFICIENT", "SUPPLIER_NOT_AUTHORIZED"]));
-    expect(result.reasonCodes).not.toContain("HUMAN_APPROVAL_REQUIRED");
+    expect(result.decision).toBe("bloqueada");
+    expect(result.reasonCodes).toEqual(expect.arrayContaining(["PRESUPUESTO_INSUFICIENTE", "PROVEEDOR_NO_AUTORIZADO"]));
+    expect(result.reasonCodes).not.toContain("REQUIERE_APROBACION_HUMANA");
   });
 });
 
 describe("decide — duplicates that are not confirmed", () => {
   it("does not treat its own earlier evaluation as a duplicate (re-evaluation)", () => {
-    const own = makePriorDecision({ invoiceId: "inv_current", invoiceNumber: "VER-2026-10", decision: "requires_approval" });
-    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [own] })).decision).toBe("approved");
+    const own = makePriorDecision({ invoiceId: "inv_current", invoiceNumber: "VER-2026-10", decision: "requiere_aprobacion" });
+    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [own] })).decision).toBe("aprobada");
   });
 
   it("escalates a suspected duplicate (same amount and date, different number)", () => {
     const prior = makePriorDecision({ invoiceNumber: "VER-OTHER", invoiceDate: "2026-10-01" });
     const result = decide(makeInvoice(), makeFacts({ priorDecisions: [prior] }));
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "not_duplicate").result).toBe("fail");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "no_es_duplicada").result).toBe("incumple");
   });
 
   it("escalates (does not auto-approve) a resubmitted copy of a blocked or rejected invoice", () => {
-    const prior = makePriorDecision({ invoiceNumber: "VER-2026-10", decision: "blocked" });
+    const prior = makePriorDecision({ invoiceNumber: "VER-2026-10", decision: "bloqueada" });
     const result = decide(makeInvoice(), makeFacts({ priorDecisions: [prior] }));
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "not_duplicate").result).toBe("fail");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "no_es_duplicada").result).toBe("incumple");
   });
 
   it.each(["ver-2026-10", "VER 2026 10", "VER_2026_10", " VER-2026-10 "])(
     "blocks a confirmed duplicate whose number differs only in case or separators (%s)",
     (number) => {
       const prior = makePriorDecision({ invoiceNumber: number.trim() });
-      expect(decide(makeInvoice(), makeFacts({ priorDecisions: [prior] })).decision).toBe("blocked");
+      expect(decide(makeInvoice(), makeFacts({ priorDecisions: [prior] })).decision).toBe("bloqueada");
     },
   );
 
   it("uses only the latest decision of an earlier invoice: pending then rejected escalates", () => {
-    const pending = makePriorDecision({ decisionId: "d1", invoiceNumber: "VER-2026-10", decision: "requires_approval", evaluatedAt: "2026-10-02T10:00:00Z" });
-    const rejected = makePriorDecision({ decisionId: "d2", invoiceNumber: "VER-2026-10", decision: "blocked", evaluatedAt: "2026-10-02T15:00:00Z" });
-    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [rejected, pending] })).decision).toBe("requires_approval");
+    const pending = makePriorDecision({ decisionId: "d1", invoiceNumber: "VER-2026-10", decision: "requiere_aprobacion", evaluatedAt: "2026-10-02T10:00:00Z" });
+    const rejected = makePriorDecision({ decisionId: "d2", invoiceNumber: "VER-2026-10", decision: "bloqueada", evaluatedAt: "2026-10-02T15:00:00Z" });
+    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [rejected, pending] })).decision).toBe("requiere_aprobacion");
   });
 
   it("uses only the latest decision of an earlier invoice: blocked then re-escalated blocks", () => {
-    const blocked = makePriorDecision({ decisionId: "d1", invoiceNumber: "VER-2026-10", decision: "blocked", evaluatedAt: "2026-10-02T10:00:00Z" });
-    const pending = makePriorDecision({ decisionId: "d2", invoiceNumber: "VER-2026-10", decision: "requires_approval", evaluatedAt: "2026-10-03T10:00:00Z" });
-    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [pending, blocked] })).decision).toBe("blocked");
+    const blocked = makePriorDecision({ decisionId: "d1", invoiceNumber: "VER-2026-10", decision: "bloqueada", evaluatedAt: "2026-10-02T10:00:00Z" });
+    const pending = makePriorDecision({ decisionId: "d2", invoiceNumber: "VER-2026-10", decision: "requiere_aprobacion", evaluatedAt: "2026-10-03T10:00:00Z" });
+    expect(decide(makeInvoice(), makeFacts({ priorDecisions: [pending, blocked] })).decision).toBe("bloqueada");
   });
 
   it("escalates when the invoice number is missing, so duplicates cannot be checked", () => {
     const result = decide(makeInvoice({ invoiceNumber: null, missingFields: ["invoiceNumber"] }), makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "not_duplicate").result).toBe("unknown");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "no_es_duplicada").result).toBe("desconocido");
   });
 });
 
@@ -148,20 +148,20 @@ describe("decide — authorization (history is not authorization)", () => {
   it("escalates a new supplier that is not in the catalog", () => {
     const invoice = makeInvoice({ supplierId: null, supplierMatchStatus: "not_found" });
     const result = decide(invoice, makeFacts({ authorizations: [], recurrenceSuggested: false }));
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("INSUFFICIENT_DATA");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("DATOS_INSUFICIENTES");
   });
 
   it("escalates a known supplier without an authorization", () => {
     const result = decide(makeInvoice(), makeFacts({ authorizations: [], recurrenceSuggested: false }));
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("SUPPLIER_NOT_AUTHORIZED");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("PROVEEDOR_NO_AUTORIZADO");
   });
 
   it("never approves a recurring supplier from CSV history without explicit authorization", () => {
     const result = decide(makeInvoice(), makeFacts({ authorizations: [], recurrenceSuggested: true }));
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("RECURRENCE_NOT_AUTHORIZED");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("RECURRENCIA_NO_AUTORIZADA");
   });
 
   it.each([
@@ -172,59 +172,59 @@ describe("decide — authorization (history is not authorization)", () => {
     ["for another supplier", { supplierId: "sup_other" }],
   ])("does not approve with an authorization that is %s", (_label, overrides) => {
     const result = decide(makeInvoice(), makeFacts({ authorizations: [makeAuthorization(overrides)] }));
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "supplier_authorized").result).toBe("fail");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "proveedor_autorizado").result).toBe("incumple");
   });
 
   it("escalates (does not block) a changed beneficiary account; the authorization does not transfer", () => {
     const result = decide(makeInvoice({ beneficiaryAccountReference: "****9999" }), makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("BENEFICIARY_CHANGED");
-    expect(result.reasonCodes).not.toContain("SUPPLIER_NOT_AUTHORIZED");
-    expect(rule(result, "within_authorization_limit").result).toBe("unknown");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("BENEFICIARIO_CAMBIADO");
+    expect(result.reasonCodes).not.toContain("PROVEEDOR_NO_AUTORIZADO");
+    expect(rule(result, "dentro_limite_autorizacion").result).toBe("desconocido");
   });
 
   it("does not approve with a one-time authorization that already covered an invoice", () => {
     const used = makeAuthorization({ scope: "one_time", frequency: null, approvalsInCurrentPeriod: 1 });
     const result = decide(makeInvoice(), makeFacts({ authorizations: [used] }));
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "supplier_authorized").explanation).toContain("already covered");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "proveedor_autorizado").explanation).toContain("already covered");
   });
 
   it("does not let a monthly authorization approve a second invoice in the same month", () => {
     const usedThisMonth = makeAuthorization({ approvalsInCurrentPeriod: 1 });
     const second = makeInvoice({ invoiceId: "inv_second", invoiceNumber: "VER-2026-10B", invoiceDate: "2026-10-12" });
-    expect(decide(second, makeFacts({ authorizations: [usedThisMonth] })).decision).toBe("requires_approval");
+    expect(decide(second, makeFacts({ authorizations: [usedThisMonth] })).decision).toBe("requiere_aprobacion");
   });
 
   it("does not approve an invoice dated outside the authorization window", () => {
     const result = decide(makeInvoice({ invoiceDate: "2025-12-15" }), makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "supplier_authorized").result).toBe("fail");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "proveedor_autorizado").result).toBe("incumple");
   });
 
   it("escalates an amount above the authorized maximum", () => {
     const result = decide(makeInvoice({ amountMinor: 3000 }), makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "within_authorization_limit").explanation).toContain("30.00 USD");
-    expect(result.reasonCodes).toContain("AMOUNT_LIMIT_EXCEEDED");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "dentro_limite_autorizacion").explanation).toContain("30.00 USD");
+    expect(result.reasonCodes).toContain("MONTO_EXCEDE_LIMITE");
   });
 
   it("escalates an amount within the authorization but above the policy auto-approval limit", () => {
     const facts = makeFacts({ authorizations: [makeAuthorization({ maxAmountMinor: 100_000 })] });
     const result = decide(makeInvoice({ amountMinor: 60_000 }), facts);
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "within_authorization_limit").result).toBe("pass");
-    expect(rule(result, "within_policy_auto_limit").result).toBe("fail");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "dentro_limite_autorizacion").result).toBe("cumple");
+    expect(rule(result, "dentro_limite_politica_auto").result).toBe("incumple");
   });
 });
 
 describe("decide — incomplete or ambiguous data never approves", () => {
   it("escalates a missing amount and does not treat it as zero", () => {
     const result = decide(makeInvoice({ amountMinor: null, missingFields: ["amountMinor"] }), makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("INSUFFICIENT_DATA");
-    expect(rule(result, "budget_available").result).toBe("unknown");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("DATOS_INSUFICIENTES");
+    expect(rule(result, "presupuesto_disponible").result).toBe("desconocido");
   });
 
   it("escalates an invoice whose extraction reported warnings, even with every field filled", () => {
@@ -232,27 +232,27 @@ describe("decide — incomplete or ambiguous data never approves", () => {
       extractionWarnings: [{ code: "low_confidence_amount", message: "Amount is blurry", field: "amountMinor" }],
     });
     const result = decide(warned, makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "no_extraction_warnings").explanation).toContain("low_confidence_amount");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "sin_advertencias_extraccion").explanation).toContain("low_confidence_amount");
   });
 
   it("escalates a non-USD invoice instead of inventing an exchange rate", () => {
     const result = decide(makeInvoice({ currency: "EUR" }), makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("CURRENCY_NOT_SUPPORTED");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("MONEDA_NO_SOPORTADA");
   });
 
   it("escalates when the policy could not be loaded", () => {
     const result = decide(makeInvoice(), makeFacts({ policy: null }));
-    expect(result.decision).toBe("requires_approval");
+    expect(result.decision).toBe("requiere_aprobacion");
     expect(result.policyVersion).toBeNull();
     expect(result.matchedPolicyIds).toEqual([]);
   });
 
   it("escalates (does not block) when the budget used cannot be calculated", () => {
     const result = decide(makeInvoice(), makeFacts({ budgetUsedMinor: null }));
-    expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "budget_available").result).toBe("unknown");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(rule(result, "presupuesto_disponible").result).toBe("desconocido");
   });
 });
 
@@ -271,18 +271,18 @@ describe("decide — contracts", () => {
 
   it("escalates when the invoice contradicts its contract", () => {
     const result = decide(makeInvoice({ contractMatch: mismatch }), makeFacts());
-    expect(result.decision).toBe("requires_approval");
-    expect(result.reasonCodes).toContain("CONTRACT_MISMATCH");
+    expect(result.decision).toBe("requiere_aprobacion");
+    expect(result.reasonCodes).toContain("CONTRATO_NO_COINCIDE");
   });
 
   it("escalates when it is ambiguous which contract applies", () => {
     const ambiguous = { ...mismatch, contractId: null, matchStatus: "ambiguous" as const, discrepancies: [] };
-    expect(decide(makeInvoice({ contractMatch: ambiguous }), makeFacts()).decision).toBe("requires_approval");
+    expect(decide(makeInvoice({ contractMatch: ambiguous }), makeFacts()).decision).toBe("requiere_aprobacion");
   });
 
   it("approves without a contract when an explicit authorization exists", () => {
     const notFound = { ...mismatch, contractId: null, matchStatus: "not_found" as const, discrepancies: [] };
-    expect(decide(makeInvoice({ contractMatch: notFound }), makeFacts()).decision).toBe("approved");
+    expect(decide(makeInvoice({ contractMatch: notFound }), makeFacts()).decision).toBe("aprobada");
   });
 });
 
@@ -292,7 +292,7 @@ describe("decide — untrusted input", () => {
     const facts = makeFacts({ authorizations: [], recurrenceSuggested: false });
     const withText = decide(injected, facts);
     const withoutText = decide(makeInvoice(), facts);
-    expect(withText.decision).toBe("requires_approval");
+    expect(withText.decision).toBe("requiere_aprobacion");
     expect(withText).toEqual(withoutText);
   });
 
@@ -310,21 +310,21 @@ describe("combine", () => {
   const outcome = (result: RuleOutcome["result"], hardBlock = false): RuleOutcome => ({
     ruleId: "r",
     result,
-    reasonCode: result === "pass" ? null : "INSUFFICIENT_DATA",
+    reasonCode: result === "cumple" ? null : "DATOS_INSUFICIENTES",
     explanation: "x",
     evidenceReferences: [],
     hardBlock,
   });
 
   it("never approves with zero rules", () => {
-    expect(combine([])).toBe("requires_approval");
+    expect(combine([])).toBe("requiere_aprobacion");
   });
 
   it("treats unknown like a failure for approval purposes", () => {
-    expect(combine([outcome("pass"), outcome("unknown")])).toBe("requires_approval");
+    expect(combine([outcome("cumple"), outcome("desconocido")])).toBe("requiere_aprobacion");
   });
 
   it("lets a hard block win over everything", () => {
-    expect(combine([outcome("unknown"), outcome("fail", true), outcome("pass")])).toBe("blocked");
+    expect(combine([outcome("desconocido"), outcome("incumple", true), outcome("cumple")])).toBe("bloqueada");
   });
 });

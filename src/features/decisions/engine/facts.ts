@@ -60,7 +60,7 @@ export const EngineFactsSchema = z.strictObject({
   policy: EnginePolicySchema.nullable(), // null = la política no pudo cargarse
   authorizations: z.array(EngineAuthorizationSchema),
   priorDecisions: z.array(EnginePriorDecisionSchema),
-  // Otras facturas con el mismo sha256 de archivo y decisión no `blocked` (lo resuelve el loader).
+  // Otras facturas con el mismo sha256 de archivo y decisión no `bloqueada` (lo resuelve el loader).
   documentDuplicateInvoiceIds: z.array(EntityIdSchema),
   budgetUsedMinor: AmountMinorSchema.nullable(), // aprobado en el mes UTC; null = no calculable
   recurrenceSuggested: z.boolean(), // sugerencia del CSV; nunca autoriza

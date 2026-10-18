@@ -119,7 +119,7 @@ describe("associateTransactions", () => {
     expect(state.suppliers.length).toBe(1);
     expect(state.transactions.filter((transaction) => transaction.supplierId !== null).length).toBe(1);
     expect(state.audit.length).toBe(1);
-    expect(state.audit[0].eventType).toBe("bank_transactions.linked");
+    expect(state.audit[0].eventType).toBe("transacciones_bancarias.vinculadas");
     expect(state.audit[0].actorId).toBe(null);
   });
 
@@ -136,8 +136,8 @@ describe("associateTransactions", () => {
     expect(result.report.suggestions.length).toBe(1); // el de una sola aparición sigue como sugerencia
     expect(state.suppliers.length).toBe(1);
     expect(state.suppliers[0].normalizedName).toBe("nuevo proveedor");
-    const created = state.audit.find((event) => event.eventType === "supplier.auto_created");
-    if (created?.eventType !== "supplier.auto_created") throw new Error("falta el evento supplier.auto_created");
+    const created = state.audit.find((event) => event.eventType === "proveedor.creado_automaticamente");
+    if (created?.eventType !== "proveedor.creado_automaticamente") throw new Error("falta el evento supplier.auto_created");
     expect(created.actorId).toBe(null);
     expect(created.payload.requestedBy).toBe("user_admin");
   });
@@ -185,7 +185,7 @@ describe("associateTransactions", () => {
     if (!result.ok) return;
     expect(result.report.created.length).toBe(0);
     expect(result.report.linked.length).toBe(1);
-    expect(state.audit.some((event) => event.eventType === "supplier.auto_created")).toBe(false);
+    expect(state.audit.some((event) => event.eventType === "proveedor.creado_automaticamente")).toBe(false);
   });
 
   it("no toca movimientos ya vinculados, entradas ni de otra organización", async () => {
@@ -248,7 +248,7 @@ describe("confirmSuggestion", () => {
     expect(result.createdSupplier).toBe(false);
     expect(state.transactions[2].supplierId).toBe(null); // la entrada no se vincula
     expect(state.audit[0].actorId).toBe("user_admin");
-    expect(state.audit[0].eventType).toBe("bank_transactions.linked");
+    expect(state.audit[0].eventType).toBe("transacciones_bancarias.vinculadas");
   });
 
   it("create_new crea el proveedor con el nombre elegido y audita ambas cosas", async () => {
@@ -258,7 +258,7 @@ describe("confirmSuggestion", () => {
     if (!result.ok) return;
     expect(result.createdSupplier).toBe(true);
     expect(state.suppliers[0].normalizedName).toBe("nuevo proveedor s a");
-    expect(state.audit.map((event) => event.eventType).sort()).toEqual(["bank_transactions.linked", "supplier.created_from_bank"]);
+    expect(state.audit.map((event) => event.eventType).sort()).toEqual(["transacciones_bancarias.vinculadas", "proveedor.creado_desde_banco"]);
     expect(state.audit.every((event) => event.actorId === "user_admin")).toBeTruthy();
   });
 

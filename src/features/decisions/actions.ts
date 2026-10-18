@@ -17,7 +17,7 @@ import { buildDemoInvoice } from "./fixtures/demo-invoices";
 import { DEMO_SCENARIOS, isDemoScenario } from "./fixtures/scenarios";
 import { evaluateInvoice } from "./server";
 
-const OUTCOME_LABEL = { approved: "✅ aprobada", blocked: "🔴 bloqueada", requires_approval: "🟡 requiere aprobación" } as const;
+const OUTCOME_LABEL = { aprobada: "✅ aprobada", bloqueada: "🔴 bloqueada", requiere_aprobacion: "🟡 requiere aprobación" } as const;
 
 export async function simulateInvoiceAction(_previous: FormActionState, formData: FormData): Promise<FormActionState> {
   const scenario = String(formData.get("scenario") ?? "");
@@ -65,7 +65,7 @@ export async function evaluateCustomInvoiceAction(_previous: FormActionState, fo
     }
     const decision = await evaluateInvoice(built.invoice);
     refresh();
-    const reasons = decision.reasonCodes.filter((code) => code !== "HUMAN_APPROVAL_REQUIRED").join(", ");
+    const reasons = decision.reasonCodes.filter((code) => code !== "REQUIERE_APROBACION_HUMANA").join(", ");
     return { ok: true, message: `Decisión: ${OUTCOME_LABEL[decision.decision]} · Motivos: ${reasons}` };
   } catch (error) {
     if (error instanceof OrganizationRequiredError) {

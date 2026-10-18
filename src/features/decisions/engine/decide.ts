@@ -1,6 +1,6 @@
 /**
  * Purpose: the payment decision engine; combines the ten rules into approved, blocked
- *   or requires_approval with reasons and evidence.
+ *   or requiere_aprobacion with reasons and evidence.
  * Runs in: server only in the app (via evaluateInvoice(), pending) and in tests. Pure.
  * Triggered by: a call to decide(invoice, facts); never by the LLM or an incoming email.
  * Receives → Returns: (unknown InvoiceContext, unknown EngineFacts) → PaymentDecision,
@@ -49,7 +49,7 @@ export function decide(invoiceInput: unknown, factsInput: unknown): PaymentDecis
     traceId: facts.traceId,
     approvalRequestId: null,
     approvedBy: null,
-    decisionSource: "automatic",
+    decisionSource: "automatica",
     isSimulated: true,
   };
 
@@ -58,37 +58,37 @@ export function decide(invoiceInput: unknown, factsInput: unknown): PaymentDecis
 }
 
 export function combine(outcomes: readonly RuleOutcome[]): DecisionOutcome {
-  if (outcomes.some((o) => o.result === "fail" && o.hardBlock)) {
-    return "blocked";
+  if (outcomes.some((o) => o.result === "incumple" && o.hardBlock)) {
+    return "bloqueada";
   }
-  if (outcomes.length === 0 || outcomes.some((o) => o.result !== "pass")) {
-    return "requires_approval";
+  if (outcomes.length === 0 || outcomes.some((o) => o.result !== "cumple")) {
+    return "requiere_aprobacion";
   }
-  return "approved";
+  return "aprobada";
 }
 
 function reasonCodes(decision: DecisionOutcome, outcomes: readonly RuleOutcome[]): ReasonCode[] {
-  if (decision === "approved") {
-    return ["AUTO_APPROVAL_RULES_PASSED"];
+  if (decision === "aprobada") {
+    return ["REGLAS_AUTOAPROBACION_CUMPLIDAS"];
   }
   const codes = new Set<ReasonCode>();
   for (const outcome of outcomes) {
-    if (outcome.result !== "pass" && outcome.reasonCode !== null) {
+    if (outcome.result !== "cumple" && outcome.reasonCode !== null) {
       codes.add(outcome.reasonCode);
     }
   }
-  if (decision === "requires_approval") {
-    codes.add("HUMAN_APPROVAL_REQUIRED");
+  if (decision === "requiere_aprobacion") {
+    codes.add("REQUIERE_APROBACION_HUMANA");
   }
   return [...codes];
 }
 
 function explanation(decision: DecisionOutcome, outcomes: readonly RuleOutcome[]): string {
-  if (decision === "approved") {
+  if (decision === "aprobada") {
     return `All ${outcomes.length} rules passed. Approved for simulated payment.`;
   }
-  const problems = outcomes.filter((o) => o.result !== "pass").map((o) => o.explanation);
-  const prefix = decision === "blocked" ? "Blocked" : "Requires human approval";
+  const problems = outcomes.filter((o) => o.result !== "cumple").map((o) => o.explanation);
+  const prefix = decision === "bloqueada" ? "Blocked" : "Requires human approval";
   return `${prefix}: ${problems.join(" ")}`;
 }
 

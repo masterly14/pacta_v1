@@ -13,6 +13,7 @@ import { Prisma, type PaymentDecision as PaymentDecisionRow } from "@prisma/clie
 import { db } from "@/lib/db";
 import { decide } from "@/features/decisions/engine/decide";
 import { loadEngineFacts } from "@/features/decisions/load-facts";
+import { notifyDecision } from "@/features/notifications/dispatch";
 import { checkCanAuthorize, type PolicyActor } from "@/features/policies/permissions";
 import { InvoiceContextSchema } from "@/shared/schemas/invoice-context";
 import {
@@ -45,16 +46,16 @@ function withComment(text: string, comment: string | null): string {
 // Motivos que explican la intervención humana (sin el código exclusivo de aprobación automática).
 function humanReasonCodes(rules: readonly RuleEvaluation[], fallback: readonly ReasonCode[]): ReasonCode[] {
   const codes = new Set<ReasonCode>();
-  for (const rule of rules) if (rule.result !== "pass" && rule.reasonCode !== null) codes.add(rule.reasonCode);
-  for (const code of fallback) if (code !== "AUTO_APPROVAL_RULES_PASSED") codes.add(code);
-  codes.add("HUMAN_APPROVAL_REQUIRED");
+  for (const rule of rules) if (rule.result !== "cumple" && rule.reasonCode !== null) codes.add(rule.reasonCode);
+  for (const code of fallback) if (code !== "REGLAS_AUTOAPROBACION_CUMPLIDAS") codes.add(code);
+  codes.add("REQUIERE_APROBACION_HUMANA");
   return [...codes];
 }
 
 function humanDecision(fields: {
   decisionId: string;
   trigger: PaymentDecisionRow;
-  decision: "approved" | "blocked";
+  decision: "aprobada" | "bloqueada";
   policyVersion: number | null;
   reasonCodes: ReasonCode[];
   explanation: string;
@@ -81,7 +82,7 @@ function humanDecision(fields: {
     traceId: null,
     approvalRequestId: fields.approvalRequestId,
     approvedBy: fields.actorId,
-    decisionSource: "human",
+    decisionSource: "humana",
     isSimulated: true,
   });
 }
@@ -99,7 +100,7 @@ function insertHumanDecision(tx: Tx, trigger: PaymentDecisionRow, decision: Paym
       currency: trigger.currency,
       invoiceDate: trigger.invoiceDate,
       decision: decision.decision,
-      decisionSource: "human",
+      decisionSource: "humana",
       reasonCodes: decision.reasonCodes,
       rulesEvaluated: decision.rulesEvaluated as Prisma.InputJsonValue,
       payload: decision as Prisma.InputJsonValue,
@@ -131,7 +132,7 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
   const approvalLimitMinor = permission.approvalLimitMinor;
 
   try {
-    return await db.$transaction(async (tx): Promise<ResolveResult> => {
+    const result = await db.$transaction(async (tx): Promise<ResolveResult> => {
       await tx.$queryRaw`SELECT id FROM organizations WHERE id = ${actor.organizationId} FOR UPDATE`;
 
       const request = await tx.approvalRequest.findFirst({
@@ -139,7 +140,7 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
         include: { decision: true },
       });
       if (request === null) return denied("Solicitud no encontrada.");
-      if (request.status !== "pending") return denied("Esta solicitud ya fue resuelta.");
+      if (request.status !== "pendiente") return denied("Esta solicitud ya fue resuelta.");
       const trigger = request.decision;
       const triggerPayload = PaymentDecisionSchema.parse(trigger.payload);
       const now = new Date();
@@ -150,7 +151,7 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
         const decision = humanDecision({
           decisionId,
           trigger,
-          decision: "blocked",
+          decision: "bloqueada",
           policyVersion: trigger.policyVersion,
           reasonCodes: humanReasonCodes(triggerPayload.rulesEvaluated, triggerPayload.reasonCodes),
           explanation: withComment("Rechazada por una persona.", input.comment),
@@ -164,9 +165,9 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
         await insertHumanDecision(tx, trigger, decision, null);
         await tx.approvalRequest.update({
           where: { id: request.id },
-          data: { status: "rejected", resolvedAt: now, resolvedBy: actor.userId, comment: input.comment },
+          data: { status: "rechazada", resolvedAt: now, resolvedBy: actor.userId, comment: input.comment },
         });
-        await audit(tx, actor, "approval_request", request.id, "approval_request.rejected", { decisionId, comment: input.comment });
+        await audit(tx, actor, "approval_request", request.id, "solicitud_aprobacion.rechazada", { decisionId, comment: input.comment });
         return { ok: true, message: "Factura rechazada." };
       }
 
@@ -206,11 +207,11 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
       const engine = decide(invoice, facts);
 
       // Un bloqueo absoluto (duplicado, sin presupuesto) gana incluso a la aprobación humana.
-      if (engine.decision === "blocked") {
+      if (engine.decision === "bloqueada") {
         const decision = humanDecision({
           decisionId,
           trigger,
-          decision: "blocked",
+          decision: "bloqueada",
           policyVersion: engine.policyVersion,
           reasonCodes: humanReasonCodes(engine.rulesEvaluated, engine.reasonCodes),
           explanation: withComment(`Aprobación rechazada al revalidar: ${engine.explanation}`, input.comment),
@@ -224,11 +225,11 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
         await insertHumanDecision(tx, trigger, decision, null);
         await tx.approvalRequest.update({
           where: { id: request.id },
-          data: { status: "rejected", resolvedAt: now, resolvedBy: actor.userId, comment: input.comment },
+          data: { status: "rechazada", resolvedAt: now, resolvedBy: actor.userId, comment: input.comment },
         });
-        await audit(tx, actor, "approval_request", request.id, "approval_request.blocked_on_revalidation", { decisionId, reasonCodes: engine.reasonCodes });
+        await audit(tx, actor, "approval_request", request.id, "solicitud_aprobacion.bloqueada_en_revalidacion", { decisionId, reasonCodes: engine.reasonCodes });
         // La solicitud sí se resolvió (como bloqueada): resultado completado, no error de entrada.
-        const reasons = engine.reasonCodes.filter((c) => c !== "HUMAN_APPROVAL_REQUIRED").join(", ");
+        const reasons = engine.reasonCodes.filter((c) => c !== "REQUIERE_APROBACION_HUMANA").join(", ");
         return { ok: true, message: `🔴 No se aprobó: al revalidar, la factura quedó bloqueada (${reasons}).` };
       }
 
@@ -264,7 +265,7 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
       const decision = humanDecision({
         decisionId,
         trigger,
-        decision: "approved",
+        decision: "aprobada",
         policyVersion: engine.policyVersion,
         reasonCodes: humanReasonCodes(engine.rulesEvaluated, []),
         explanation: withComment("Aprobada por una persona tras revalidar las reglas vigentes. Pago simulado.", input.comment),
@@ -279,14 +280,25 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
       await insertHumanDecision(tx, trigger, decision, authorizationId);
       await tx.approvalRequest.update({
         where: { id: request.id },
-        data: { status: "approved", resolvedAt: now, resolvedBy: actor.userId, comment: input.comment },
+        data: { status: "aprobada", resolvedAt: now, resolvedBy: actor.userId, comment: input.comment },
       });
-      await audit(tx, actor, "approval_request", request.id, "approval_request.approved", { decisionId, authorizationId, comment: input.comment });
+      await audit(tx, actor, "approval_request", request.id, "solicitud_aprobacion.aprobada", { decisionId, authorizationId, comment: input.comment });
       return {
         ok: true,
         message: authorizationId === null ? "Factura aprobada (pago simulado)." : "Factura aprobada y autorización recurrente creada.",
       };
     }, TRANSACTION_OPTIONS);
+
+    // Tras el commit: avisar de la decisión humana por los canales configurados (best-effort, nunca altera el resultado).
+    if (result.ok) {
+      const resolution = await db.paymentDecision.findFirst({
+        where: { organizationId: actor.organizationId, approvalRequestId: input.approvalRequestId },
+        orderBy: { evaluatedAt: "desc" },
+        select: { id: true },
+      });
+      if (resolution !== null) await notifyDecision(resolution.id);
+    }
+    return result;
   } catch (error) {
     // Índice único parcial: la factura ya tiene una aprobación (no se aprueba dos veces).
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

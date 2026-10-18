@@ -62,21 +62,21 @@ describe("informe y auditoría", () => {
         entityType: "supplier",
         entityId: "sup_1",
         actorId: null,
-        eventType: "supplier.auto_created",
+        eventType: "proveedor.creado_automaticamente",
         payload: { name: "Hosting Demo", normalizedName: "hosting demo", key: "hosting demo", transactionCount: 3, requestedBy: "user_1", importBatchId: null },
       }).success).toBe(true);
     expect(SupplierAssociationAuditEventSchema.safeParse({
         entityType: "supplier",
         entityId: "sup_1",
         actorId: "user_1",
-        eventType: "bank_transactions.linked",
+        eventType: "transacciones_bancarias.vinculadas",
         payload: { key: "hosting demo", count: 0, method: "exact", importBatchId: null },
       }).success).toBe(false);
     expect(SupplierAssociationAuditEventSchema.safeParse({
         entityType: "supplier",
         entityId: "sup_1",
         actorId: null,
-        eventType: "authorization.created",
+        eventType: "autorizacion.creada",
         payload: {},
       }).success).toBe(false);
   });

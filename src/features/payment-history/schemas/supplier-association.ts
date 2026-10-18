@@ -92,7 +92,7 @@ export const SupplierAssociationAuditEventSchema = z.discriminatedUnion("eventTy
   // Creación automática pedida con `autoCreate`. actorId null = proceso del sistema; requestedBy = quien activó la opción.
   z.strictObject({
     ...auditRowBase,
-    eventType: z.literal("supplier.auto_created"),
+    eventType: z.literal("proveedor.creado_automaticamente"),
     payload: z.strictObject({
       name: z.string().min(1),
       normalizedName: z.string().min(1),
@@ -105,7 +105,7 @@ export const SupplierAssociationAuditEventSchema = z.discriminatedUnion("eventTy
   // Creación confirmada por una persona desde una sugerencia.
   z.strictObject({
     ...auditRowBase,
-    eventType: z.literal("supplier.created_from_bank"),
+    eventType: z.literal("proveedor.creado_desde_banco"),
     payload: z.strictObject({
       name: z.string().min(1),
       normalizedName: z.string().min(1),
@@ -115,7 +115,7 @@ export const SupplierAssociationAuditEventSchema = z.discriminatedUnion("eventTy
   }),
   z.strictObject({
     ...auditRowBase,
-    eventType: z.literal("bank_transactions.linked"),
+    eventType: z.literal("transacciones_bancarias.vinculadas"),
     payload: z.strictObject({
       key: CounterpartyKeySchema,
       count: z.int().positive(),
