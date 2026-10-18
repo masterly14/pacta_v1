@@ -8,4 +8,4 @@ Los JSON de este directorio son **respuestas simuladas** con la forma exacta de 
 - Cuentas bancarias **solo** como `****1234`. Nunca un número completo.
 - Montos en COP, plausibles para 2026 pero ficticios. El cálculo de nómina está simplificado (salud 4 %, pensión 4 %, FSP 1 %, sin retención en la fuente) y no es asesoría laboral.
 - `_pacta/` **no** es Buk: son datos propios de Pacta (plantilla §9, fondos simulados, última cuenta y monto confirmados, calendario de beneficios, hora de cada captura).
-- Se regeneran con `npm run generate`.
+- Se regeneran con `npm run mock:generate`.

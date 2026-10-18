@@ -1,0 +1,100 @@
+{
+  "pagination": {
+    "next": null,
+    "previous": null,
+    "count": 15,
+    "total_pages": 1
+  },
+  "data": [
+    {
+      "id": 298,
+      "month": "2025-10",
+      "end_date": "2025-10-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 299,
+      "month": "2025-11",
+      "end_date": "2025-11-30",
+      "status": "cerrado"
+    },
+    {
+      "id": 300,
+      "month": "2025-12",
+      "end_date": "2025-12-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 301,
+      "month": "2026-01",
+      "end_date": "2026-01-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 302,
+      "month": "2026-02",
+      "end_date": "2026-02-28",
+      "status": "cerrado"
+    },
+    {
+      "id": 303,
+      "month": "2026-03",
+      "end_date": "2026-03-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 304,
+      "month": "2026-04",
+      "end_date": "2026-04-30",
+      "status": "cerrado"
+    },
+    {
+      "id": 305,
+      "month": "2026-05",
+      "end_date": "2026-05-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 306,
+      "month": "2026-06",
+      "end_date": "2026-06-30",
+      "status": "cerrado"
+    },
+    {
+      "id": 307,
+      "month": "2026-07",
+      "end_date": "2026-07-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 308,
+      "month": "2026-08",
+      "end_date": "2026-08-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 309,
+      "month": "2026-09",
+      "end_date": "2026-09-30",
+      "status": "cerrado"
+    },
+    {
+      "id": 310,
+      "month": "2026-10",
+      "end_date": "2026-10-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 311,
+      "month": "2026-11",
+      "end_date": "2026-11-30",
+      "status": "cerrado"
+    },
+    {
+      "id": 312,
+      "month": "2026-12",
+      "end_date": "2026-12-31",
+      "status": "abierto"
+    }
+  ]
+}
