@@ -1,28 +1,41 @@
 "use client";
 /**
- * Purpose: contrato proactivo de nómina como flujo de React Flow, sobre la plantilla GUARDADA: fuente
- *   de RR. HH. → plantilla (versiones, activar, pausar) → calendario → reloj → corridas → por resolver
- *   → pagos. Cada nodo abre su panel con los mismos formularios y datos que ya existían en
- *   Obligaciones y Corridas, ahora dentro de Contratos.
+ * Purpose: contrato proactivo de nómina como flujo de React Flow, sobre la plantilla GUARDADA. Cada
+ *   nodo arma una parte de la plantilla y se edita en su propio panel (fuente, reglas de control,
+ *   calendario) sin volver a otro nodo; el botón «Guardar nueva versión» está en cada uno. Los demás
+ *   nodos muestran la operación: hoy, corridas, por resolver y pagos.
  * Runs in: browser (cargado sin SSR desde process-loader.tsx); los datos llegan del servidor.
  * Triggered by: /obligations/payroll.
- * Receives → Returns: ProactiveData (disponible) → el lienzo y el panel del paso elegido.
- * Talks to: ../data (tipos), ../labels, ../../components/obligation-forms (formularios con server actions),
- *   ../../labels, ../../schedule/calendar, decisions/labels, contracts/money, ./process-canvas, shadcn Badge.
+ * Receives → Returns: ProactiveData → el lienzo y el panel del paso elegido.
+ * Talks to: ../data (tipos), ../labels, ../../actions#saveDraftAction, ../../components/obligation-forms
+ *   (activar, pausar, reloj, resolver), ../../schedule (calendario y editor), decisions/labels,
+ *   contracts/money, ./process-canvas, shadcn Badge, Button, Input, Label.
  */
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { formatMinor } from "@/features/contracts/money";
 import { REASON_LABEL } from "@/features/decisions/labels";
+import { useFormAction } from "@/shared/forms/use-form-action";
 import type { ReasonCode } from "@/shared/schemas/payment-decision";
-import { ActivateButton, AdvanceClockForm, DraftForm, PauseButton, ResolveLineForm, SeedHistoryForm } from "../../components/obligation-forms";
+import { saveDraftAction } from "../../actions";
+import { ActivateButton, AdvanceClockForm, PauseButton, ResolveLineForm, SeedHistoryForm } from "../../components/obligation-forms";
 import { LINE_TYPE_LABEL, OBLIGATION_STATUS_LABEL } from "../../labels";
-import { SCHEDULE_RULE_LABELS } from "../../schedule/calendar";
+import { DEFAULT_SCHEDULE, SCHEDULE_RULE_LABELS, type Schedule } from "../../schedule/calendar";
+import { ScheduleEditor } from "../../schedule/components/schedule-editor";
 import type { ProactiveData } from "../data";
 import { FLOW_OUTCOME, RUN_PHASE_LABEL, RUN_STATUS_LABEL } from "../labels";
 import { ProcessCanvas, type ProcessStep, type StepStatus } from "./process-canvas";
 
 type Ready = Extract<ProactiveData, { available: true }>;
+
+// Lo que arman los nodos de plantilla; se guarda junto como una versión nueva en borrador.
+type Draft = { scenario: string; schedule: Schedule; tolerancePercent: string; runCapPesos: string };
+
+const DEFAULT_TOLERANCE = "10";
+const DEFAULT_CAP_PESOS = "120000000";
 
 const EDGES = [
   ["source", "rules"],
@@ -32,6 +45,11 @@ const EDGES = [
   ["runs", "approvals"],
   ["approvals", "payments"],
 ].map(([source, target]) => ({ id: `${source}-${target}`, source, target }));
+
+const TEMPLATE_STEPS = new Set(["source", "rules", "schedule"]);
+
+// JSON con claves ordenadas: el calendario que vuelve de la base puede traer las claves en otro orden.
+const stable = (value: unknown): string => JSON.stringify(value, (_key, v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) : v));
 
 export function PayrollPersistedFlow({ data, backHref }: { data: ProactiveData; backHref: string }) {
   if (!data.available) {
@@ -52,15 +70,31 @@ function Flow({ data, backHref }: { data: Ready; backHref: string }) {
   // La plantilla vigente es la última versión; las anteriores quedan en el historial.
   const versions = useMemo(() => [...overview.obligations].sort((a, b) => b.version - a.version), [overview.obligations]);
   const latest = versions[0] ?? null;
+
+  // Punto de partida del borrador: la última versión guardada (o los valores por omisión).
+  const base = useMemo<Draft>(
+    () => ({
+      scenario: latest?.settings.source.scenario ?? data.defaultScenario,
+      schedule: latest?.settings.schedule ?? DEFAULT_SCHEDULE,
+      tolerancePercent: latest ? String(latest.template.varianceToleranceBps / 100) : DEFAULT_TOLERANCE,
+      runCapPesos: latest ? String(Math.round(latest.template.runCapMinor / 100)) : DEFAULT_CAP_PESOS,
+    }),
+    [latest, data.defaultScenario],
+  );
+  const [draft, setDraft] = useState<Draft>(base);
+  const dirty = latest === null || stable(draft) !== stable(base);
+  const patch = (changes: Partial<Draft>) => setDraft((d) => ({ ...d, ...changes }));
+
   const pending = overview.runs.flatMap((run) => run.requests.filter((r) => r.status === "pending").map((request) => ({ run, request })));
   const payments = overview.runs.flatMap((run) => run.payments.map((payment) => ({ run, payment })));
   const attentionRuns = overview.runs.filter((r) => ["held", "failed"].includes(r.occurrence.status)).length;
+  const editedHint = latest !== null && dirty ? "Cambios sin guardar" : null;
 
   const st = (s: StepStatus) => s;
   const steps: ProcessStep[] = [
-    { id: "source", title: "Fuente de RR. HH.", icon: "source", summary: latest ? `Buk · ${latest.settings.source.scenario}` : "Sin configurar", status: st(latest ? "done" : "ready"), x: 0, y: 0 },
-    { id: "rules", title: "Plantilla de nómina", icon: "rules", summary: latest ? `v${latest.version} · ${OBLIGATION_STATUS_LABEL[latest.status]}` : "Crear la primera", status: st(!latest ? "ready" : latest.status === "active" ? "done" : "attention"), x: 330, y: 0 },
-    { id: "schedule", title: "Calendario", icon: "clock", summary: latest ? `${SCHEDULE_RULE_LABELS[latest.settings.schedule.rule]} · preparar ${latest.settings.schedule.leadDays} d antes` : "Sin plantilla", status: st(latest ? "done" : "idle"), x: 660, y: 0 },
+    { id: "source", title: "Fuente de RR. HH.", icon: "source", summary: editedHint ?? `Buk · ${draft.scenario}`, status: st(editedHint ? "attention" : latest ? "done" : "ready"), x: 0, y: 0 },
+    { id: "rules", title: "Plantilla de nómina", icon: "rules", summary: editedHint ?? (latest ? `v${latest.version} · ${OBLIGATION_STATUS_LABEL[latest.status]}` : "Crear la primera"), status: st(editedHint ? "attention" : !latest ? "ready" : latest.status === "active" ? "done" : "attention"), x: 330, y: 0 },
+    { id: "schedule", title: "Calendario", icon: "clock", summary: editedHint ?? `${SCHEDULE_RULE_LABELS[draft.schedule.rule]} · preparar ${draft.schedule.leadDays} d antes`, status: st(editedHint ? "attention" : latest ? "done" : "ready"), x: 660, y: 0 },
     { id: "clock", title: "Hoy", icon: "proposal", summary: data.today, status: st("done"), x: 990, y: 0 },
     { id: "runs", title: "Corridas", icon: "evaluate", summary: overview.runs.length === 0 ? "Todavía no hay" : `${overview.runs.length} reciente${overview.runs.length === 1 ? "" : "s"}`, status: st(overview.runs.length === 0 ? "idle" : attentionRuns > 0 ? "attention" : "done"), x: 0, y: 220 },
     { id: "approvals", title: "Por resolver", icon: "approvals", summary: pending.length === 0 ? "Sin pendientes" : `${pending.length} pendiente${pending.length === 1 ? "" : "s"}`, status: st(pending.length > 0 ? "attention" : overview.runs.length > 0 ? "done" : "idle"), x: 330, y: 220 },
@@ -69,62 +103,86 @@ function Flow({ data, backHref }: { data: Ready; backHref: string }) {
   const stepOf = selected ?? "rules";
   const titles = Object.fromEntries(steps.map((s) => [s.id, s.title])) as Record<string, string>;
 
-  const panel = (
+  const body = (
     <>
       {stepOf === "source" && (
-        <Section description="Pacta lee de Buk (recursos humanos): empleados, nómina del mes, licencias y retiros. La fuente se elige al guardar una versión de la plantilla.">
-          {latest ? <Fact label="Fuente" value={latest.settings.source.scenario} /> : <p className="text-sm text-muted-foreground">Aún no hay plantilla. Créala en «Plantilla de nómina».</p>}
+        <Section description="De dónde lee Pacta los datos de recursos humanos: empleados, nómina del mes, licencias y retiros.">
+          <Field label="Fuente de RR. HH." hint="Buk (Colombia). El escenario define qué datos trae.">
+            {data.canManage ? (
+              <select className={selectClass} value={draft.scenario} onChange={(e) => patch({ scenario: e.target.value })}>
+                {data.scenarios.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-sm font-medium">{draft.scenario}</p>
+            )}
+          </Field>
         </Section>
       )}
 
       {stepOf === "rules" && (
-        <Section description="Cada cambio crea una versión nueva; las corridas ya preparadas conservan la suya. Una plantilla no opera hasta que una persona autorizada la activa.">
-          {versions.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {versions.map((o) => (
-                <li key={o.id} className="flex flex-col gap-2 rounded-lg p-2 text-sm ring-1 ring-black/5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">Versión {o.version}</span>
-                    <Badge variant={o.status === "active" ? "default" : o.status === "paused" ? "outline" : "secondary"}>{OBLIGATION_STATUS_LABEL[o.status]}</Badge>
+        <div className="flex flex-col gap-5">
+          <Section title="Estado" description="Una plantilla no opera hasta que una persona autorizada la activa. Cada cambio crea una versión nueva y las corridas ya preparadas conservan la suya.">
+            {latest === null ? (
+              <p className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">Todavía no hay plantilla. Define la fuente, las reglas y el calendario en sus nodos y guarda la primera versión.</p>
+            ) : (
+              <div className="flex flex-col gap-2 rounded-lg p-3 ring-1 ring-black/10">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold">Versión {latest.version}</span>
+                  <Badge variant={latest.status === "active" ? "default" : latest.status === "paused" ? "outline" : "secondary"}>{OBLIGATION_STATUS_LABEL[latest.status]}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {latest.status === "active" ? `Activa desde ${latest.activatedAt?.slice(0, 10)} por ${latest.activatedBy}.` : latest.status === "draft" ? "Está en borrador: actívala para que Pacta empiece a preparar corridas." : "Está pausada: no se preparan corridas nuevas."}
+                </p>
+                {data.canManage && (
+                  <div className="flex items-center gap-2">
+                    {(latest.status === "draft" || latest.status === "paused") && data.canApprove && <ActivateButton obligationId={latest.obligationId} version={latest.version} />}
+                    {latest.status === "active" && <PauseButton obligationId={latest.obligationId} version={latest.version} />}
+                    {(latest.status === "draft" || latest.status === "paused") && !data.canApprove && <span className="text-xs text-muted-foreground">Falta permiso de aprobación para activarla</span>}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Tolerancia {(o.template.varianceToleranceBps / 100).toFixed(1)} % · tope {formatMinor(o.template.runCapMinor, o.template.currency)}
-                    {o.activatedAt ? ` · activada ${o.activatedAt.slice(0, 10)} por ${o.activatedBy}` : ""}
-                  </p>
-                  {data.canManage && (
-                    <div>
-                      {(o.status === "draft" || o.status === "paused") && data.canApprove && <ActivateButton obligationId={o.obligationId} version={o.version} />}
-                      {o.status === "active" && <PauseButton obligationId={o.obligationId} version={o.version} />}
-                      {(o.status === "draft" || o.status === "paused") && !data.canApprove && <span className="text-xs text-muted-foreground">Falta permiso de aprobación</span>}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          {data.canManage ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">{latest ? "Nueva versión" : "Crear plantilla de nómina"}</p>
-              <DraftForm scenarios={data.scenarios} today={data.today} defaultScenario={data.defaultScenario} defaultSchedule={latest?.settings.schedule} />
+                )}
+              </div>
+            )}
+          </Section>
+
+          <Section title="Reglas de control" description="Dentro de estos límites Pacta puede aprobar sola; fuera de ellos escala a una persona.">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Tolerancia del salario (%)" hint="Variación aceptada frente al último salario confirmado.">
+                <Input type="number" min={0} max={100} step={0.5} disabled={!data.canManage} value={draft.tolerancePercent} onChange={(e) => patch({ tolerancePercent: e.target.value })} />
+              </Field>
+              <Field label="Tope de la corrida (COP)" hint="Si el total lo supera, la corrida pide aprobación.">
+                <Input type="number" min={1} step={1000000} disabled={!data.canManage} value={draft.runCapPesos} onChange={(e) => patch({ runCapPesos: e.target.value })} />
+              </Field>
             </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Necesitas el permiso de gestionar políticas para crear o activar plantillas.</p>
+            <p className="text-[0.7rem] text-muted-foreground">Un cambio de cuenta o de referencia de pago nunca se aprueba solo, sin importar estas reglas.</p>
+          </Section>
+
+          {versions.length > 1 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Historial de versiones ({versions.length})</summary>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {versions.map((o) => (
+                  <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs ring-1 ring-black/5">
+                    <span>
+                      <span className="font-medium">v{o.version}</span> · {SCHEDULE_RULE_LABELS[o.settings.schedule.rule]} · tolerancia {(o.template.varianceToleranceBps / 100).toFixed(1)} % · tope {formatMinor(o.template.runCapMinor, o.template.currency)}
+                    </span>
+                    <Badge variant={o.status === "active" ? "default" : "outline"}>{OBLIGATION_STATUS_LABEL[o.status]}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
-        </Section>
+        </div>
       )}
 
       {stepOf === "schedule" && (
-        <Section description="El calendario define cuándo vence cada pago. Pacta prepara la corrida con anticipación, avisa y paga el día del vencimiento tras volver a validar.">
-          {latest ? (
-            <div className="grid grid-cols-2 gap-2">
-              <Fact label="Regla" value={SCHEDULE_RULE_LABELS[latest.settings.schedule.rule]} />
-              <Fact label="Preparar" value={`${latest.settings.schedule.leadDays} días antes`} />
-              {latest.settings.schedule.rule === "day_of_month" && <Fact label="Día del mes" value={String(latest.settings.schedule.day)} />}
-            </div>
+        <Section description="Cuándo vence cada pago. Pacta prepara la corrida con anticipación, avisa y paga el día del vencimiento tras volver a validar.">
+          {data.canManage ? (
+            <ScheduleEditor today={data.today} defaultValue={draft.schedule} onChange={(schedule) => patch({ schedule })} />
           ) : (
-            <p className="text-sm text-muted-foreground">Crea una plantilla para definir el calendario.</p>
+            <p className="text-sm font-medium">{SCHEDULE_RULE_LABELS[draft.schedule.rule]} · preparar {draft.schedule.leadDays} días antes</p>
           )}
-          <p className="text-xs text-muted-foreground">Para cambiarlo, guarda una versión nueva en «Plantilla de nómina».</p>
         </Section>
       )}
 
@@ -238,14 +296,67 @@ function Flow({ data, backHref }: { data: Ready; backHref: string }) {
     </>
   );
 
-  return <ProcessCanvas title="Nómina" steps={steps} edges={EDGES} selectedId={selected} onSelect={setSelected} panelTitle={titles[stepOf] ?? "Paso"} panel={panel} backHref={backHref} wide={stepOf === "rules"} />;
+  // La barra de guardado acompaña a los tres nodos que arman la plantilla: se edita y se guarda desde cualquiera.
+  const panel = (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex flex-col gap-4">{body}</div>
+      {TEMPLATE_STEPS.has(stepOf) && data.canManage && <SaveBar draft={draft} dirty={dirty} first={latest === null} onReset={() => setDraft(base)} />}
+    </div>
+  );
+
+  return <ProcessCanvas title="Nómina" steps={steps} edges={EDGES} selectedId={selected} onSelect={setSelected} panelTitle={titles[stepOf] ?? "Paso"} panel={panel} backHref={backHref} wide={stepOf === "schedule" || stepOf === "rules"} />;
 }
 
-function Section({ description, children }: { description: string; children: React.ReactNode }) {
+const selectClass = "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+
+function SaveBar({ draft, dirty, first, onReset }: { draft: Draft; dirty: boolean; first: boolean; onReset: () => void }) {
+  const { state, pending, onSubmit } = useFormAction(saveDraftAction);
+  return (
+    <form onSubmit={onSubmit} className="sticky bottom-0 -mx-3 -mb-3 mt-auto flex flex-col gap-2 rounded-b-xl border-t bg-background p-3">
+      <input type="hidden" name="scenario" value={draft.scenario} />
+      <input type="hidden" name="schedule" value={JSON.stringify(draft.schedule)} />
+      <input type="hidden" name="tolerancePercent" value={draft.tolerancePercent} />
+      <input type="hidden" name="runCapPesos" value={draft.runCapPesos} />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">{dirty ? (first ? "Todavía no se ha guardado la primera versión." : "Hay cambios sin guardar.") : "Todo guardado."}</p>
+        <div className="flex gap-2">
+          {dirty && !first && (
+            <Button type="button" size="sm" variant="ghost" onClick={onReset}>
+              Descartar
+            </Button>
+          )}
+          <Button type="submit" size="sm" disabled={pending || !dirty}>
+            {pending ? "Guardando…" : first ? "Guardar primera versión" : "Guardar nueva versión"}
+          </Button>
+        </div>
+      </div>
+      {state !== null && (
+        <p role="status" className={state.ok ? "text-xs text-emerald-600" : "text-xs text-destructive"}>
+          {state.message}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function Section({ title, description, children }: { title?: string; description: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-muted-foreground">{description}</p>
+      <div className="flex flex-col gap-1">
+        {title !== undefined && <h3 className="text-sm font-semibold">{title}</h3>}
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
       {children}
+    </div>
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{label}</Label>
+      {children}
+      {hint !== undefined && <p className="text-[0.7rem] text-muted-foreground">{hint}</p>}
     </div>
   );
 }

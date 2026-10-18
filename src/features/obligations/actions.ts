@@ -46,7 +46,13 @@ async function run(name: string, mutate: (actor: PolicyActor) => Promise<{ ok: t
   }
 }
 
-const DraftSchema = z.object({ schedule: z.string().min(2).max(2000), scenario: z.string().regex(/^[a-z0-9-]+$/) });
+// Tolerancia en % y tope en pesos enteros: opcionales, llegan como texto del formulario.
+const DraftSchema = z.object({
+  schedule: z.string().min(2).max(2000),
+  scenario: z.string().regex(/^[a-z0-9-]+$/),
+  tolerancePercent: z.string().max(10).optional(),
+  runCapPesos: z.string().max(18).optional(),
+});
 
 export async function saveDraftAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = DraftSchema.safeParse(Object.fromEntries(formData));
@@ -57,8 +63,13 @@ export async function saveDraftAction(_prev: ActionState, formData: FormData): P
   } catch {
     return { ok: false, message: "El calendario no es válido." };
   }
+  const tolerance = parsed.data.tolerancePercent?.trim();
+  const cap = parsed.data.runCapPesos?.trim();
+  const varianceToleranceBps = tolerance ? Math.round(Number(tolerance) * 100) : undefined;
+  const runCapMinor = cap ? Number(cap) * 100 : undefined;
+  if ((tolerance && !Number.isFinite(varianceToleranceBps)) || (cap && !Number.isFinite(runCapMinor))) return { ok: false, message: "Revisa la tolerancia y el tope: deben ser números." };
   return run("save-draft", async (actor) => {
-    const result = await saveObligationDraft(defaultRuntime(), actor, { schedule, scenario: parsed.data.scenario, now: nowIso() });
+    const result = await saveObligationDraft(defaultRuntime(), actor, { schedule, scenario: parsed.data.scenario, now: nowIso(), varianceToleranceBps, runCapMinor });
     return result.ok ? { ok: true, message: `Versión ${result.obligation.version} guardada como borrador. Nada opera hasta que una persona la active.` } : result;
   });
 }
