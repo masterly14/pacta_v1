@@ -188,7 +188,7 @@ describe("decide — authorization (history is not authorization)", () => {
     const used = makeAuthorization({ scope: "one_time", frequency: null, approvalsInCurrentPeriod: 1 });
     const result = decide(makeInvoice(), makeFacts({ authorizations: [used] }));
     expect(result.decision).toBe("requires_approval");
-    expect(rule(result, "supplier_authorized").explanation).toContain("already covered");
+    expect(rule(result, "supplier_authorized").explanation).toContain("ya cubrió");
   });
 
   it("does not let a monthly authorization approve a second invoice in the same month", () => {

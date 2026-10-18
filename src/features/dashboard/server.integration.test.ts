@@ -21,6 +21,7 @@ vi.mock("@/lib/db", async () => {
 
 describe.skipIf(!url)("getDashboard (integration)", async () => {
   const { getDashboard, listOutsidePayments } = await import("./server");
+  const { archiveInvoices } = await import("@/features/decisions/archive");
   const prisma = new PrismaClient({ datasourceUrl: url });
 
   const ORG = "org_dash";
@@ -30,7 +31,7 @@ describe.skipIf(!url)("getDashboard (integration)", async () => {
 
   beforeEach(async () => {
     await prisma.$executeRawUnsafe(
-      `TRUNCATE invoices, document_groups, ignored_inbound_items, documents, gmail_inbound_messages, gmail_connections,
+      `TRUNCATE archived_invoices, invoices, document_groups, ignored_inbound_items, documents, gmail_inbound_messages, gmail_connections,
        audit_events, payment_decisions, approval_requests, payment_authorizations, payment_policies, bank_transactions,
        bank_import_batches, contracts, suppliers, approval_permissions, organization_memberships, users, organizations CASCADE`,
     );
@@ -202,5 +203,26 @@ describe.skipIf(!url)("getDashboard (integration)", async () => {
     expect(dashboard.budget).toBeNull();
     expect(dashboard.decisions.autonomyRate).toBeNull();
     expect(dashboard.outsidePayments).toMatchObject({ allTimeCount: 0, month: { count: 0 } });
+  });
+  it("leaves archived invoices out of every number without deleting them", async () => {
+    await decision({ id: "d1", invoiceId: "inv_keep", decision: "approved", reasons: ["AUTO_APPROVAL_RULES_PASSED"], evaluatedAt: "2027-01-05T10:00:00Z" });
+    await decision({ id: "d2", invoiceId: "test_old", decision: "requires_approval", reasons: ["INSUFFICIENT_DATA"], evaluatedAt: "2027-01-06T10:00:00Z" });
+    await prisma.approvalRequest.create({ data: { organizationId: ORG, invoiceId: "test_old", decisionId: "d2" } });
+    await receipt("rec_old", { supplierId: null, amountMinor: 999, paidOn: "2027-01-10" });
+
+    expect(await archiveInvoices(ORG, ["test_old", "rec_old", "test_old"], "prueba antigua", null)).toBe(2);
+    // Repetir no duplica ni falla.
+    expect(await archiveInvoices(ORG, ["test_old"], "prueba antigua", null)).toBe(0);
+
+    const dashboard = await getDashboard(ORG, NOW);
+    expect(dashboard.decisions.total).toBe(1);
+    expect(dashboard.safetyCatches).toEqual([]);
+    expect(dashboard.pending.count).toBe(0);
+    expect(dashboard.outsidePayments.allTimeCount).toBe(0);
+    expect((await listOutsidePayments(ORG, { status: null }, NOW)).receipts).toEqual([]);
+    // Nada se borró: las filas siguen y hay rastro en la auditoría.
+    expect(await prisma.paymentDecision.count({ where: { invoiceId: "test_old" } })).toBe(1);
+    expect(await prisma.invoice.count({ where: { id: "rec_old" } })).toBe(1);
+    expect(await prisma.auditEvent.count({ where: { eventType: "invoices.archived" } })).toBe(2);
   });
 });
