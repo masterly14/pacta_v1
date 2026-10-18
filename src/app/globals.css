@@ -128,3 +128,88 @@
     @apply font-sans;
   }
 }
+/* ---------------------------------------------------------------------------
+   Movimiento de la plataforma: entrada escalonada de secciones, tarjetas y filas.
+   Solo CSS (funciona en componentes de servidor). Desactivado con movimiento reducido.
+   --------------------------------------------------------------------------- */
+@keyframes pacta-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pacta-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .animate-rise {
+    animation: pacta-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Hijos directos entran uno tras otro (hasta 8 escalones; el resto con el último retraso).
+     El contenido de cada página (PlatformSection) se escalona solo. */
+  :is(.stagger, .platform-content > *) > * {
+    animation: pacta-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: 280ms;
+  }
+  :is(.stagger, .platform-content > *) > *:nth-child(1) { animation-delay: 0ms; }
+  :is(.stagger, .platform-content > *) > *:nth-child(2) { animation-delay: 40ms; }
+  :is(.stagger, .platform-content > *) > *:nth-child(3) { animation-delay: 80ms; }
+  :is(.stagger, .platform-content > *) > *:nth-child(4) { animation-delay: 120ms; }
+  :is(.stagger, .platform-content > *) > *:nth-child(5) { animation-delay: 160ms; }
+  :is(.stagger, .platform-content > *) > *:nth-child(6) { animation-delay: 200ms; }
+  :is(.stagger, .platform-content > *) > *:nth-child(7) { animation-delay: 240ms; }
+}
+
+@layer components {
+  /* Filas de tabla en cascada al aparecer (solo la primera vez que se montan). */
+  [data-slot="table-body"] > tr {
+    animation: pacta-fade 0.4s ease-out both;
+    animation-delay: 300ms;
+  }
+  [data-slot="table-body"] > tr:nth-child(1) { animation-delay: 60ms; }
+  [data-slot="table-body"] > tr:nth-child(2) { animation-delay: 80ms; }
+  [data-slot="table-body"] > tr:nth-child(3) { animation-delay: 100ms; }
+  [data-slot="table-body"] > tr:nth-child(4) { animation-delay: 120ms; }
+  [data-slot="table-body"] > tr:nth-child(5) { animation-delay: 140ms; }
+  [data-slot="table-body"] > tr:nth-child(6) { animation-delay: 160ms; }
+  [data-slot="table-body"] > tr:nth-child(7) { animation-delay: 180ms; }
+  [data-slot="table-body"] > tr:nth-child(8) { animation-delay: 200ms; }
+  [data-slot="table-body"] > tr:nth-child(9) { animation-delay: 220ms; }
+  [data-slot="table-body"] > tr:nth-child(10) { animation-delay: 240ms; }
+  [data-slot="table-body"] > tr:nth-child(11) { animation-delay: 260ms; }
+  [data-slot="table-body"] > tr:nth-child(12) { animation-delay: 280ms; }
+
+  /* Las tarjetas responden al cursor con una sombra suave. */
+  [data-slot="card"] {
+    transition:
+      box-shadow 200ms ease,
+      border-color 200ms ease,
+      translate 200ms ease;
+  }
+  [data-slot="card"]:hover {
+    box-shadow: 0 1px 2px oklch(0 0 0 / 0.04), 0 8px 24px -12px oklch(0 0 0 / 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  :is(.stagger, .platform-content > *) > *,
+  [data-slot="table-body"] > tr {
+    animation: none !important;
+  }
+  [data-slot="card"] {
+    transition: none;
+  }
+}
