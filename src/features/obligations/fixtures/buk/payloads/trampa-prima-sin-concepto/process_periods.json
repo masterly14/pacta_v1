@@ -1,0 +1,28 @@
+{
+  "pagination": {
+    "next": null,
+    "previous": null,
+    "count": 3,
+    "total_pages": 1
+  },
+  "data": [
+    {
+      "id": 304,
+      "month": "2026-04",
+      "end_date": "2026-04-30",
+      "status": "cerrado"
+    },
+    {
+      "id": 305,
+      "month": "2026-05",
+      "end_date": "2026-05-31",
+      "status": "cerrado"
+    },
+    {
+      "id": 306,
+      "month": "2026-06",
+      "end_date": "2026-06-30",
+      "status": "abierto"
+    }
+  ]
+}

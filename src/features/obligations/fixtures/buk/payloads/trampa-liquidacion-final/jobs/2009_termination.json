@@ -1,0 +1,71 @@
+{
+  "data": {
+    "fecha": "2026-10-15",
+    "fecha_aviso": "2026-10-01",
+    "fecha_pago": "2026-10-29",
+    "razon": "renuncia",
+    "anos_de_servicio": 3,
+    "indemnizacion_legal_por_anos_servicios": 0,
+    "indemnizacion_legal_por_meses_obra": 0,
+    "indemnizacion_sustitutiva_previo_aviso": 0,
+    "indemnizacion_pactada_contractualmente": 0,
+    "indemnizacion_voluntaria": 0,
+    "indemnizacion_vacaciones": 0,
+    "descuento_seguro_cesantia": 0,
+    "otros_descuentos": 0,
+    "monto_indemnizacion_no_renta": 0,
+    "reajuste_indemnizacion": 0,
+    "interes_indemnizacion": 0,
+    "en_liquidacion": false,
+    "custom_attributes": {
+      "pacta_fixture": "FICTICIO - dato de prueba de Pacta, no es una persona real"
+    },
+    "id": 9009,
+    "fecha_inicio": "2023-05-02",
+    "monto": 6766176,
+    "monto_sin_liquidacion": 5077628,
+    "razon_print": "Renuncia voluntaria",
+    "dias_indemnizacion_por_obra": 0,
+    "dias_feriados_corridos": 7.5,
+    "descuentos": [
+      {
+        "nombre": "Salud",
+        "monto": 68000
+      },
+      {
+        "nombre": "Pensión",
+        "monto": 68000
+      }
+    ],
+    "haberes": [
+      {
+        "nombre": "Salario pendiente",
+        "monto": 1700000
+      },
+      {
+        "nombre": "Auxilio de transporte pendiente",
+        "monto": 124548
+      },
+      {
+        "nombre": "Cesantías",
+        "monto": 2888867
+      },
+      {
+        "nombre": "Intereses sobre cesantías",
+        "monto": 274442
+      },
+      {
+        "nombre": "Prima de servicios proporcional",
+        "monto": 1064319
+      },
+      {
+        "nombre": "Vacaciones compensadas",
+        "monto": 850000
+      }
+    ],
+    "indemnizacion_tributable": 0,
+    "impuesto_indemnizacion": 0,
+    "remuneraciones_pendientes": 1700000,
+    "asignaciones_no_imponibles_pendientes": 124548
+  }
+}

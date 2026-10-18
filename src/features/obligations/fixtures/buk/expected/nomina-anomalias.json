@@ -1,0 +1,278 @@
+{
+  "fixture": true,
+  "simulatedMoney": true,
+  "scenario": "nomina-anomalias",
+  "description": "Demo §12: 9 aprobada, 1 bloqueada (retirado en línea ordinaria), 2 requiere_aprobacion (cuenta cambiada, variación excedida). Luego llega el webhook de Buk 'Laura Gómez deja de laborar' y la reevaluación pasa su línea de aprobada a requiere_aprobacion.",
+  "organization": "Andina Demo S.A.S.",
+  "occurrenceId": "obl_nomina_andina:2026-10-01",
+  "period": "2026-10",
+  "amountsUnit": "COP en unidades menores (centavos)",
+  "authority": "Oráculo escrito a mano por escenario según platform-core §7.1 y §13. El motor real de Pacta es la fuente de verdad.",
+  "totalMinor": 4651449800,
+  "evaluations": [
+    {
+      "stage": "inicial",
+      "asOf": "2026-10-29T14:00:00Z",
+      "description": "Evaluación inicial (9 / 1 / 2).",
+      "occurrenceStatus": "in_approval",
+      "counts": {
+        "approved": 9,
+        "blocked": 1,
+        "requires_approval": 2
+      },
+      "runFindings": [],
+      "lines": [
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703001:salary",
+          "counterpartyRef": "buk:employee:1001",
+          "displayName": "Valentina Rojas Castaño",
+          "lineType": "salary",
+          "amountMinor": 319309500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703002:salary",
+          "counterpartyRef": "buk:employee:1002",
+          "displayName": "Andrés Felipe Arango Ríos",
+          "lineType": "salary",
+          "amountMinor": 819000000,
+          "decision": "requires_approval",
+          "reasons": [
+            "VARIANCE_EXCEEDED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703003:salary",
+          "counterpartyRef": "buk:employee:1003",
+          "displayName": "Laura Marcela Gómez Ospina",
+          "lineType": "salary",
+          "amountMinor": 185992800,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703004:salary",
+          "counterpartyRef": "buk:employee:1004",
+          "displayName": "Juan Sebastián Martínez Duque",
+          "lineType": "salary",
+          "amountMinor": 386400000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703005:salary",
+          "counterpartyRef": "buk:employee:1005",
+          "displayName": "Camila Andrea Torres Restrepo",
+          "lineType": "salary",
+          "amountMinor": 349600000,
+          "decision": "requires_approval",
+          "reasons": [
+            "BENEFICIARY_CHANGED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703006:salary",
+          "counterpartyRef": "buk:employee:1006",
+          "displayName": "Diego Alejandro Herrera Mejía",
+          "lineType": "salary",
+          "amountMinor": 282509500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703007:salary",
+          "counterpartyRef": "buk:employee:1007",
+          "displayName": "Natalia Ramírez Zuluaga",
+          "lineType": "salary",
+          "amountMinor": 515200000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703008:salary",
+          "counterpartyRef": "buk:employee:1008",
+          "displayName": "Carlos Mario Londoño Vélez",
+          "lineType": "salary",
+          "amountMinor": 199709500,
+          "decision": "blocked",
+          "reasons": [
+            "EMPLOYEE_TERMINATED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703009:salary",
+          "counterpartyRef": "buk:employee:1009",
+          "displayName": "María José Cárdenas Giraldo",
+          "lineType": "salary",
+          "amountMinor": 337709500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703010:salary",
+          "counterpartyRef": "buk:employee:1010",
+          "displayName": "Felipe Ortiz Salazar",
+          "lineType": "salary",
+          "amountMinor": 746200000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703011:salary",
+          "counterpartyRef": "buk:employee:1011",
+          "displayName": "Daniela Suárez Montoya",
+          "lineType": "salary",
+          "amountMinor": 245709500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703012:salary",
+          "counterpartyRef": "buk:employee:1012",
+          "displayName": "Julián David Moreno Patiño",
+          "lineType": "salary",
+          "amountMinor": 264109500,
+          "decision": "approved",
+          "reasons": []
+        }
+      ]
+    },
+    {
+      "stage": "reevaluacion",
+      "asOf": "2026-10-29T22:00:00Z",
+      "description": "Webhook job_termination de Laura Marcela Gómez (1003) recibido 16:30 hora de Bogotá, después de la lectura y antes de ejecutar: señal `propuesta`, su línea pasa a requiere_aprobacion (8 / 1 / 3).",
+      "occurrenceStatus": "in_approval",
+      "counts": {
+        "approved": 8,
+        "blocked": 1,
+        "requires_approval": 3
+      },
+      "runFindings": [],
+      "lines": [
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703001:salary",
+          "counterpartyRef": "buk:employee:1001",
+          "displayName": "Valentina Rojas Castaño",
+          "lineType": "salary",
+          "amountMinor": 319309500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703002:salary",
+          "counterpartyRef": "buk:employee:1002",
+          "displayName": "Andrés Felipe Arango Ríos",
+          "lineType": "salary",
+          "amountMinor": 819000000,
+          "decision": "requires_approval",
+          "reasons": [
+            "VARIANCE_EXCEEDED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703003:salary",
+          "counterpartyRef": "buk:employee:1003",
+          "displayName": "Laura Marcela Gómez Ospina",
+          "lineType": "salary",
+          "amountMinor": 185992800,
+          "decision": "requires_approval",
+          "reasons": [
+            "SIGNAL_PENDING_REVIEW"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703004:salary",
+          "counterpartyRef": "buk:employee:1004",
+          "displayName": "Juan Sebastián Martínez Duque",
+          "lineType": "salary",
+          "amountMinor": 386400000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703005:salary",
+          "counterpartyRef": "buk:employee:1005",
+          "displayName": "Camila Andrea Torres Restrepo",
+          "lineType": "salary",
+          "amountMinor": 349600000,
+          "decision": "requires_approval",
+          "reasons": [
+            "BENEFICIARY_CHANGED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703006:salary",
+          "counterpartyRef": "buk:employee:1006",
+          "displayName": "Diego Alejandro Herrera Mejía",
+          "lineType": "salary",
+          "amountMinor": 282509500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703007:salary",
+          "counterpartyRef": "buk:employee:1007",
+          "displayName": "Natalia Ramírez Zuluaga",
+          "lineType": "salary",
+          "amountMinor": 515200000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703008:salary",
+          "counterpartyRef": "buk:employee:1008",
+          "displayName": "Carlos Mario Londoño Vélez",
+          "lineType": "salary",
+          "amountMinor": 199709500,
+          "decision": "blocked",
+          "reasons": [
+            "EMPLOYEE_TERMINATED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703009:salary",
+          "counterpartyRef": "buk:employee:1009",
+          "displayName": "María José Cárdenas Giraldo",
+          "lineType": "salary",
+          "amountMinor": 337709500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703010:salary",
+          "counterpartyRef": "buk:employee:1010",
+          "displayName": "Felipe Ortiz Salazar",
+          "lineType": "salary",
+          "amountMinor": 746200000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703011:salary",
+          "counterpartyRef": "buk:employee:1011",
+          "displayName": "Daniela Suárez Montoya",
+          "lineType": "salary",
+          "amountMinor": 245709500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703012:salary",
+          "counterpartyRef": "buk:employee:1012",
+          "displayName": "Julián David Moreno Patiño",
+          "lineType": "salary",
+          "amountMinor": 264109500,
+          "decision": "approved",
+          "reasons": []
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "1008 (Carlos Mario Londoño) se retiró el 2026-09-30 (active_until) pero aparece con liquidación ordinaria de octubre: bloqueada.",
+    "1005 (Camila Torres) cambió de Bancolombia ****4417 a Nequi ****9032: BENEFICIARIO_CAMBIADO.",
+    "1002 (Andrés Felipe Arango) trae una bonificación de $2.500.000: neto +37 % vs último monto confirmado (tolerancia 10 %).",
+    "1003 (Laura Marcela Gómez): Buk notifica job_termination después de la lectura. La señal solo aumenta cautela; mientras nadie relea/confirme, requiere aprobación (no bloquea)."
+  ]
+}
