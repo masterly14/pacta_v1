@@ -344,4 +344,6 @@ model BankImportRejection {
 
 **Verificado:** `vitest run` (todo el repo: 220 pasan, 10 omitidos preexistentes), `tsc --noEmit`, typecheck de tests, `eslint src/features/payment-history` y `npm run build`. **No verificado:** el adaptador Prisma contra una base real (no hay BD de prueba); se cubre por tipos y por los tests de los servicios con fakes.
 
-**Pendiente:** importador (parser, mapeo de columnas, fingerprint, etiquetas) y su migración; rutas HTTP y UI de sugerencias; conectar `hasRecurrenceSuggestion` al loader de `evaluateInvoice`; relinkear movimientos ya vinculados (acción humana auditada).
+**Pendiente:** importador (parser, mapeo de columnas, fingerprint, etiquetas) y su migración; rutas HTTP y UI de sugerencias; relinkear movimientos ya vinculados (acción humana auditada).
+
+**Conectado (2026-10-17, `feature/b-recurrence-decision`):** `loadEngineFacts` llama a `hasRecurrenceSuggestion` a través de `createPrismaRecurrenceStore` dentro de la transacción de `evaluateInvoice`. La sugerencia exige la cadencia y la tolerancia de monto del detector; un simple conteo de salidas ya no basta. Si el historial está truncado o el proveedor no está confirmado, el flag queda en `false` y el motor escala igual por falta de autorización. El historial sigue sin autorizar.

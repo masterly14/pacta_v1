@@ -220,6 +220,16 @@ describe("decide — authorization (history is not authorization)", () => {
 });
 
 describe("decide — incomplete or ambiguous data never approves", () => {
+  it("escalates when the beneficiary account is missing", () => {
+    const result = decide(
+      makeInvoice({ beneficiaryAccountReference: null, missingFields: ["beneficiaryAccountReference"] }),
+      makeFacts(),
+    );
+    expect(result.decision).toBe("requires_approval");
+    expect(result.reasonCodes).toContain("INSUFFICIENT_DATA");
+    expect(rule(result, "essential_fields_present").result).toBe("fail");
+  });
+
   it("escalates a missing amount and does not treat it as zero", () => {
     const result = decide(makeInvoice({ amountMinor: null, missingFields: ["amountMinor"] }), makeFacts());
     expect(result.decision).toBe("requires_approval");
@@ -283,6 +293,11 @@ describe("decide — contracts", () => {
   it("approves without a contract when an explicit authorization exists", () => {
     const notFound = { ...mismatch, contractId: null, matchStatus: "not_found" as const, discrepancies: [] };
     expect(decide(makeInvoice({ contractMatch: notFound }), makeFacts()).decision).toBe("approved");
+  });
+
+  it("approves when the invoice matches its contract", () => {
+    const matched = { ...mismatch, matchStatus: "matched" as const, agreedAmountMinor: 2000, discrepancies: [] };
+    expect(decide(makeInvoice({ contractMatch: matched }), makeFacts()).decision).toBe("approved");
   });
 });
 
