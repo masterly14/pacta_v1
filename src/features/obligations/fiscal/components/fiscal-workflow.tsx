@@ -179,9 +179,12 @@ function Workflow({ scenario }: { scenario: FiscalScenario }) {
   const pendingConfirm = watched.filter((item) => !isPaid(item.fiscalType, item.periodStart));
   const settlementFor = (fiscalType: FiscalType, periodStart: string) => settlements.find((s) => periodKey(s.fiscalType, s.periodStart) === periodKey(fiscalType, periodStart)) ?? null;
 
-  function evaluate(currentRun = run) {
+  const humanApprovedIds = (extra?: string) => [...Object.keys(resolution).filter((id) => resolution[id] === "approved_by_human"), ...(extra === undefined ? [] : [extra])];
+
+  // Las aprobaciones humanas entran a las reglas de corrida: lo que se paga debe caber en fondos y tope.
+  function evaluate(currentRun = run, humanApprovedLineIds: string[] = humanApprovedIds()) {
     if (template === null) return null;
-    return decideFiscalRun({ template, snapshot, settlements, run: currentRun, asOf });
+    return decideFiscalRun({ template, snapshot, settlements, run: currentRun, asOf, humanApprovedLineIds });
   }
 
   function connect() {
@@ -243,12 +246,16 @@ function Workflow({ scenario }: { scenario: FiscalScenario }) {
 
   // Aprobación humana: reevalúa primero; un bloqueo absoluto no se puede aprobar (CLAUDE.md §6.5).
   function approve(lineId: string) {
-    const fresh = evaluate()?.lines.find((l) => l.lineId === lineId);
-    if (!fresh || fresh.decision === "blocked") {
-      setNotice("Al reevaluar, la línea quedó bloqueada: una aprobación humana no salta un bloqueo absoluto.");
+    // Se reevalúa contando esta aprobación: si ya no caben los fondos o el tope, la línea queda bloqueada.
+    const next = evaluate(run, humanApprovedIds(lineId));
+    const fresh = next?.lines.find((l) => l.lineId === lineId);
+    if (!next || !fresh || fresh.decision === "blocked") {
+      setNotice("Al reevaluar, la línea quedó bloqueada: una aprobación humana no salta un bloqueo absoluto (por ejemplo, fondos).");
       return;
     }
+    setNotice(null);
     setResolution((current) => ({ ...current, [lineId]: "approved_by_human" }));
+    setResult({ asOf, run: next });
   }
 
   // Pago simulado: revalida con la evidencia vigente antes de registrar (platform-core principio 7).
@@ -375,7 +382,17 @@ function Workflow({ scenario }: { scenario: FiscalScenario }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">Reloj de demo:</span>
               {DATES.map((d) => (
-                <Pill key={d.date} active={d.date === date} onClick={() => setDate(d.date)}>
+                <Pill
+                  key={d.date}
+                  active={d.date === date}
+                  onClick={() => {
+                    // Otra fecha es otra evaluación: el resultado y las aprobaciones anteriores ya no valen.
+                    setDate(d.date);
+                    setResult(null);
+                    setResolution({});
+                    setNotice(null);
+                  }}
+                >
                   {d.label}
                 </Pill>
               ))}
