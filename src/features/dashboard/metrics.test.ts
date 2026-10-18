@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyReceipt,
+  dailyCounts,
+  dailyDecisionSeries,
   latestPerInvoice,
   sumByCurrency,
   summarizeDecisions,
   summarizeReceipts,
   topReasonCodes,
+  utcDayRange,
   type ClassifiedReceipt,
   type DecisionRow,
   type ReceiptFacts,
@@ -186,5 +189,37 @@ describe("summarizeReceipts", () => {
     expect(empty.count).toBe(0);
     expect(empty.byStatus.unapproved).toEqual({ count: 0, amountByCurrency: {} });
     expect(empty.topUnapprovedSuppliers).toEqual([]);
+  });
+});
+
+describe("daily series", () => {
+  const NOW = new Date("2027-01-20T15:30:00Z");
+
+  it("lists UTC calendar days ending today, oldest first", () => {
+    expect(utcDayRange(NOW, 3)).toEqual(["2027-01-18", "2027-01-19", "2027-01-20"]);
+    expect(utcDayRange(new Date("2027-03-01T01:00:00Z"), 2)).toEqual(["2027-02-28", "2027-03-01"]);
+  });
+
+  it("buckets decisions by outcome and ignores days outside the range", () => {
+    const days = utcDayRange(NOW, 3);
+    const series = dailyDecisionSeries([
+      { decision: "approved", evaluatedAt: at("2027-01-18T10:00:00Z") },
+      { decision: "blocked", evaluatedAt: at("2027-01-18T23:59:59Z") },
+      { decision: "requires_approval", evaluatedAt: at("2027-01-20T00:00:00Z") },
+      { decision: "approved", evaluatedAt: at("2027-01-10T10:00:00Z") },
+    ], days);
+    expect(series).toEqual([
+      { day: "2027-01-18", approved: 1, requiresApproval: 0, blocked: 1 },
+      { day: "2027-01-19", approved: 0, requiresApproval: 0, blocked: 0 },
+      { day: "2027-01-20", approved: 0, requiresApproval: 1, blocked: 0 },
+    ]);
+  });
+
+  it("counts instants per day with zeros for empty days", () => {
+    const days = utcDayRange(NOW, 2);
+    expect(dailyCounts([at("2027-01-20T01:00:00Z"), at("2027-01-20T22:00:00Z"), at("2026-12-01T00:00:00Z")], days)).toEqual([
+      { day: "2027-01-19", count: 0 },
+      { day: "2027-01-20", count: 2 },
+    ]);
   });
 });
