@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "name": "fiscal-anomalias",
+  "description": "Andina Demo S.A.S. (ficticia). IVA triplicado frente al periodo anterior y sin fondos, retención con otra referencia de pago, ICA solo propuesta por correo, seguridad social con el mes contable abierto y parafiscales ya pagados. Calendario simplificado e inventado; no es asesoría tributaria.",
+  "asOf": "2026-11-07T14:00:00Z",
+  "template": {
+    "schemaVersion": 1,
+    "obligationId": "obl_impuestos_andina",
+    "organizationId": "org_andina_demo",
+    "version": 1,
+    "status": "active",
+    "activatedBy": "usr_demo_admin",
+    "activatedAt": "2026-10-01T15:00:00Z",
+    "currency": "COP",
+    "taxes": [
+      { "fiscalType": "vat", "authorizedPaymentReference": "DIAN-****4410" },
+      { "fiscalType": "withholding", "authorizedPaymentReference": "DIAN-****4410" },
+      { "fiscalType": "ica", "authorizedPaymentReference": "ICA-****3301" },
+      { "fiscalType": "social_security", "authorizedPaymentReference": "PILA-****7781" },
+      { "fiscalType": "parafiscal", "authorizedPaymentReference": "PILA-****7781" }
+    ],
+    "varianceToleranceBps": 1000,
+    "provisionBps": 3000,
+    "runCapMinor": 2000000000,
+    "evidenceMaxAgeDays": 7,
+    "earlyAlertDays": 7,
+    "urgentAlertDays": 3,
+    "dataOrigin": "fixture"
+  },
+  "snapshot": {
+    "schemaVersion": 1,
+    "snapshotId": "acc_snap_2026_11_05_anom",
+    "organizationId": "org_andina_demo",
+    "sourceLabel": "Contabilidad (simulada)",
+    "dataOrigin": "fixture",
+    "currency": "COP",
+    "capturedAt": "2026-11-05T12:00:00Z",
+    "income": { "periodStart": "2026-10-01", "periodEnd": "2026-10-31", "amountMinor": 5200000000 },
+    "items": [
+      {
+        "fiscalType": "vat",
+        "displayName": "IVA bimestral sep–oct",
+        "periodStart": "2026-09-01",
+        "periodEnd": "2026-10-31",
+        "dueDate": "2026-11-10",
+        "draftAmountMinor": 1830000000,
+        "accountingPeriodClosed": true,
+        "previousConfirmedAmountMinor": 610000000,
+        "paymentReference": "DIAN-****4410"
+      },
+      {
+        "fiscalType": "withholding",
+        "displayName": "Retención en la fuente oct",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-10-31",
+        "dueDate": "2026-11-10",
+        "draftAmountMinor": 124000000,
+        "accountingPeriodClosed": true,
+        "previousConfirmedAmountMinor": 118000000,
+        "paymentReference": "DIAN-****9902"
+      },
+      {
+        "fiscalType": "ica",
+        "displayName": "ICA bimestral sep–oct",
+        "periodStart": "2026-09-01",
+        "periodEnd": "2026-10-31",
+        "dueDate": "2026-11-12",
+        "draftAmountMinor": 42000000,
+        "accountingPeriodClosed": true,
+        "previousConfirmedAmountMinor": 40000000,
+        "paymentReference": "ICA-****3301"
+      },
+      {
+        "fiscalType": "social_security",
+        "displayName": "Aportes a seguridad social oct",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-10-31",
+        "dueDate": "2026-11-12",
+        "draftAmountMinor": 315000000,
+        "accountingPeriodClosed": false,
+        "previousConfirmedAmountMinor": 315000000,
+        "paymentReference": "PILA-****7781"
+      },
+      {
+        "fiscalType": "parafiscal",
+        "displayName": "Aportes parafiscales oct",
+        "periodStart": "2026-10-01",
+        "periodEnd": "2026-10-31",
+        "dueDate": "2026-11-12",
+        "draftAmountMinor": 98000000,
+        "accountingPeriodClosed": true,
+        "previousConfirmedAmountMinor": 98000000,
+        "paymentReference": "PILA-****7781"
+      }
+    ]
+  },
+  "settlements": [
+    {
+      "settlementId": "liq_vat_2026_09_anom",
+      "fiscalType": "vat",
+      "periodStart": "2026-09-01",
+      "status": "confirmed",
+      "amountMinor": 1830000000,
+      "source": "human",
+      "confirmedBy": "usr_demo_admin",
+      "confirmedAt": "2026-11-06T16:00:00Z"
+    },
+    {
+      "settlementId": "liq_withholding_2026_10_anom",
+      "fiscalType": "withholding",
+      "periodStart": "2026-10-01",
+      "status": "confirmed",
+      "amountMinor": 124000000,
+      "source": "human",
+      "confirmedBy": "usr_demo_admin",
+      "confirmedAt": "2026-11-06T16:05:00Z"
+    },
+    {
+      "settlementId": "liq_ica_2026_09_anom",
+      "fiscalType": "ica",
+      "periodStart": "2026-09-01",
+      "status": "proposed",
+      "amountMinor": 42000000,
+      "source": "inbox",
+      "confirmedBy": null,
+      "confirmedAt": null
+    },
+    {
+      "settlementId": "liq_ss_2026_10_anom",
+      "fiscalType": "social_security",
+      "periodStart": "2026-10-01",
+      "status": "confirmed",
+      "amountMinor": 315000000,
+      "source": "human",
+      "confirmedBy": "usr_demo_admin",
+      "confirmedAt": "2026-11-06T16:10:00Z"
+    },
+    {
+      "settlementId": "liq_parafiscal_2026_10_anom",
+      "fiscalType": "parafiscal",
+      "periodStart": "2026-10-01",
+      "status": "confirmed",
+      "amountMinor": 98000000,
+      "source": "human",
+      "confirmedBy": "usr_demo_admin",
+      "confirmedAt": "2026-11-06T16:15:00Z"
+    }
+  ],
+  "run": {
+    "fundsAvailableMinor": 1000000000,
+    "fundsReservedMinor": 0,
+    "paidPeriods": [{ "fiscalType": "parafiscal", "periodStart": "2026-10-01" }]
+  },
+  "expected": [
+    { "fiscalType": "vat", "periodStart": "2026-09-01", "decision": "blocked", "reasonCodes": ["VARIANCE_EXCEEDED", "FUNDS_INSUFFICIENT"] },
+    { "fiscalType": "withholding", "periodStart": "2026-10-01", "decision": "requires_approval", "reasonCodes": ["BENEFICIARY_CHANGED", "HUMAN_APPROVAL_REQUIRED"] },
+    { "fiscalType": "ica", "periodStart": "2026-09-01", "decision": "requires_approval", "reasonCodes": ["SETTLEMENT_UNCONFIRMED", "HUMAN_APPROVAL_REQUIRED"] },
+    { "fiscalType": "social_security", "periodStart": "2026-10-01", "decision": "requires_approval", "reasonCodes": ["STALE_EVIDENCE", "HUMAN_APPROVAL_REQUIRED"] },
+    { "fiscalType": "parafiscal", "periodStart": "2026-10-01", "decision": "blocked", "reasonCodes": ["DUPLICATE_LINE"] }
+  ]
+}
