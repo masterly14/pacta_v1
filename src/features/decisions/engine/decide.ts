@@ -85,10 +85,10 @@ function reasonCodes(decision: DecisionOutcome, outcomes: readonly RuleOutcome[]
 
 function explanation(decision: DecisionOutcome, outcomes: readonly RuleOutcome[]): string {
   if (decision === "approved") {
-    return `All ${outcomes.length} rules passed. Approved for simulated payment.`;
+    return `Se cumplieron las ${outcomes.length} reglas. Aprobada para pago simulado.`;
   }
   const problems = outcomes.filter((o) => o.result !== "pass").map((o) => o.explanation);
-  const prefix = decision === "blocked" ? "Blocked" : "Requires human approval";
+  const prefix = decision === "blocked" ? "Bloqueada" : "Requiere aprobación humana";
   return `${prefix}: ${problems.join(" ")}`;
 }
 

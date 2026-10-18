@@ -21,26 +21,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatMinor } from "@/features/contracts/money";
 import { AnimatedNumber, BarList, Donut, RadialGauge, Sparkline, StackedBars } from "@/features/dashboard/components/charts";
 import { formatAmounts } from "@/features/dashboard/components/labels";
+import { REASON_LABEL } from "@/features/decisions/labels";
 import { getDashboard, type Dashboard } from "@/features/dashboard/server";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
-import type { ReasonCode } from "@/shared/schemas/payment-decision";
 
 export const metadata: Metadata = { title: "Resumen" };
 
-const REASON: Record<ReasonCode, string> = {
-  SUPPLIER_NOT_AUTHORIZED: "Proveedor sin autorización",
-  DUPLICATE_INVOICE: "Factura duplicada",
-  AMOUNT_LIMIT_EXCEEDED: "Monto sobre el límite",
-  BUDGET_INSUFFICIENT: "Presupuesto insuficiente",
-  CONTRACT_NOT_FOUND: "Sin contrato",
-  CONTRACT_MISMATCH: "No coincide con el contrato",
-  INSUFFICIENT_DATA: "Datos incompletos",
-  HUMAN_APPROVAL_REQUIRED: "Requiere aprobación humana",
-  RECURRENCE_NOT_AUTHORIZED: "Recurrencia sin autorizar",
-  AUTO_APPROVAL_RULES_PASSED: "Reglas cumplidas",
-  BENEFICIARY_CHANGED: "Cambio de cuenta beneficiaria",
-  CURRENCY_NOT_SUPPORTED: "Moneda no soportada",
-};
 const CADENCE = { weekly: "semanal", monthly: "mensual", quarterly: "trimestral", yearly: "anual" } as const;
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -332,7 +318,7 @@ function SafetyCard({ dashboard }: { dashboard: Dashboard }) {
         {dashboard.safetyCatches.length === 0 ? (
           <p className="text-sm text-muted-foreground">Ninguna factura bloqueada o escalada este mes.</p>
         ) : (
-          <BarList barClassName="bg-amber-500" items={dashboard.safetyCatches.map(({ code, count }) => ({ label: REASON[code], value: count }))} />
+          <BarList barClassName="bg-amber-500" items={dashboard.safetyCatches.map(({ code, count }) => ({ label: REASON_LABEL[code], value: count }))} />
         )}
       </CardContent>
     </Card>
