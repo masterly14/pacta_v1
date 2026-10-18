@@ -37,8 +37,25 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
   );
 }
 
-export function ContractForm({ suppliers, today }: { suppliers: { id: string; name: string }[]; today: string }) {
-  const { state, pending, formRef, onSubmit } = useFormAction(createContractAction, { resetOnSuccess: true });
+export function ContractForm({
+  suppliers,
+  today,
+  onCreated,
+  compact = false,
+}: {
+  suppliers: { id: string; name: string }[];
+  today: string;
+  onCreated?: () => void; // p. ej. cerrar el modal donde se muestra el formulario
+  compact?: boolean; // dos columnas en lugar de cuatro, para espacios angostos
+}) {
+  const { state, pending, formRef, onSubmit } = useFormAction(createContractAction, {
+    resetOnSuccess: true,
+    onSuccess: (result) => {
+      if (onCreated === undefined) return;
+      toast.success(result.message);
+      onCreated();
+    },
+  });
   if (suppliers.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -47,7 +64,7 @@ export function ContractForm({ suppliers, today }: { suppliers: { id: string; na
     );
   }
   return (
-    <form ref={formRef} onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <form ref={formRef} onSubmit={onSubmit} className={compact ? "grid gap-3 sm:grid-cols-2" : "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"}>
       <Field label="Proveedor" htmlFor="contract-supplier">
         <select id="contract-supplier" name="supplierId" required className={selectClass}>
           {suppliers.map((supplier) => (
@@ -90,12 +107,12 @@ export function ContractForm({ suppliers, today }: { suppliers: { id: string; na
       <Field label="Descripción (opcional)" htmlFor="contract-description">
         <Input id="contract-description" name="description" maxLength={500} placeholder="Plan Pro mensual" />
       </Field>
-      <div className="flex items-end sm:col-span-2 lg:col-span-4">
+      <div className={compact ? "flex items-end sm:col-span-2" : "flex items-end sm:col-span-2 lg:col-span-4"}>
         <Button type="submit" disabled={pending}>
           {pending ? "Guardando…" : "Registrar contrato"}
         </Button>
       </div>
-      <div className="sm:col-span-2 lg:col-span-4">
+      <div className={compact ? "sm:col-span-2" : "sm:col-span-2 lg:col-span-4"}>
         <Result state={state} />
       </div>
     </form>

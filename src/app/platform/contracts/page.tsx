@@ -16,7 +16,7 @@ import { PlatformSection } from "@/components/platform/section";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ContractForm } from "@/features/contracts/components/contract-forms";
+import { NewContractDialog } from "@/features/contracts/components/new-contract-dialog";
 import { FREQUENCY_LABEL } from "@/features/contracts/components/flow/flow-model";
 import { formatMinor } from "@/features/contracts/money";
 import { checkCanManageContracts } from "@/features/contracts/permissions";
@@ -64,18 +64,9 @@ async function ContractsData() {
   return (
     <>
       {canManage && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Nuevo contrato</CardTitle>
-            <CardDescription>
-              Se crea con un flujo básico (vigencia → monto → cuenta). Después puedes abrir el editor para añadir
-              condiciones, hitos, plazos y tolerancias.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ContractForm suppliers={overview.suppliers} today={today} />
-          </CardContent>
-        </Card>
+        <div className="flex justify-end">
+          <NewContractDialog suppliers={overview.suppliers} today={today} />
+        </div>
       )}
 
       <section aria-labelledby="active-contracts" className="flex flex-col gap-3">

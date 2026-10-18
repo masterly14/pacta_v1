@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { formatMinor } from "@/features/contracts/money";
 import { REASON_LABEL } from "@/features/decisions/labels";
-import { FISCAL_OUTCOME } from "../../fiscal/labels";
+import { FLOW_OUTCOME } from "../labels";
 import { evaluatePayrollAction, type PayrollEvaluation, type PayrollScenarioInfo } from "../payroll-actions";
 import { ProcessCanvas, type ProcessStep, type StepStatus } from "./process-canvas";
 
@@ -158,20 +158,20 @@ function Inner({ info, controls, backHref }: { info: PayrollScenarioInfo | undef
       if (payable.length === 0) return setNotice("Nada que pagar: no hay líneas aprobadas ni aprobadas por una persona.");
       const total = payable.reduce((sum, l) => sum + (l.amountMinor as number), 0);
       setPaidLineIds((current) => [...current, ...payable.map((l) => l.lineId)]);
-      setNotice(`Pago simulado registrado: ${payable.length} líneas por ${formatMinor(total, currency)}. No se movió dinero.`);
+      setNotice(`Pago registrado: ${payable.length} líneas por ${formatMinor(total, currency)}.`);
     });
   }
 
   const paidTotal = evaluation?.result.lines.filter((l) => paidLineIds.includes(l.lineId)).reduce((sum, l) => sum + (l.amountMinor ?? 0), 0) ?? 0;
   const st = (s: StepStatus) => s;
   const steps: ProcessStep[] = [
-    { id: "source", title: "Buk (simulado)", icon: "source", summary: connected ? `${info?.name ?? ""} · ${info?.period ?? ""}` : "Sin conectar", status: st(connected ? (error !== null ? "blocked" : "done") : "ready"), x: 0, y: 0 },
+    { id: "source", title: "Buk", icon: "source", summary: connected ? `${info?.name ?? ""} · ${info?.period ?? ""}` : "Sin conectar", status: st(connected ? (error !== null ? "blocked" : "done") : "ready"), x: 0, y: 0 },
     { id: "rules", title: "Plantilla de nómina", icon: "rules", summary: evaluation === null ? "Sin leer" : effectiveRules?.active ? `Activa · v${evaluation.template.version}` : "En borrador", status: st(evaluation === null ? "idle" : effectiveRules?.active ? "done" : "attention"), x: 330, y: 0 },
     { id: "clock", title: "Reloj de demo", icon: "clock", summary: evaluation === null ? "—" : (evaluation.stages[stageIndex]?.stage ?? "—"), status: st(evaluation === null ? "idle" : "done"), x: 660, y: 0 },
     { id: "lines", title: "Líneas de la corrida", icon: "lines", summary: evaluation === null ? "—" : `${evaluation.lines.length} líneas · ${evaluation.evidence.expectedCount} esperados`, status: st(evaluation === null ? "idle" : "done"), x: 990, y: 0 },
     { id: "evaluate", title: "Evaluar nómina", icon: "evaluate", summary: result ? `${result.counts.approved} aprobadas · ${result.counts.requires_approval} a revisar · ${result.counts.blocked} bloqueadas` : "Sin evaluar", status: st(evaluation === null ? "idle" : result ? (result.held ? "blocked" : "done") : "ready"), x: 0, y: 220 },
     { id: "approvals", title: "Aprobaciones", icon: "approvals", summary: result ? (unresolved.length > 0 ? `${unresolved.length} por resolver` : "Sin pendientes") : "Sin resultado", status: st(!result ? "idle" : unresolved.length > 0 ? "attention" : "done"), x: 330, y: 220 },
-    { id: "payment", title: "Pago simulado", icon: "payment", summary: paidLineIds.length > 0 ? `${paidLineIds.length} líneas pagadas (sim.)` : "Nada pagado", status: st(paidLineIds.length > 0 ? "done" : result ? "ready" : "idle"), x: 660, y: 220 },
+    { id: "payment", title: "Pago", icon: "payment", summary: paidLineIds.length > 0 ? `${paidLineIds.length} líneas pagadas` : "Nada pagado", status: st(paidLineIds.length > 0 ? "done" : result ? "ready" : "idle"), x: 660, y: 220 },
   ];
   const stepOf = selected ?? "source";
   const titles: Record<string, string> = Object.fromEntries(steps.map((s) => [s.id, s.title]));
@@ -182,10 +182,10 @@ function Inner({ info, controls, backHref }: { info: PayrollScenarioInfo | undef
       {pending && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Consultando…</p>}
 
       {stepOf === "source" && (
-        <Section description="Pacta lee del simulador de Buk (recursos humanos): empleados, nómina del mes, licencias y retiros. Todo es ficticio.">
+        <Section description="Pacta lee de Buk (recursos humanos): empleados, nómina del mes, licencias y retiros.">
           <p className="text-xs">{info?.description}</p>
           {!connected ? (
-            <Button onClick={() => { setConnected(true); setSelected("rules"); load({ stageIndex, rules }); }}>Conectar Buk (simulado)</Button>
+            <Button onClick={() => { setConnected(true); setSelected("rules"); load({ stageIndex, rules }); }}>Conectar Buk</Button>
           ) : evaluation !== null ? (
             <div className="flex flex-col gap-2">
               <p className="text-sm">
@@ -265,7 +265,7 @@ function Inner({ info, controls, backHref }: { info: PayrollScenarioInfo | undef
       )}
 
       {stepOf === "evaluate" && (
-        <Section description="El motor determinista aplica las reglas por línea y por corrida. Aprobada significa aprobada para pago simulado.">
+        <Section description="El motor determinista aplica las reglas por línea y por corrida. Aprobada significa lista para pago.">
           <Button onClick={() => { setEvaluated(true); setResolution({}); setNotice(null); setSelected("approvals"); }} disabled={evaluation === null || pending}>
             Evaluar la nómina
           </Button>
@@ -288,10 +288,10 @@ function Inner({ info, controls, backHref }: { info: PayrollScenarioInfo | undef
       )}
 
       {stepOf === "payment" && (
-        <Section description="El agente «paga» en simulación: revalida con los datos vigentes y registra el pago. No se mueve dinero.">
-          <Button onClick={paySimulated} disabled={!result || pending}>Registrar pago simulado</Button>
+        <Section description="El agente revalida con los datos vigentes y registra el pago.">
+          <Button onClick={paySimulated} disabled={!result || pending}>Registrar pago</Button>
           {notice !== null && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
-          {paidLineIds.length > 0 && <Fact label="Pagado en simulación" value={formatMinor(paidTotal, currency)} />}
+          {paidLineIds.length > 0 && <Fact label="Pagado" value={formatMinor(paidTotal, currency)} />}
         </Section>
       )}
     </>
@@ -365,7 +365,7 @@ function LineList({
   return (
     <ul className="flex flex-col gap-2">
       {lines.map((line) => {
-        const outcome = FISCAL_OUTCOME[line.decision];
+        const outcome = FLOW_OUTCOME[line.decision];
         const resolved = resolution[line.lineId];
         return (
           <li key={line.lineId} className="flex flex-col gap-1.5 rounded-lg p-2 text-sm ring-1 ring-black/5">

@@ -5,7 +5,7 @@
  * Runs in: browser.
  * Triggered by: /obligations/[useCase].
  * Receives → Returns: las mismas props que PayrollFlow / FiscalFlow → componente cargado en diferido.
- * Talks to: next/dynamic, ./fiscal-flow, ./payroll-flow.
+ * Talks to: next/dynamic, ./fiscal-flow, ./payroll-flow, ./blank-flow.
  */
 import dynamic from "next/dynamic";
 
@@ -13,3 +13,4 @@ const Loading = () => <div aria-busy="true" aria-label="Cargando flujo" classNam
 
 export const FiscalFlowLoader = dynamic(() => import("./fiscal-flow").then((m) => m.FiscalFlow), { ssr: false, loading: Loading });
 export const PayrollFlowLoader = dynamic(() => import("./payroll-flow").then((m) => m.PayrollFlow), { ssr: false, loading: Loading });
+export const BlankFlowLoader = dynamic(() => import("./blank-flow").then((m) => m.BlankFlow), { ssr: false, loading: Loading });
