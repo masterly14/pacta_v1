@@ -1,46 +1,39 @@
 /**
- * Purpose: register, list and terminate the organization's supplier contracts, which the
- *   invoice pipeline uses as evidence (never as payment authorization).
- * Runs in: server (React Server Component; data streamed inside <Suspense>).
- * Triggered by: GET /platform/contracts and refresh() after a contracts server action.
- * Receives → Returns: request → rendered HTML inside the platform shell (forms only for admins;
- *   a prompt to pick an organization when the session has none).
+ * Purpose: tablero de contratos de la organización: reactivos (comparan cada factura con su flujo)
+ *   y proactivos (Pacta valida pagos recurrentes como la nómina), con resumen, filtros y acceso al
+ *   flujo de cada uno. Un contrato es evidencia; nunca autoriza un pago.
+ * Runs in: server (React Server Component; datos dentro de <Suspense>).
+ * Triggered by: GET /platform/contracts y refresh() tras una acción de contratos.
+ * Receives → Returns: request → HTML dentro del shell de la plataforma (crear solo para
+ *   administradores; aviso si la sesión no tiene organización).
  * Talks to: ensureWorkspaceFromSession, PlatformSection, features/contracts (server, permissions,
- *   money, components/contract-forms), shadcn Card, Table, Badge.
+ *   money, components), features/obligations/flow/data.
  */
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PlatformSection } from "@/components/platform/section";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ContractForm, TerminateContractButton } from "@/features/contracts/components/contract-forms";
+import { ContractsBoard, type BoardItem, type BoardSummary } from "@/features/contracts/components/contracts-board";
+import { FREQUENCY_LABEL } from "@/features/contracts/components/flow/flow-model";
+import { NewContractDialog } from "@/features/contracts/components/new-contract-dialog";
 import { formatMinor } from "@/features/contracts/money";
 import { checkCanManageContracts } from "@/features/contracts/permissions";
 import { contractActorFromWorkspace, getContractsOverview } from "@/features/contracts/server";
+import { latestObligations, loadProactiveData } from "@/features/obligations/flow/data";
+import { OBLIGATION_STATUS_LABEL } from "@/features/obligations/labels";
+import { SCHEDULE_RULE_LABELS } from "@/features/obligations/schedule/calendar";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
 
 export const metadata: Metadata = { title: "Contratos" };
-
-const FREQUENCY_LABEL = {
-  one_time: "pago único",
-  weekly: "semanal",
-  monthly: "mensual",
-  quarterly: "trimestral",
-  yearly: "anual",
-} as const;
 
 export default function ContractsPage() {
   return (
     <PlatformSection
       title="Contratos"
-      description="Condiciones acordadas con cada proveedor. Las facturas se comparan con el contrato vigente y las diferencias se escalan. Un contrato no autoriza pagos: solo una autorización explícita lo hace."
+      description="Cada contrato es un flujo que define cómo se paga. Los reactivos comparan cada factura que llega; los proactivos reúnen la evidencia y validan los pagos recurrentes antes de soltarlos. Un contrato no autoriza pagos: solo una autorización explícita lo hace."
     >
-      <div className="flex flex-col gap-6">
-        <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando contratos…</p>}>
-          <ContractsData />
-        </Suspense>
-      </div>
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando contratos…</p>}>
+        <ContractsData />
+      </Suspense>
     </PlatformSection>
   );
 }
@@ -62,85 +55,63 @@ async function ContractsData() {
   const overview = await getContractsOverview(workspace.organization.id);
   const canManage = checkCanManageContracts(actor) === null;
   const today = new Date().toISOString().slice(0, 10);
+  const proactive = await loadProactiveData(workspace);
+  const obligations = proactive.available ? latestObligations(proactive.overview) : [];
 
-  return (
-    <>
-      {canManage && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Registrar contrato</CardTitle>
-            <CardDescription>
-              El monto acordado se compara exacto con cada factura: cualquier diferencia escala la factura.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ContractForm suppliers={overview.suppliers} today={today} />
-          </CardContent>
-        </Card>
-      )}
+  const proactiveItems: BoardItem[] = obligations.map((o) => {
+    const runs = proactive.available ? proactive.overview.runs.filter((r) => r.occurrence.obligationId === o.obligationId) : [];
+    const pending = runs.reduce((sum, r) => sum + r.requests.filter((q) => q.status === "pending").length, 0);
+    return {
+      id: o.obligationId,
+      kind: "proactive",
+      typeLabel: `Proactivo · ${o.kind === "payroll" ? "Nómina" : "Impuestos"}`,
+      title: o.kind === "payroll" ? "Nómina" : "Impuestos",
+      subtitle: `Recursos humanos · versión ${o.version}`,
+      status: { label: OBLIGATION_STATUS_LABEL[o.status], tone: o.status === "active" ? "active" : "attention" },
+      stats: [
+        { label: "Calendario", value: SCHEDULE_RULE_LABELS[o.settings.schedule.rule] },
+        { label: "Tope de la corrida", value: formatMinor(o.template.runCapMinor, o.template.currency) },
+        { label: "Última corrida", value: runs[0] ? runs[0].occurrence.periodStart.slice(0, 7) : "—" },
+        { label: "Por resolver", value: String(pending) },
+      ],
+      actions: [{ href: "/obligations/payroll", label: "Abrir flujo", primary: true }],
+      terminated: false,
+    };
+  });
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Contratos registrados</CardTitle>
-          <CardDescription>
-            {canManage
-              ? "Un contrato no se edita: se termina y se registra uno nuevo."
-              : "Solo un administrador puede registrar o terminar contratos."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {overview.contracts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin contratos.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead>Monto acordado</TableHead>
-                  <TableHead>Frecuencia</TableHead>
-                  <TableHead>Vigencia</TableHead>
-                  <TableHead>Cuenta</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Registrado</TableHead>
-                  {canManage && <TableHead />}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {overview.contracts.map((contract) => (
-                  <TableRow key={contract.contractId}>
-                    <TableCell>
-                      <div className="font-medium">{contract.supplierName}</div>
-                      {contract.description !== null && (
-                        <div className="text-xs text-muted-foreground">{contract.description}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>{formatMinor(contract.agreedAmountMinor, contract.currency)}</TableCell>
-                    <TableCell>{FREQUENCY_LABEL[contract.frequency]}</TableCell>
-                    <TableCell>
-                      {contract.validFrom} → {contract.validTo ?? "sin fin"}
-                      {contract.terminatedAt !== null && (
-                        <div className="text-xs text-muted-foreground">terminado el {contract.terminatedAt.slice(0, 10)}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>{contract.beneficiaryAccountRef ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={contract.status === "active" ? "default" : "secondary"}>
-                        {contract.status === "active" ? "activo" : "terminado"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{contract.createdAt.slice(0, 10)}</TableCell>
-                    {canManage && (
-                      <TableCell className="text-right">
-                        {contract.status === "active" && <TerminateContractButton contractId={contract.contractId} />}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </>
-  );
+  const reactiveItems: BoardItem[] = overview.contracts.map((c) => ({
+    id: c.contractId,
+    kind: "reactive",
+    typeLabel: "Reactivo",
+    title: c.supplierName,
+    subtitle: c.description,
+    status: c.status === "active" ? { label: "Activo", tone: "active" } : { label: "Terminado", tone: "muted" },
+    stats: [
+      { label: "Monto", value: formatMinor(c.agreedAmountMinor, c.currency) },
+      { label: "Frecuencia", value: FREQUENCY_LABEL[c.frequency] },
+      { label: "Vigencia", value: `${c.validFrom} → ${c.validTo ?? "sin fin"}` },
+      { label: "Cuenta", value: c.beneficiaryAccountRef ?? "—" },
+      { label: "Flujo", value: c.activeFlowVersion === null ? "sin versión activa" : `versión ${c.activeFlowVersion}${c.hasDraft ? " · borrador" : ""}` },
+    ],
+    actions:
+      c.status === "active"
+        ? [
+            { href: `/platform/contracts/${c.contractId}`, label: "Ver flujo" },
+            ...(canManage ? [{ href: `/contracts/${c.contractId}/flow`, label: "Editar flujo", primary: true }] : []),
+          ]
+        : [{ href: `/platform/contracts/${c.contractId}`, label: "Ver historial" }],
+    terminated: c.status === "terminated",
+  }));
+
+  const items = [...proactiveItems, ...reactiveItems];
+  const live = items.filter((i) => !i.terminated);
+  const pendingTotal = proactive.available ? proactive.overview.runs.reduce((sum, r) => sum + r.requests.filter((q) => q.status === "pending").length, 0) : 0;
+  const summary: BoardSummary = [
+    { label: "Contratos activos", value: String(live.length) },
+    { label: "Proactivos", value: String(proactiveItems.length), hint: "Pacta valida los pagos recurrentes" },
+    { label: "Reactivos", value: String(reactiveItems.filter((i) => !i.terminated).length), hint: "Comparan cada factura que llega" },
+    { label: "Por resolver", value: String(pendingTotal), hint: pendingTotal > 0 ? "Esperan a una persona" : "Nada pendiente" },
+  ];
+
+  return <ContractsBoard items={items} summary={summary} action={canManage ? <NewContractDialog suppliers={overview.suppliers} today={today} /> : null} />;
 }

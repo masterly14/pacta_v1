@@ -53,225 +53,11 @@ const REASON_EN = {
   MONEDA_NO_SOPORTADA: "CURRENCY_NOT_SUPPORTED",
 } as const satisfies Record<ReasonCode, string>;
 
-const SMMLV = 1_750_905;
-const AUX = 249_095;
-const TENANT = "andina-demo-fixture.buk.co"; // ficticio
-const ORG = "Andina Demo S.A.S.";
-const FIXTURE_ATTR = { pacta_fixture: "FICTICIO - dato de prueba de Pacta, no es una persona real" };
-
-type Bank = { bank: string; account_type: "Ahorro" | "Corriente"; last4: string };
-interface Person {
-  id: number;
-  first: string;
-  surname: string;
-  second: string;
-  gender: "M" | "F";
-  birthday: string;
-  since: string;
-  wage: number;
-  role: number;
-  area: number;
-  district: string;
-  bankInfo: Bank;
-  eps: string;
-  afp: string;
-  ces: string;
-}
-
-// ---------- Plantilla de 12 personas ficticias ----------
-const P = (
-  id: number, first: string, surname: string, second: string, gender: "M" | "F", birthday: string, since: string,
-  wage: number, area: number, role: number, district: string, bankInfo: Bank, eps: string, afp: string, ces: string,
-): Person => ({ id, first, surname, second, gender, birthday, since, wage, area, role, district, bankInfo, eps, afp, ces });
-
-const ROSTER: Person[] = [
-  P(1001, "Valentina", "Rojas", "Castaño", "F", "1993-04-11", "2022-02-01", 3_200_000, 10, 101, "Chapinero", { bank: "Bancolombia", account_type: "Ahorro", last4: "4821" }, "eps_sura", "porvenir", "porvenir"),
-  P(1002, "Andrés Felipe", "Arango", "Ríos", "M", "1990-09-23", "2021-06-15", 6_500_000, 20, 201, "Usaquén", { bank: "Banco Davivienda", account_type: "Ahorro", last4: "7310" }, "compensar", "proteccion", "proteccion"),
-  P(1003, "Laura Marcela", "Gómez", "Ospina", "F", "1999-01-30", "2024-03-04", SMMLV, 10, 102, "Kennedy", { bank: "Banco de Bogotá", account_type: "Ahorro", last4: "1157" }, "famisanar", "colpensiones", "porvenir"),
-  P(1004, "Juan Sebastián", "Martínez", "Duque", "M", "1988-12-02", "2020-08-10", 4_200_000, 30, 301, "Fontibón", { bank: "BBVA Colombia", account_type: "Corriente", last4: "9046" }, "eps_sura", "proteccion", "proteccion"),
-  P(1005, "Camila Andrea", "Torres", "Restrepo", "F", "1995-06-17", "2023-01-16", 3_800_000, 20, 202, "Teusaquillo", { bank: "Bancolombia", account_type: "Ahorro", last4: "4417" }, "compensar", "porvenir", "porvenir"),
-  P(1006, "Diego Alejandro", "Herrera", "Mejía", "M", "1992-03-08", "2022-10-03", 2_800_000, 40, 401, "Suba", { bank: "Banco de Occidente", account_type: "Ahorro", last4: "6602" }, "sanitas", "porvenir", "porvenir"),
-  P(1007, "Natalia", "Ramírez", "Zuluaga", "F", "1986-11-21", "2019-04-01", 5_600_000, 10, 103, "Chapinero", { bank: "Banco AV Villas", account_type: "Ahorro", last4: "3389" }, "eps_sura", "proteccion", "proteccion"),
-  P(1008, "Carlos Mario", "Londoño", "Vélez", "M", "1997-07-14", "2023-07-03", 1_900_000, 30, 302, "Bosa", { bank: "Banco Popular", account_type: "Ahorro", last4: "5524" }, "famisanar", "colpensiones", "fondo_nacional_del_ahorro"),
-  P(1009, "María José", "Cárdenas", "Giraldo", "F", "1994-02-27", "2023-05-02", 3_400_000, 50, 501, "Engativá", { bank: "Banco Caja Social BCSC", account_type: "Ahorro", last4: "8873" }, "compensar", "porvenir", "porvenir"),
-  P(1010, "Felipe", "Ortiz", "Salazar", "M", "1985-05-05", "2018-09-17", 8_200_000, 20, 203, "Usaquén", { bank: "Banco Itau", account_type: "Corriente", last4: "2290" }, "sanitas", "proteccion", "proteccion"),
-  P(1011, "Daniela", "Suárez", "Montoya", "F", "1998-08-19", "2024-06-04", 2_400_000, 50, 502, "Puente Aranda", { bank: "Lulo Bank S.A", account_type: "Ahorro", last4: "7765" }, "eps_sura", "porvenir", "porvenir"),
-  P(1012, "Julián David", "Moreno", "Patiño", "M", "1996-10-09", "2022-11-21", 2_600_000, 40, 402, "Kennedy", { bank: "Bancoomeva", account_type: "Ahorro", last4: "4038" }, "coomeva", "colfondos", "colfondos"),
-];
-const NEW_HIRE = P(1013, "Sara Lucía", "Bermúdez", "Quintero", "F", "2000-12-12", "2026-10-01", 2_900_000, 40, 403, "Suba", { bank: "Nequi", account_type: "Ahorro", last4: "6150" }, "compensar", "porvenir", "porvenir");
-
-const idx = (p: Person) => p.id - 1000;
-const rut = (p: Person) => `999000${p.id}`; // 10 dígitos, prefijo 999: documento FALSO a propósito
-const jobId = (p: Person) => 2000 + idx(p);
-const personId = (p: Person) => 5000 + idx(p);
-const slug = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(" ")[0];
-
-interface EmpState {
-  p: Person;
-  status: "activo" | "inactivo";
-  activeUntil: string | null;
-  terminationReason: string | null;
-  bankInfo: Bank;
-}
-const st = (p: Person, o: Partial<EmpState> = {}): EmpState => ({ p, status: "activo", activeUntil: null, terminationReason: null, bankInfo: p.bankInfo, ...o });
-
-// ---------- Constructores con la forma EXACTA de la doc de Buk ----------
-function employeeJson(s: EmpState) {
-  const p = s.p;
-  return {
-    document_number: rut(p),
-    document_type: "cc",
-    period_type: "mensual",
-    person_id: personId(p),
-    id: p.id,
-    picture_url: null,
-    first_name: p.first,
-    surname: p.surname,
-    second_surname: p.second,
-    full_name: `${p.first} ${p.surname} ${p.second}`,
-    rut: rut(p),
-    code_sheet: `AND-${String(idx(p)).padStart(3, "0")}`,
-    email: `${slug(p.first)}.${slug(p.surname)}@andina-demo.example`,
-    personal_email: null,
-    address: `Calle Ficticia ${idx(p)} # ${10 + idx(p)}-${20 + idx(p)}`,
-    district: p.district,
-    location_id: 11001,
-    region: "Bogotá D.C.",
-    office_phone: null,
-    phone: `300 000 ${String(1000 + idx(p))}`, // ficticio
-    gender: p.gender,
-    birthday: p.birthday,
-    university: null,
-    degree: null,
-    active_since: p.since,
-    status: s.status,
-    payment_currency: "COP",
-    payment_method: "Transferencia Bancaria",
-    bank: s.bankInfo.bank,
-    account_type: s.bankInfo.account_type,
-    account_number: `****${s.bankInfo.last4}`,
-    payment_document_type: "cc",
-    payment_document_number: rut(p),
-    private_role: false,
-    progressive_vacations_start: null,
-    nationality: "CO",
-    country_code: "CO",
-    civil_status: idx(p) % 3 === 0 ? "Casado" : "Soltero",
-    health_company: p.eps,
-    pension_regime: null,
-    pension_fund: p.afp,
-    afc: null, // en Colombia AFC es una cuenta de ahorro (Fomento a la Construcción); no aplica al fixture
-    custom_attributes: FIXTURE_ATTR,
-    active_until: s.activeUntil,
-    termination_reason: s.terminationReason,
-    current_job: {
-      id: jobId(p),
-      company_id: 1,
-      start_date: p.since,
-      type_of_contract: "Indefinido",
-      end_of_contract: null,
-      notice_date: null,
-      regular_hours: 42,
-      risk_type: "minimo",
-      end_date: s.activeUntil,
-      contract_finishing_date_1: null,
-      contract_finishing_date_2: null,
-      cost_center: `CC-${p.area}`,
-      periodicity: "mensual",
-      zone_assignment: false,
-      custom_attributes: {},
-      area_id: p.area,
-      role_id: p.role,
-      leader_id: 1010,
-      retention_taxes: "procedimiento_1",
-      retention_taxes_type: "automatic_retention_rate",
-      retention_taxes_rate: 0,
-      currency_code: "COP",
-      wage: p.wage,
-      wage_type: "fijo",
-      boss: { document_number: rut(ROSTER[9]!), document_type: "cc", id: 1010, rut: rut(ROSTER[9]!) },
-      without_wage: false,
-    },
-    family_responsabilities: null,
-  };
-}
-
-const line = (type: string, name: string, amount: number, code: string, o: { taxable?: boolean; imponible?: boolean; institution?: string | null } = {}) => ({
-  type,
-  subtype: null,
-  income_type: null,
-  name,
-  amount,
-  resettlement: false,
-  taxable: o.taxable ?? type === "haber",
-  imponible: o.imponible ?? type === "haber",
-  anticipo: false,
-  credit_type: null,
-  institution: o.institution ?? null,
-  description: null,
-  code,
-  item_code: null,
-});
-
-interface SettleOpts {
-  workedDays?: number;
-  bonus?: number;
-  incapacityDays?: number;
-  prima?: boolean | "missing";
-  /** Prima con un monto distinto al que espera el calendario de beneficios (COP). */
-  primaAmount?: number;
-  liqId: number;
-}
-function settlementJson(p: Person, month: string, o: SettleOpts) {
-  const [year, mm] = month.split("-") as [string, string];
-  const worked = o.workedDays ?? 30 - (o.incapacityDays ?? 0);
-  const daily = p.wage / 30;
-  const salary = Math.round(daily * worked);
-  const auxEligible = p.wage <= 2 * SMMLV;
-  const aux = auxEligible ? Math.round((AUX * worked) / 30) : 0;
-  const incap = o.incapacityDays ? Math.round(Math.max(daily * 0.6667, SMMLV / 30) * o.incapacityDays) : 0;
-  const bonus = o.bonus ?? 0;
-  const prima = o.prima === true ? (o.primaAmount ?? Math.round((p.wage + (auxEligible ? AUX : 0)) / 2)) : 0; // semestre completo: (salario+aux)*180/360
-  const ibc = salary + incap + bonus;
-  const salud = Math.round(ibc * 0.04);
-  const pension = Math.round(ibc * 0.04);
-  const fsp = ibc >= 4 * SMMLV ? Math.round(ibc * 0.01) : 0;
-  const lines = [line("haber", "Sueldo", salary, "sueldo")];
-  if (incap) lines.push(line("haber", "Incapacidad general", incap, "incapacidad_general"));
-  if (bonus) lines.push(line("haber", "Bonificación por desempeño", bonus, "bonificacion"));
-  if (aux) lines.push(line("haber", "Auxilio de transporte", aux, "aux_transporte", { imponible: false, taxable: false }));
-  if (prima) lines.push(line("haber", "Prima de servicios", prima, "prima_servicios", { imponible: false }));
-  lines.push(line("descuento", "Salud", salud, "salud", { institution: p.eps }));
-  lines.push(line("descuento", "Pensión", pension, "pension", { institution: p.afp }));
-  if (fsp) lines.push(line("descuento", "Fondo de solidaridad pensional", fsp, "fondo_solidaridad", { institution: p.afp }));
-  const gross = salary + incap + bonus + aux + prima;
-  const legal = salud + pension + fsp;
-  const net = gross - legal;
-  return {
-    liquidacion_id: o.liqId,
-    person_id: personId(p),
-    employee_id: p.id,
-    month: mm,
-    year,
-    worked_days: worked,
-    noworked_days: 30 - worked,
-    income_gross: gross,
-    income_net: net,
-    income_afp: ibc,
-    income_ips: 0,
-    total_income_taxable: ibc,
-    total_income_notaxable: aux + prima,
-    total_legal_discounts: legal,
-    total_other_discounts: 0,
-    closed: true,
-    liquid_reach: net,
-    taxable_base: ibc,
-    rut: rut(p),
-    lines_settlement: lines,
-  };
-}
-
-const page = <T>(data: T[]) => ({ pagination: { next: null, previous: null, count: data.length, total_pages: 1 }, data });
+import { AUX, DEFAULT_TREASURY, FIXTURE_ATTR, NEW_HIRE, OBLIGATION_BASE, ORG, ROSTER, SMMLV, TENANT, employeeJson, idx, jobId, licenceJson, page, settlementJson, st } from "./builders";
+import type { EmpState, Person, SettleOpts } from "./builders";
+import { buildMonth, monthRange, type Injection } from "./history";
+import { replayLedger } from "./ledger";
+import { HISTORY_RESOLUTIONS } from "./resolutions";
 
 // ---------- Escenarios (§13 del doc de diseño, casos de fuente de RR. HH.) ----------
 type Expect = { decision: Decision; reasons: ReasonCode[] };
@@ -301,6 +87,19 @@ interface ScenarioSpec {
   webhooks?: { file: string; receivedAt: string; body: unknown }[];
   obligation?: Partial<ObligationTemplate>;
   treasury?: { fundsAvailableMinor: number | null; fundsReservedMinor: number | null };
+  /**
+   * Escenario con historia: el mes de prueba sale de `buildMonth` (línea de tiempo + inyecciones) y el último monto
+   * confirmado, del libro de decisiones. `historyFrom` null = Buk no expone meses anteriores (el agente no tiene historia).
+   */
+  timeline?: {
+    injections: Injection[];
+    historyFrom: string | null;
+    ledgerFrom: string;
+    /** Último mes del libro que el demo siembra en la BD; los siguientes los decide el demo en vivo. */
+    seedThrough: string;
+    /** Clave de línea (`<empleado>:<tipo>`) -> tipo de anomalía sembrada. Las demás líneas son limpias. */
+    labels: Record<string, string>;
+  };
   stages: StageSpec[];
   notes: string[];
 }
@@ -471,6 +270,65 @@ const SCENARIOS: ScenarioSpec[] = [
     stages: [{ stage: "inicial", asOf: OCT_ASOF, description: "fondos_suficientes bloquea la corrida.", all: { decision: "bloqueada", reasons: ["FONDOS_INSUFICIENTES"] }, runFindings: [{ ruleId: "fondos_suficientes", code: "FONDOS_INSUFICIENTES", effect: "bloquea", employeeId: null }], occurrenceStatus: "retenida" }],
     notes: ["Bloqueo absoluto de corrida: ninguna línea se ejecuta aunque individualmente esté limpia."],
   },
+  {
+    name: "aprendizaje-trimestral",
+    description:
+      "Historia de 14 meses (2025-10 a 2026-11) con eventos legítimos y un mes de prueba (2026-12) con dos anomalías sembradas: la bonificación trimestral de 1002 sale 3 veces mayor y 1010 recibe +5 % fuera de enero. Con reglas fijas solo escala 1002; 1010 pasa por estar dentro del 10 %.",
+    month: "2026-12",
+    states: base12(),
+    current: [],
+    timeline: {
+      injections: [
+        { kind: "bonus_multiple", employeeId: 1002, x100: 300 },
+        { kind: "bump_pct", employeeId: 1010, bps: 500 },
+      ],
+      historyFrom: "2025-10",
+      ledgerFrom: "2025-10",
+      seedThrough: "2026-02",
+      labels: { "1002:salario": "bonus_over_pattern", "1010:salario": "off_cycle_raise" },
+    },
+    stages: [
+      {
+        stage: "inicial",
+        asOf: "2026-12-31T14:00:00Z",
+        description: "Reglas fijas: 1002 escala por variación (+37 % o más); el +5 % de 1010 queda dentro de la tolerancia y se aprueba.",
+        lines: { "1002:salario": { decision: "requiere_aprobacion", reasons: ["VARIACION_EXCEDIDA"] } },
+        occurrenceStatus: "en_aprobacion",
+      },
+    ],
+    notes: [
+      "El +5 % de 1010 es la anomalía que solo detecta el perfil histórico (un empleado de salario fijo sin variación previa fuera de enero).",
+      "Las resoluciones humanas del libro (_pacta/decision-history.json) son datos de fixture; las decisiones automáticas se calculan con las reglas.",
+    ],
+  },
+  {
+    name: "aprendizaje-sin-historia",
+    description:
+      "Mismo mes de prueba que aprendizaje-trimestral, pero Buk no expone meses anteriores y el libro no tiene decisiones: es el punto de partida (historia 0) del agente. Pacta solo conoce lo último confirmado.",
+    month: "2026-12",
+    states: base12(),
+    current: [],
+    timeline: {
+      injections: [
+        { kind: "bonus_multiple", employeeId: 1002, x100: 300 },
+        { kind: "bump_pct", employeeId: 1010, bps: 500 },
+      ],
+      historyFrom: null,
+      ledgerFrom: "2025-10",
+      seedThrough: "2026-02",
+      labels: { "1002:salario": "bonus_over_pattern", "1010:salario": "off_cycle_raise" },
+    },
+    stages: [
+      {
+        stage: "inicial",
+        asOf: "2026-12-31T14:00:00Z",
+        description: "Sin historia rigen solo las reglas fijas: igual resultado que aprendizaje-trimestral.",
+        lines: { "1002:salario": { decision: "requiere_aprobacion", reasons: ["VARIACION_EXCEDIDA"] } },
+        occurrenceStatus: "en_aprobacion",
+      },
+    ],
+    notes: ["Con historia 0 el agente no tiene perfiles ni precedentes; no cambia nada respecto a las reglas fijas."],
+  },
 ];
 
 // ---------- Escritura ----------
@@ -489,25 +347,6 @@ const prevMonth = (m: string, k = 1) => {
 const ddmmyyyy = (iso: string) => iso.split("-").reverse().join("-");
 const minusMin = (utc: string, min: number) => new Date(Date.parse(utc) - min * 60_000).toISOString().replace(".000Z", "Z");
 
-const OBLIGATION_BASE: ObligationTemplate = {
-  schemaVersion: 1,
-  obligationId: "obl_nomina_andina",
-  organizationId: "org_andina_demo",
-  kind: "payroll",
-  calendar: { kind: "payroll", frequency: "monthly", anchor: "month_end" },
-  currency: "COP",
-  varianceToleranceBps: 1000, // 10 % (valor por defecto del contrato compartido)
-  runCapMinor: 12_000_000_000, // $120.000.000 COP
-  evidenceMaxAgeDays: 2, // supuesto del mock: el contrato compartido propone 7
-  earlyAlertDays: 7,
-  urgentAlertDays: 3,
-  version: 1,
-  status: "active",
-  activatedBy: "usr_santiago_demo",
-  activatedAt: "2026-09-01T14:00:00Z",
-  dataOrigin: "fixture",
-};
-const DEFAULT_TREASURY = { fundsAvailableMinor: 8_000_000_000, fundsReservedMinor: 0 }; // $80.000.000 COP
 
 rmSync(PAYLOADS_DIR, { recursive: true, force: true });
 rmSync(EXPECTED_DIR, { recursive: true, force: true });
@@ -521,7 +360,10 @@ for (const sc of SCENARIOS) {
   };
   const start = `${sc.month}-01`;
   const end = lastDay(sc.month);
-  const months = [prevMonth(sc.month, 2), prevMonth(sc.month, 1), sc.month];
+  const tl = sc.timeline ?? null;
+  const histMonths = tl?.historyFrom ? monthRange(tl.historyFrom, prevMonth(sc.month)) : [];
+  const months = histMonths.length ? [...histMonths, sc.month] : [prevMonth(sc.month, 2), prevMonth(sc.month, 1), sc.month];
+  const built = tl ? buildMonth(sc.month, { injections: tl.injections }) : null;
   const monthIdx = (m: string) => months.indexOf(m) + 1;
   const firstAsOf = sc.stages[0]!.asOf;
   const capturedDefault = minusMin(firstAsOf, 5);
@@ -529,11 +371,16 @@ for (const sc of SCENARIOS) {
   add("/process_periods", "GET /process_periods", {}, "process_periods.json",
     page(months.map((m, i) => ({ id: 300 + Number(m.slice(5)) + (Number(m.slice(0, 4)) - 2026) * 12, month: m, end_date: lastDay(m), status: i === months.length - 1 ? "abierto" : "cerrado" }))));
 
-  const active = sc.states.filter((s) => s.status === "activo");
-  add("/employees/active", "GET /employees/active", { date: end }, "employees_active.json", page(active.map(employeeJson)));
-  for (const s of sc.states) add(`/employees/${s.p.id}`, "GET /employees/{id}", {}, `employees/${s.p.id}.json`, employeeJson(s));
+  if (built) {
+    add("/employees/active", "GET /employees/active", { date: end }, "employees_active.json", built.employeesActive);
+    for (const [id, body] of Object.entries(built.employeeDetails)) add(`/employees/${id}`, "GET /employees/{id}", {}, `employees/${id}.json`, body);
+  } else {
+    const active = sc.states.filter((s) => s.status === "activo");
+    add("/employees/active", "GET /employees/active", { date: end }, "employees_active.json", page(active.map(employeeJson)));
+    for (const s of sc.states) add(`/employees/${s.p.id}`, "GET /employees/{id}", {}, `employees/${s.p.id}.json`, employeeJson(s));
+  }
 
-  const currentSettlements = sc.current.map((c, i) => {
+  const currentSettlements = built ? built.payrollDetail.data : sc.current.map((c, i) => {
     const dupOffset = sc.current.findIndex((x) => x.p.id === c.p.id) === i ? 0 : 500;
     const o = c.opts ?? {};
     return settlementJson(c.p, sc.month, { ...o, prima: o.prima === true, liqId: 700000 + monthIdx(sc.month) * 1000 + idx(c.p) + dupOffset });
@@ -588,19 +435,23 @@ for (const sc of SCENARIOS) {
     });
   }
 
-  const lic = (sc.licences ?? []).map((l, i) => {
-    const endD = new Date(Date.parse(`${l.start}T00:00:00Z`) + (l.days - 1) * 86400000).toISOString().slice(0, 10);
-    return {
-      id: 8101 + i, start_date: l.start, end_date: endD, days_count: l.days, day_percent: 1, contribution_days: 2, workday_stage: "full_working_day",
-      application_date: l.start, application_end_date: endD, justification: "Incapacidad por enfermedad general (FICTICIO)", employee_id: l.p.id,
-      status: "aprobado", created_at: l.start, updated_at: l.start, licence_type_id: 3, format: "electronica", type: "remunerada",
-      codigo_incapacidad_colombia: "J069", descripcion_codigo_incapacidad_colombia: "INFECCION AGUDA DE LAS VIAS RESPIRATORIAS SUPERIORES, NO ESPECIFICADA",
-      licence_type_code: "incapacidad_enfermedad_general", licence_number: "FICT-000123", medic_name: "Médico Ficticio", custom_attributes: {}, medic_rut: "9990009999",
-    };
-  });
+  const lic = built ? built.licences.data : (sc.licences ?? []).map((l, i) => licenceJson(l.p.id, 8101 + i, l.start, l.days));
   add("/absences/licence", "GET /absences/licence", { from: start, to: end }, "absences_licence.json", page(lic));
 
   for (const w of sc.webhooks ?? []) write(join(dir, w.file), w.body);
+
+  // Meses anteriores: se escriben una sola vez en payloads/_history y todos los escenarios con historia los comparten.
+  const addShared = (path: string, endpoint: string, query: Record<string, string>, file: string, body: unknown) => {
+    routes.push({ method: "GET", path, endpoint, query, file: `shared:${file}` });
+    write(join(PAYLOADS_DIR, "_history", file), body);
+  };
+  for (const m of histMonths) {
+    const h = buildMonth(m);
+    addShared("/employees/active", "GET /employees/active", { date: lastDay(m) }, `employees_active_${m}.json`, h.employeesActive);
+    addShared("/payroll_detail/month", "GET /payroll_detail/month", { date: ddmmyyyy(`${m}-01`) }, `payroll_detail_month_${m}.json`, h.payrollDetail);
+    addShared("/absences/licence", "GET /absences/licence", { from: `${m}-01`, to: lastDay(m) }, `absences_licence_${m}.json`, h.licences);
+    addShared("/jobs/events/terminations", "GET /jobs/events/terminations", { start_date: `${m}-01`, end_date: lastDay(m) }, `jobs_events_terminations_${m}.json`, h.terminations);
+  }
 
   // ---------- Datos propios de Pacta ----------
   const obligation: ObligationTemplate = { ...OBLIGATION_BASE, ...sc.obligation };
@@ -615,13 +466,27 @@ for (const sc of SCENARIOS) {
   });
   const prev = prevMonth(sc.month);
   const confirmed = sc.confirmedPeople ?? ROSTER;
+  // Con historia, lo confirmado sale del libro de decisiones (replay de los meses anteriores); si no, de la corrida anterior limpia.
+  const ledger = tl ? await replayLedger({ template: obligation, from: tl.ledgerFrom, to: prev, resolutions: HISTORY_RESOLUTIONS }) : null;
   write(join(dir, "_pacta/last-confirmed.json"), {
     fixture: true,
-    note: `Último monto (línea salario, neto) y última cuenta confirmados por Pacta en la corrida de ${prev}. Solo cuentas enmascaradas.`,
-    byCounterparty: Object.fromEntries(
-      confirmed.map((p) => [`buk:employee:${p.id}`, { beneficiaryReference: `****${p.bankInfo.last4}`, amountMinor: settlementJson(p, prev, { liqId: 0 }).liquid_reach * 100 }]),
-    ),
+    note: ledger
+      ? `Último monto (línea salario, neto) y última cuenta confirmados al cierre de ${prev}, derivados del libro de decisiones (_pacta/decision-history.json). Solo cuentas enmascaradas.`
+      : `Último monto (línea salario, neto) y última cuenta confirmados por Pacta en la corrida de ${prev}. Solo cuentas enmascaradas.`,
+    byCounterparty: ledger
+      ? ledger.confirmed
+      : Object.fromEntries(
+          confirmed.map((p) => [`buk:employee:${p.id}`, { beneficiaryReference: `****${p.bankInfo.last4}`, amountMinor: settlementJson(p, prev, { liqId: 0 }).liquid_reach * 100 }]),
+        ),
   });
+  if (ledger && tl) {
+    write(join(dir, "_pacta/decision-history.json"), {
+      ...ledger,
+      seedThrough: tl.seedThrough,
+      // Sin historia, el agente no conoce decisiones previas: solo lo último confirmado.
+      months: tl.historyFrom ? ledger.months : [],
+    });
+  }
   write(join(dir, "_pacta/benefit-calendar.json"), {
     fixture: true,
     note: "Calendario de beneficios del escenario. Fórmula SIMPLIFICADA y ficticia: prima = (salario base + auxilio de transporte si salario ≤ 2 SMMLV) / 2, redondeada a peso. No es cálculo laboral legal.",
@@ -642,6 +507,7 @@ for (const sc of SCENARIOS) {
       obligation: "_pacta/obligation.json",
       treasury: "_pacta/treasury.json",
       lastConfirmed: "_pacta/last-confirmed.json",
+      ...(ledger ? { decisionHistory: "_pacta/decision-history.json" } : {}),
       benefitCalendar: "_pacta/benefit-calendar.json",
       fetchLog: "_pacta/fetch-log.json",
       webhooks: (sc.webhooks ?? []).map((w) => ({ file: w.file, receivedAt: w.receivedAt })),
@@ -706,6 +572,16 @@ for (const sc of SCENARIOS) {
       lines,
     };
   });
+  if (tl) {
+    for (const k of Object.keys(tl.labels)) if (!skel.some((l) => l.key === k)) throw new Error(`${sc.name}: etiqueta sin línea: ${k}`);
+    write(join(EXPECTED_DIR, "learning", `${sc.name}.labels.json`), {
+      fixture: true,
+      scenario: sc.name,
+      period: sc.month,
+      note: "Verdad de terreno de las anomalías sembradas. NO la lee el aprendizaje: solo el backtest y las pruebas.",
+      lines: skel.map((l) => ({ lineId: l.lineId, counterpartyRef: `buk:employee:${l.employeeId}`, lineType: LINE_TYPE_EN[l.lineType], label: tl.labels[l.key] ? "anomalous" : "clean", kind: tl.labels[l.key] ?? null })),
+    });
+  }
   write(join(EXPECTED_DIR, `${sc.name}.json`), {
     fixture: true,
     simulatedMoney: true,
@@ -738,6 +614,6 @@ Los JSON de este directorio son **respuestas simuladas** con la forma exacta de 
 - Cuentas bancarias **solo** como \`****1234\`. Nunca un número completo.
 - Montos en COP, plausibles para 2026 pero ficticios. El cálculo de nómina está simplificado (salud 4 %, pensión 4 %, FSP 1 %, sin retención en la fuente) y no es asesoría laboral.
 - \`_pacta/\` **no** es Buk: son datos propios de Pacta (plantilla §9, fondos simulados, última cuenta y monto confirmados, calendario de beneficios, hora de cada captura).
-- Se regeneran con \`npm run generate\`.
+- Se regeneran con \`npm run mock:generate\`.
 `);
 console.log(`OK: ${SCENARIOS.length} escenarios generados en payloads/ y expected/`);

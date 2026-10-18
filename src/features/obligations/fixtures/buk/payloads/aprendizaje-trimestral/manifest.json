@@ -1,0 +1,606 @@
+{
+  "fixture": true,
+  "scenario": "aprendizaje-trimestral",
+  "description": "Historia de 14 meses (2025-10 a 2026-11) con eventos legítimos y un mes de prueba (2026-12) con dos anomalías sembradas: la bonificación trimestral de 1002 sale 3 veces mayor y 1010 recibe +5 % fuera de enero. Con reglas fijas solo escala 1002; 1010 pasa por estar dentro del 10 %.",
+  "organization": "Andina Demo S.A.S.",
+  "period": {
+    "month": "2026-12",
+    "startDate": "2026-12-01",
+    "endDate": "2026-12-31"
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/process_periods",
+      "endpoint": "GET /process_periods",
+      "query": {},
+      "file": "process_periods.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-12-31"
+      },
+      "file": "employees_active.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-12-2026"
+      },
+      "file": "payroll_detail_month_2026-12.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-12-01",
+        "end_date": "2026-12-31"
+      },
+      "file": "jobs_events_terminations.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-12-01",
+        "to": "2026-12-31"
+      },
+      "file": "absences_licence.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2025-10-31"
+      },
+      "file": "shared:employees_active_2025-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-10-2025"
+      },
+      "file": "shared:payroll_detail_month_2025-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2025-10-01",
+        "to": "2025-10-31"
+      },
+      "file": "shared:absences_licence_2025-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2025-10-01",
+        "end_date": "2025-10-31"
+      },
+      "file": "shared:jobs_events_terminations_2025-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2025-11-30"
+      },
+      "file": "shared:employees_active_2025-11.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-11-2025"
+      },
+      "file": "shared:payroll_detail_month_2025-11.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2025-11-01",
+        "to": "2025-11-30"
+      },
+      "file": "shared:absences_licence_2025-11.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2025-11-01",
+        "end_date": "2025-11-30"
+      },
+      "file": "shared:jobs_events_terminations_2025-11.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2025-12-31"
+      },
+      "file": "shared:employees_active_2025-12.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-12-2025"
+      },
+      "file": "shared:payroll_detail_month_2025-12.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2025-12-01",
+        "to": "2025-12-31"
+      },
+      "file": "shared:absences_licence_2025-12.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2025-12-01",
+        "end_date": "2025-12-31"
+      },
+      "file": "shared:jobs_events_terminations_2025-12.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-01-31"
+      },
+      "file": "shared:employees_active_2026-01.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-01-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-01.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-01-01",
+        "to": "2026-01-31"
+      },
+      "file": "shared:absences_licence_2026-01.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-31"
+      },
+      "file": "shared:jobs_events_terminations_2026-01.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-02-28"
+      },
+      "file": "shared:employees_active_2026-02.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-02-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-02.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-02-01",
+        "to": "2026-02-28"
+      },
+      "file": "shared:absences_licence_2026-02.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-02-01",
+        "end_date": "2026-02-28"
+      },
+      "file": "shared:jobs_events_terminations_2026-02.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-03-31"
+      },
+      "file": "shared:employees_active_2026-03.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-03-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-03.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-03-01",
+        "to": "2026-03-31"
+      },
+      "file": "shared:absences_licence_2026-03.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-03-01",
+        "end_date": "2026-03-31"
+      },
+      "file": "shared:jobs_events_terminations_2026-03.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-04-30"
+      },
+      "file": "shared:employees_active_2026-04.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-04-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-04.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-04-01",
+        "to": "2026-04-30"
+      },
+      "file": "shared:absences_licence_2026-04.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-04-01",
+        "end_date": "2026-04-30"
+      },
+      "file": "shared:jobs_events_terminations_2026-04.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-05-31"
+      },
+      "file": "shared:employees_active_2026-05.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-05-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-05.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-05-01",
+        "to": "2026-05-31"
+      },
+      "file": "shared:absences_licence_2026-05.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31"
+      },
+      "file": "shared:jobs_events_terminations_2026-05.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-06-30"
+      },
+      "file": "shared:employees_active_2026-06.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-06-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-06.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-06-01",
+        "to": "2026-06-30"
+      },
+      "file": "shared:absences_licence_2026-06.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-06-01",
+        "end_date": "2026-06-30"
+      },
+      "file": "shared:jobs_events_terminations_2026-06.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-07-31"
+      },
+      "file": "shared:employees_active_2026-07.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-07-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-07.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-07-01",
+        "to": "2026-07-31"
+      },
+      "file": "shared:absences_licence_2026-07.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-07-01",
+        "end_date": "2026-07-31"
+      },
+      "file": "shared:jobs_events_terminations_2026-07.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-08-31"
+      },
+      "file": "shared:employees_active_2026-08.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-08-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-08.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-08-01",
+        "to": "2026-08-31"
+      },
+      "file": "shared:absences_licence_2026-08.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-08-01",
+        "end_date": "2026-08-31"
+      },
+      "file": "shared:jobs_events_terminations_2026-08.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-09-30"
+      },
+      "file": "shared:employees_active_2026-09.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-09-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-09.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-09-01",
+        "to": "2026-09-30"
+      },
+      "file": "shared:absences_licence_2026-09.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-09-01",
+        "end_date": "2026-09-30"
+      },
+      "file": "shared:jobs_events_terminations_2026-09.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-10-31"
+      },
+      "file": "shared:employees_active_2026-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-10-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-10-01",
+        "to": "2026-10-31"
+      },
+      "file": "shared:absences_licence_2026-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-10-01",
+        "end_date": "2026-10-31"
+      },
+      "file": "shared:jobs_events_terminations_2026-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-11-30"
+      },
+      "file": "shared:employees_active_2026-11.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-11-2026"
+      },
+      "file": "shared:payroll_detail_month_2026-11.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-11-01",
+        "to": "2026-11-30"
+      },
+      "file": "shared:absences_licence_2026-11.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-11-01",
+        "end_date": "2026-11-30"
+      },
+      "file": "shared:jobs_events_terminations_2026-11.json"
+    }
+  ],
+  "pacta": {
+    "obligation": "_pacta/obligation.json",
+    "treasury": "_pacta/treasury.json",
+    "lastConfirmed": "_pacta/last-confirmed.json",
+    "decisionHistory": "_pacta/decision-history.json",
+    "benefitCalendar": "_pacta/benefit-calendar.json",
+    "fetchLog": "_pacta/fetch-log.json",
+    "webhooks": []
+  },
+  "evaluations": [
+    {
+      "stage": "inicial",
+      "asOf": "2026-12-31T14:00:00Z",
+      "description": "Reglas fijas: 1002 escala por variación (+37 % o más); el +5 % de 1010 queda dentro de la tolerancia y se aprueba."
+    }
+  ]
+}

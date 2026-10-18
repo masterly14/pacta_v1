@@ -38,6 +38,9 @@ export type FiscalRunInput = {
   settlements: readonly Settlement[];
   run: FiscalRunContext;
   asOf: string; // instante UTC; el motor no lee el reloj (CLAUDE.md §6.13)
+  // Líneas que una persona ya aprobó a mano. No cambian la decisión de la línea, pero sí cuentan en
+  // las reglas de corrida: lo que se va a pagar (aprobadas + aprobadas a mano) debe caber en fondos, tope y provisión.
+  humanApprovedLineIds?: readonly string[];
 };
 
 export type FiscalRunResult = {
@@ -65,7 +68,9 @@ function unknown(ruleId: string, reasonCode: FiscalReasonCode, explanation: stri
   return { ruleId, result: "unknown", reasonCode, explanation, hardBlock: false, evidence: [] };
 }
 
-const freeFunds = (run: FiscalRunContext) => run.fundsAvailableMinor - run.fundsReservedMinor;
+export const fiscalLineId = (template: FiscalTemplate, item: AccountingItem) => `${template.obligationId}:${item.periodStart}:${item.fiscalType}`;
+
+const freeFunds =(run: FiscalRunContext) => run.fundsAvailableMinor - run.fundsReservedMinor;
 
 const templateRef = (template: FiscalTemplate): FiscalEvidenceReference => ({ type: "obligation_template", id: template.obligationId });
 const snapshotRef = (snapshot: AccountingSnapshot): FiscalEvidenceReference => ({ type: "accounting_snapshot", id: snapshot.snapshotId });
@@ -76,10 +81,14 @@ const settlementRef = (settlement: Settlement): FiscalEvidenceReference => ({ ty
 // ---------------------------------------------------------------------------
 
 // 1. La plantilla está activa, vigila este impuesto y coincide en organización y moneda.
-function obligationAuthorized({ template, snapshot, item }: LineInput): RuleOutcome {
+function obligationAuthorized({ template, snapshot, item, asOf }: LineInput): RuleOutcome {
   const ruleId = "obligacion_autorizada";
   if (template.status !== "active") {
     return fail(ruleId, "OBLIGATION_NOT_AUTHORIZED", `La plantilla de impuestos está en estado ${template.status}; solo una plantilla activa opera en automático.`, [templateRef(template)]);
+  }
+  // Evaluar a una fecha anterior a la activación no puede usar una autorización que aún no existía.
+  if (template.activatedAt !== null && Date.parse(asOf) < Date.parse(template.activatedAt)) {
+    return fail(ruleId, "OBLIGATION_NOT_AUTHORIZED", `La plantilla se activó el ${template.activatedAt.slice(0, 10)}, después de la fecha de evaluación.`, [templateRef(template)]);
   }
   if (template.organizationId !== snapshot.organizationId) {
     return fail(ruleId, "OBLIGATION_NOT_AUTHORIZED", "La contabilidad pertenece a otra organización.", [templateRef(template)]);
@@ -129,7 +138,7 @@ function accountingPeriodClosed({ snapshot, item }: LineInput): RuleOutcome {
 }
 
 // 5. Hay una liquidación confirmada por una persona. Nunca se paga sobre un borrador.
-function settlementConfirmed({ settlement, item }: LineInput): RuleOutcome {
+function settlementConfirmed({ settlement, item, asOf }: LineInput): RuleOutcome {
   const ruleId = "liquidacion_confirmada";
   if (settlement === null) {
     return fail(ruleId, "SETTLEMENT_UNCONFIRMED", `${item.displayName} solo tiene el borrador contable; nadie confirmó la liquidación.`);
@@ -137,6 +146,10 @@ function settlementConfirmed({ settlement, item }: LineInput): RuleOutcome {
   if (settlement.status !== "confirmed") {
     const origin = settlement.source === "inbox" ? "llegó por correo" : "fue cargada";
     return fail(ruleId, "SETTLEMENT_UNCONFIRMED", `La liquidación de ${item.displayName} ${origin} y sigue propuesta; falta que una persona la confirme.`, [settlementRef(settlement)]);
+  }
+  // Una confirmación posterior a asOf no existía en ese momento: no cuenta.
+  if (settlement.confirmedAt !== null && Date.parse(settlement.confirmedAt) > Date.parse(asOf)) {
+    return fail(ruleId, "SETTLEMENT_UNCONFIRMED", `La liquidación de ${item.displayName} se confirmó el ${settlement.confirmedAt.slice(0, 10)}, después de la fecha de evaluación.`, [settlementRef(settlement)]);
   }
   return pass(ruleId, `Liquidación confirmada por ${settlement.confirmedBy}.`, [settlementRef(settlement)]);
 }
@@ -173,7 +186,8 @@ function varianceWithinTolerance({ template, item, snapshot }: LineInput): RuleO
   const previous = item.previousConfirmedAmountMinor;
   const delta = Math.abs(item.draftAmountMinor - previous);
   // Enteros: delta / previous > bps / 10000  ⇔  delta * 10000 > previous * bps.
-  if (delta * 10_000 > previous * template.varianceToleranceBps) {
+  // BigInt: el producto puede pasar de 2^53 con importes grandes y no debe perder exactitud.
+  if (BigInt(delta) * BigInt(10_000) > BigInt(previous) * BigInt(template.varianceToleranceBps)) {
     return fail(
       ruleId,
       "VARIANCE_EXCEEDED",
@@ -300,7 +314,7 @@ function toDecision(input: LineInput, outcomes: readonly RuleOutcome[]): FiscalL
     evidence.set(`${ref.type}:${ref.id}`, ref);
   }
   return {
-    lineId: `${template.obligationId}:${item.periodStart}:${item.fiscalType}`,
+    lineId: fiscalLineId(template, item),
     organizationId: template.organizationId,
     obligationId: template.obligationId,
     obligationVersion: template.version,
@@ -331,8 +345,13 @@ export function decideFiscalRun(input: FiscalRunInput): FiscalRunResult {
     return { lineInput, outcomes: LINE_RULES.map((rule) => rule(lineInput)) };
   });
 
-  // Reglas de corrida: solo miran las líneas que quedarían aprobadas.
-  const approvable = lines.filter((line) => combine(line.outcomes) === "approved");
+  // Reglas de corrida: miran todo lo que se podría pagar: las líneas que quedarían aprobadas y las que
+  // una persona aprobó a mano (si no están bloqueadas). Así una aprobación humana no salta fondos ni tope.
+  const approvedByHuman = new Set(input.humanApprovedLineIds ?? []);
+  const approvable = lines.filter((line) => {
+    const decision = combine(line.outcomes);
+    return decision === "approved" || (decision === "requires_approval" && approvedByHuman.has(fiscalLineId(input.template, line.lineInput.item)));
+  });
   const total = approvable.reduce((sum, line) => sum + (line.lineInput.item.draftAmountMinor ?? 0), 0);
   const currency = input.snapshot.currency;
   const free = freeFunds(input.run);
