@@ -8,7 +8,7 @@ export {
   CurrencyCodeSchema,
   EntityIdSchema,
   UtcInstantSchema,
-} from "../../../shared/schemas/invoice-context.ts";
+} from "@/shared/schemas/invoice-context";
 
 // `amount` del CSV es siempre positivo; el sentido del movimiento va aparte (AmountMinorSchema no admite negativos).
 export const DirectionSchema = z.enum(["debit", "credit"]);

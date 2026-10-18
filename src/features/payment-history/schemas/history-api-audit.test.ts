@@ -1,6 +1,5 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { BankImportAuditPayloadSchema } from "./audit-events.ts";
+import { describe, expect, it } from "vitest";
+import { BankImportAuditPayloadSchema } from "./audit-events";
 import {
   ApiErrorSchema,
   ConfirmMappingRequestSchema,
@@ -8,13 +7,13 @@ import {
   ImportResponseSchema,
   SetBatchTagsRequestSchema,
   VoidBatchRequestSchema,
-} from "./api.ts";
+} from "./api";
 import {
   DuplicateCandidateSchema,
   HistoryCoverageSchema,
   HistorySpendResultSchema,
   RecurrenceSuggestionSchema,
-} from "./history-queries.ts";
+} from "./history-queries";
 import {
   detectedHeadersFixture,
   mappingSignedFixture,
@@ -22,94 +21,64 @@ import {
   spendKnownFixture,
   spendUnknownFixture,
   summaryFixture,
-} from "./fixtures.ts";
+} from "./fixtures";
 
 describe("HistorySpendResultSchema (fail-closed)", () => {
   it("acepta known y unknown con razón", () => {
-    assert.equal(HistorySpendResultSchema.safeParse(spendKnownFixture).success, true);
-    assert.equal(HistorySpendResultSchema.safeParse(spendUnknownFixture).success, true);
+    expect(HistorySpendResultSchema.safeParse(spendKnownFixture).success).toBe(true);
+    expect(HistorySpendResultSchema.safeParse(spendUnknownFixture).success).toBe(true);
   });
 
   it("unknown exige razón y no admite importe", () => {
-    assert.equal(HistorySpendResultSchema.safeParse({ status: "unknown" }).success, false);
-    assert.equal(HistorySpendResultSchema.safeParse({ ...spendUnknownFixture, amountMinor: 0 }).success, false);
+    expect(HistorySpendResultSchema.safeParse({ status: "unknown" }).success).toBe(false);
+    expect(HistorySpendResultSchema.safeParse({ ...spendUnknownFixture, amountMinor: 0 }).success).toBe(false);
   });
 
   it("known no admite importe nulo, negativo, flotante ni cero lotes", () => {
-    assert.equal(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, amountMinor: null }).success, false);
-    assert.equal(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, amountMinor: -1 }).success, false);
-    assert.equal(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, amountMinor: 1.5 }).success, false);
-    assert.equal(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, batchIds: [] }).success, false);
+    expect(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, amountMinor: null }).success).toBe(false);
+    expect(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, amountMinor: -1 }).success).toBe(false);
+    expect(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, amountMinor: 1.5 }).success).toBe(false);
+    expect(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, batchIds: [] }).success).toBe(false);
   });
 
   it("known rechaza from posterior a to", () => {
-    assert.equal(
-      HistorySpendResultSchema.safeParse({ ...spendKnownFixture, from: "2026-05-01", to: "2026-04-01" }).success,
-      false,
-    );
+    expect(HistorySpendResultSchema.safeParse({ ...spendKnownFixture, from: "2026-05-01", to: "2026-04-01" }).success).toBe(false);
   });
 });
 
 describe("HistoryCoverageSchema", () => {
   it("null/null significa sin histórico", () => {
-    assert.equal(
-      HistoryCoverageSchema.safeParse({ firstPostedOn: null, lastPostedOn: null, rejectedRows: 0 }).success,
-      true,
-    );
+    expect(HistoryCoverageSchema.safeParse({ firstPostedOn: null, lastPostedOn: null, rejectedRows: 0 }).success).toBe(true);
   });
 
   it("rechaza un extremo nulo y el orden invertido", () => {
-    assert.equal(
-      HistoryCoverageSchema.safeParse({ firstPostedOn: "2026-01-01", lastPostedOn: null, rejectedRows: 0 }).success,
-      false,
-    );
-    assert.equal(
-      HistoryCoverageSchema.safeParse({ firstPostedOn: "2026-03-01", lastPostedOn: "2026-01-01", rejectedRows: 0 }).success,
-      false,
-    );
+    expect(HistoryCoverageSchema.safeParse({ firstPostedOn: "2026-01-01", lastPostedOn: null, rejectedRows: 0 }).success).toBe(false);
+    expect(HistoryCoverageSchema.safeParse({ firstPostedOn: "2026-03-01", lastPostedOn: "2026-01-01", rejectedRows: 0 }).success).toBe(false);
   });
 });
 
 describe("recurrencias y duplicados", () => {
   it("una recurrencia es solo una sugerencia", () => {
-    assert.equal(RecurrenceSuggestionSchema.safeParse(recurrenceSuggestionFixture).success, true);
-    assert.equal(
-      RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, isSuggestionOnly: false }).success,
-      false,
-    );
+    expect(RecurrenceSuggestionSchema.safeParse(recurrenceSuggestionFixture).success).toBe(true);
+    expect(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, isSuggestionOnly: false }).success).toBe(false);
   });
 
   it("no puede portar un permiso de pago (campo extra) ni tener ocurrencias inconsistentes", () => {
-    assert.equal(
-      RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, authorized: true }).success,
-      false,
-    );
-    assert.equal(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, occurrences: 5 }).success, false);
-    assert.equal(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, occurrences: 1 }).success, false);
+    expect(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, authorized: true }).success).toBe(false);
+    expect(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, occurrences: 5 }).success).toBe(false);
+    expect(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, occurrences: 1 }).success).toBe(false);
   });
 
   it("groupKind y supplierId deben ser coherentes; las fechas, ordenadas", () => {
-    assert.equal(
-      RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, groupKind: "supplier" }).success,
-      false,
-    );
-    assert.equal(
-      RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, groupKind: "supplier", supplierId: "sup_1" })
-        .success,
-      true,
-    );
-    assert.equal(
-      RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, supplierId: "sup_1" }).success,
-      false,
-    );
-    assert.equal(
-      RecurrenceSuggestionSchema.safeParse({
+    expect(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, groupKind: "supplier" }).success).toBe(false);
+    expect(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, groupKind: "supplier", supplierId: "sup_1" })
+        .success).toBe(true);
+    expect(RecurrenceSuggestionSchema.safeParse({ ...recurrenceSuggestionFixture, supplierId: "sup_1" }).success).toBe(false);
+    expect(RecurrenceSuggestionSchema.safeParse({
         ...recurrenceSuggestionFixture,
         firstPostedOn: "2026-04-01",
         lastPostedOn: "2026-01-01",
-      }).success,
-      false,
-    );
+      }).success).toBe(false);
   });
 
   it("el candidato duplicado exige base de coincidencia conocida", () => {
@@ -120,16 +89,16 @@ describe("recurrencias y duplicados", () => {
       currency: "USD",
       matchBasis: "external_ref",
     };
-    assert.equal(DuplicateCandidateSchema.safeParse(candidate).success, true);
-    assert.equal(DuplicateCandidateSchema.safeParse({ ...candidate, matchBasis: "same_name" }).success, false);
+    expect(DuplicateCandidateSchema.safeParse(candidate).success).toBe(true);
+    expect(DuplicateCandidateSchema.safeParse({ ...candidate, matchBasis: "same_name" }).success).toBe(false);
   });
 });
 
 describe("contratos de API", () => {
   it("los campos de subida son opcionales y por defecto vacíos", () => {
-    assert.deepEqual(ImportRequestFieldsSchema.parse({}), { tags: [], contextNote: null });
+    expect(ImportRequestFieldsSchema.parse({})).toEqual({ tags: [], contextNote: null });
     const parsed = ImportRequestFieldsSchema.parse({ tags: ["RRHH"], contextNote: "tarjeta corporativa" });
-    assert.deepEqual(parsed.tags, ["rrhh"]);
+    expect(parsed.tags).toEqual(["rrhh"]);
   });
 
   it("la respuesta distingue needs_mapping de staged", () => {
@@ -140,42 +109,39 @@ describe("contratos de API", () => {
       sampleRows: [{ Fecha: "01/02/2026" }],
       suggestions: [{ field: "posted_on", header: "Fecha", matchedBy: "alias" }],
     };
-    assert.equal(ImportResponseSchema.safeParse(needsMapping).success, true);
-    assert.equal(ImportResponseSchema.safeParse({ status: "staged", batchId: "batch_1", summary: summaryFixture }).success, true);
-    assert.equal(ImportResponseSchema.safeParse({ status: "committed", batchId: "batch_1" }).success, false);
+    expect(ImportResponseSchema.safeParse(needsMapping).success).toBe(true);
+    expect(ImportResponseSchema.safeParse({ status: "staged", batchId: "batch_1", summary: summaryFixture }).success).toBe(true);
+    expect(ImportResponseSchema.safeParse({ status: "committed", batchId: "batch_1" }).success).toBe(false);
   });
 
   it("limita las filas de muestra a 5", () => {
     const sampleRows = Array.from({ length: 6 }, () => ({ Fecha: "x" }));
-    assert.equal(
-      ImportResponseSchema.safeParse({
+    expect(ImportResponseSchema.safeParse({
         status: "needs_mapping",
         batchId: "batch_1",
         detectedHeaders: detectedHeadersFixture,
         sampleRows,
         suggestions: [],
-      }).success,
-      false,
-    );
+      }).success).toBe(false);
   });
 
   it("confirmar mapeo exige un mapeo válido", () => {
-    assert.equal(ConfirmMappingRequestSchema.safeParse({ mapping: mappingSignedFixture }).success, true);
-    assert.equal(ConfirmMappingRequestSchema.safeParse({ mapping: { schemaVersion: 1 } }).success, false);
-    assert.equal(ConfirmMappingRequestSchema.safeParse({}).success, false);
+    expect(ConfirmMappingRequestSchema.safeParse({ mapping: mappingSignedFixture }).success).toBe(true);
+    expect(ConfirmMappingRequestSchema.safeParse({ mapping: { schemaVersion: 1 } }).success).toBe(false);
+    expect(ConfirmMappingRequestSchema.safeParse({}).success).toBe(false);
   });
 
   it("anular exige motivo; editar etiquetas valida el máximo", () => {
-    assert.equal(VoidBatchRequestSchema.safeParse({ reason: "ab" }).success, false);
-    assert.equal(VoidBatchRequestSchema.safeParse({ reason: "Fechas mal interpretadas" }).success, true);
+    expect(VoidBatchRequestSchema.safeParse({ reason: "ab" }).success).toBe(false);
+    expect(VoidBatchRequestSchema.safeParse({ reason: "Fechas mal interpretadas" }).success).toBe(true);
     const eleven = Array.from({ length: 11 }, (_, i) => `t${i}`);
-    assert.equal(SetBatchTagsRequestSchema.safeParse({ tags: eleven, contextNote: null }).success, false);
-    assert.equal(SetBatchTagsRequestSchema.safeParse({ tags: ["q3"], contextNote: null }).success, true);
+    expect(SetBatchTagsRequestSchema.safeParse({ tags: eleven, contextNote: null }).success).toBe(false);
+    expect(SetBatchTagsRequestSchema.safeParse({ tags: ["q3"], contextNote: null }).success).toBe(true);
   });
 
   it("los errores usan códigos tipados", () => {
-    assert.equal(ApiErrorSchema.safeParse({ error: { code: "FORBIDDEN", message: "Sin permiso" } }).success, true);
-    assert.equal(ApiErrorSchema.safeParse({ error: { code: "OTHER", message: "x" } }).success, false);
+    expect(ApiErrorSchema.safeParse({ error: { code: "FORBIDDEN", message: "Sin permiso" } }).success).toBe(true);
+    expect(ApiErrorSchema.safeParse({ error: { code: "OTHER", message: "x" } }).success).toBe(false);
   });
 });
 
@@ -196,22 +162,13 @@ describe("payloads de auditoría", () => {
     ];
     for (const event of events) {
       const result = BankImportAuditPayloadSchema.safeParse({ schemaVersion: 1, batchId: "batch_1", ...event });
-      assert.equal(result.success, true, JSON.stringify(result.error?.issues));
+      expect(result.success).toBe(true);
     }
   });
 
   it("rechaza eventos desconocidos, sin batchId o sin versión", () => {
-    assert.equal(
-      BankImportAuditPayloadSchema.safeParse({ schemaVersion: 1, batchId: "b", eventType: "BANK_IMPORT_APPROVED" }).success,
-      false,
-    );
-    assert.equal(
-      BankImportAuditPayloadSchema.safeParse({ schemaVersion: 1, eventType: "BANK_IMPORT_VOIDED", reason: "motivo válido" }).success,
-      false,
-    );
-    assert.equal(
-      BankImportAuditPayloadSchema.safeParse({ batchId: "b", eventType: "BANK_IMPORT_VOIDED", reason: "motivo válido" }).success,
-      false,
-    );
+    expect(BankImportAuditPayloadSchema.safeParse({ schemaVersion: 1, batchId: "b", eventType: "BANK_IMPORT_APPROVED" }).success).toBe(false);
+    expect(BankImportAuditPayloadSchema.safeParse({ schemaVersion: 1, eventType: "BANK_IMPORT_VOIDED", reason: "motivo válido" }).success).toBe(false);
+    expect(BankImportAuditPayloadSchema.safeParse({ batchId: "b", eventType: "BANK_IMPORT_VOIDED", reason: "motivo válido" }).success).toBe(false);
   });
 });

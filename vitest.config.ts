@@ -18,10 +18,6 @@ export default defineConfig({
       "src/shared/schemas/notification-contracts.test.ts",
       "src/features/invoices/gmail/gmail-backend.test.ts",
       "src/lib/r2.test.ts",
-      "src/features/payment-history/recurrence/detect-recurrence.test.ts",
-      "src/features/payment-history/schemas/history-api-audit.test.ts",
-      "src/features/payment-history/schemas/import-batch.test.ts",
-      "src/features/payment-history/suppliers/counterparty-key.test.ts",
     ],
   },
 });

@@ -1,7 +1,7 @@
-import { AMOUNT_TOLERANCE_PERCENT, CADENCE_BANDS, RECURRENCE_MIN_OCCURRENCES, type RecurrenceCadence } from "../config.ts";
-import type { BankTransaction } from "../schemas/bank-transaction.ts";
-import type { RecurrenceSuggestion } from "../schemas/history-queries.ts";
-import { extractCounterpartyKey } from "../suppliers/counterparty-key.ts";
+import { AMOUNT_TOLERANCE_PERCENT, CADENCE_BANDS, RECURRENCE_MIN_OCCURRENCES, type RecurrenceCadence } from "../config";
+import type { BankTransaction } from "../schemas/bank-transaction";
+import type { RecurrenceSuggestion } from "../schemas/history-queries";
+import { extractCounterpartyKey } from "../suppliers/counterparty-key";
 
 // Detección determinística de pagos recurrentes a partir del historial bancario.
 // El resultado es una SUGERENCIA (historial ≠ autorización): solo una acción humana explícita

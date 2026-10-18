@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_CELL_LENGTH } from "./csv-fields.ts";
+import { MAX_CELL_LENGTH } from "./csv-fields";
 import {
   CalendarDateSchema,
   CurrencyCodeSchema,
@@ -7,7 +7,7 @@ import {
   Sha256Schema,
   SignedAmountMinorSchema,
   UtcInstantSchema,
-} from "./primitives.ts";
+} from "./primitives";
 
 // Movimiento bancario importado (tabla `bank_transactions`). Es historial, NO autorización:
 // vincularlo a un proveedor del catálogo no autoriza ningún pago.

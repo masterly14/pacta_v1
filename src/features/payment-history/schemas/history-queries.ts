@@ -5,7 +5,7 @@ import {
   CurrencyCodeSchema,
   EntityIdSchema,
   TagsSchema,
-} from "./primitives.ts";
+} from "./primitives";
 
 // Contrato entre el historial y el motor determinístico de B. Fail-closed: lo que no se puede
 // afirmar es `unknown` con razón; nunca se expresa como 0 ni como "sin gasto".

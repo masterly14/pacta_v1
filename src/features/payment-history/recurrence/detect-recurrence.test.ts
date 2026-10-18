@@ -1,7 +1,6 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { RecurrenceSuggestionSchema } from "../schemas/history-queries.ts";
-import { detectRecurrences, type RecurrenceInput } from "./detect-recurrence.ts";
+import { describe, expect, it } from "vitest";
+import { RecurrenceSuggestionSchema } from "../schemas/history-queries";
+import { detectRecurrences, type RecurrenceInput } from "./detect-recurrence";
 
 let counter = 0;
 function txn(overrides: Partial<RecurrenceInput> & { postedOn: string }): RecurrenceInput {
@@ -21,26 +20,26 @@ const monthly = ["2026-01-15", "2026-02-14", "2026-03-16"];
 describe("detectRecurrences", () => {
   it("3 pagos mensuales al mismo proveedor => sugerencia mensual", () => {
     const result = detectRecurrences(monthly.map((postedOn) => txn({ postedOn, supplierId: "sup_1" })));
-    assert.equal(result.length, 1);
-    assert.equal(result[0].cadence, "monthly");
-    assert.equal(result[0].occurrences, 3);
-    assert.equal(result[0].typicalAmountMinor, 2000);
-    assert.equal(result[0].groupKind, "supplier");
-    assert.equal(result[0].supplierId, "sup_1");
-    assert.equal(result[0].isSuggestionOnly, true);
-    assert.equal(RecurrenceSuggestionSchema.safeParse(result[0]).success, true);
+    expect(result.length).toBe(1);
+    expect(result[0].cadence).toBe("monthly");
+    expect(result[0].occurrences).toBe(3);
+    expect(result[0].typicalAmountMinor).toBe(2000);
+    expect(result[0].groupKind).toBe("supplier");
+    expect(result[0].supplierId).toBe("sup_1");
+    expect(result[0].isSuggestionOnly).toBe(true);
+    expect(RecurrenceSuggestionSchema.safeParse(result[0]).success).toBe(true);
   });
 
   it("2 pagos no alcanzan el mínimo", () => {
-    assert.deepEqual(detectRecurrences(monthly.slice(0, 2).map((postedOn) => txn({ postedOn, supplierId: "sup_1" }))), []);
+    expect(detectRecurrences(monthly.slice(0, 2).map((postedOn) => txn({ postedOn, supplierId: "sup_1" })))).toEqual([]);
   });
 
   it("detecta también contrapartes sin proveedor, agrupadas por clave", () => {
     const result = detectRecurrences(monthly.map((postedOn) => txn({ postedOn })));
-    assert.equal(result.length, 1);
-    assert.equal(result[0].groupKind, "unlinked_counterparty");
-    assert.equal(result[0].supplierId, null);
-    assert.equal(result[0].counterpartyNormalized, "hosting demo");
+    expect(result.length).toBe(1);
+    expect(result[0].groupKind).toBe("unlinked_counterparty");
+    expect(result[0].supplierId).toBe(null);
+    expect(result[0].counterpartyNormalized).toBe("hosting demo");
   });
 
   it("un proveedor une descripciones distintas del banco", () => {
@@ -49,42 +48,42 @@ describe("detectRecurrences", () => {
       txn({ postedOn: "2026-02-14", supplierId: "sup_1", description: "PAGO HOSTING-DEMO.COM 9981" }),
       txn({ postedOn: "2026-03-16", supplierId: "sup_1", description: "Hosting Demo LLC ref 55" }),
     ]);
-    assert.equal(result.length, 1);
-    assert.equal(result[0].occurrences, 3);
+    expect(result.length).toBe(1);
+    expect(result[0].occurrences).toBe(3);
   });
 
   it("tolerancia de monto: 10 % exacto pasa, 11 % no", () => {
     const within = detectRecurrences(
       [-10000, -11000, -9000].map((amountMinor, i) => txn({ postedOn: monthly[i], amountMinor, supplierId: "s" })),
     );
-    assert.equal(within.length, 1);
+    expect(within.length).toBe(1);
     const outside = detectRecurrences(
       [-10000, -10000, -11200].map((amountMinor, i) => txn({ postedOn: monthly[i], amountMinor, supplierId: "s" })),
     );
-    assert.deepEqual(outside, []);
+    expect(outside).toEqual([]);
   });
 
   it("un hueco de 60 días corta la racha, pero una racha final de 3 se sugiere", () => {
     const dates = ["2025-10-01", "2025-12-05", "2026-01-15", "2026-02-14", "2026-03-16"];
     const result = detectRecurrences(dates.map((postedOn) => txn({ postedOn, supplierId: "s" })));
-    assert.equal(result.length, 1);
-    assert.equal(result[0].occurrences, 3);
-    assert.equal(result[0].firstPostedOn, "2026-01-15");
-    assert.equal(result[0].lastPostedOn, "2026-03-16");
+    expect(result.length).toBe(1);
+    expect(result[0].occurrences).toBe(3);
+    expect(result[0].firstPostedOn).toBe("2026-01-15");
+    expect(result[0].lastPostedOn).toBe("2026-03-16");
   });
 
   it("un mes faltante rompe la serie: intervalos irregulares no son recurrencia", () => {
     const dates = ["2026-01-15", "2026-02-14", "2026-04-20"];
-    assert.deepEqual(detectRecurrences(dates.map((postedOn) => txn({ postedOn, supplierId: "s" }))), []);
+    expect(detectRecurrences(dates.map((postedOn) => txn({ postedOn, supplierId: "s" })))).toEqual([]);
   });
 
   it("detecta cadencias semanal, trimestral y anual", () => {
     const weekly = ["2026-03-02", "2026-03-09", "2026-03-16"];
     const quarterly = ["2025-09-15", "2025-12-15", "2026-03-16"];
     const yearly = ["2024-03-15", "2025-03-15", "2026-03-15"];
-    assert.equal(detectRecurrences(weekly.map((postedOn) => txn({ postedOn, supplierId: "w" })))[0].cadence, "weekly");
-    assert.equal(detectRecurrences(quarterly.map((postedOn) => txn({ postedOn, supplierId: "q" })))[0].cadence, "quarterly");
-    assert.equal(detectRecurrences(yearly.map((postedOn) => txn({ postedOn, supplierId: "y" })))[0].cadence, "yearly");
+    expect(detectRecurrences(weekly.map((postedOn) => txn({ postedOn, supplierId: "w" })))[0].cadence).toBe("weekly");
+    expect(detectRecurrences(quarterly.map((postedOn) => txn({ postedOn, supplierId: "q" })))[0].cadence).toBe("quarterly");
+    expect(detectRecurrences(yearly.map((postedOn) => txn({ postedOn, supplierId: "y" })))[0].cadence).toBe("yearly");
   });
 
   it("no mezcla monedas", () => {
@@ -93,12 +92,12 @@ describe("detectRecurrences", () => {
       txn({ postedOn: monthly[1], supplierId: "s", currency: "EUR" }),
       txn({ postedOn: monthly[2], supplierId: "s", currency: "USD" }),
     ]);
-    assert.deepEqual(result, []);
+    expect(result).toEqual([]);
   });
 
   it("ignora entradas", () => {
     const result = detectRecurrences(monthly.map((postedOn) => txn({ postedOn, supplierId: "s", amountMinor: 2000 })));
-    assert.deepEqual(result, []);
+    expect(result).toEqual([]);
   });
 
   it("mismo día y monto cuenta una sola vez", () => {
@@ -107,24 +106,24 @@ describe("detectRecurrences", () => {
       txn({ postedOn: monthly[0], supplierId: "s" }), // doble apunte
       txn({ postedOn: monthly[1], supplierId: "s" }),
     ]);
-    assert.deepEqual(result, []); // solo 2 ocurrencias reales
+    expect(result).toEqual([]); // solo 2 ocurrencias reales
   });
 
   it("descripciones sin contraparte identificable y sin proveedor no se agrupan", () => {
     const result = detectRecurrences(monthly.map((postedOn) => txn({ postedOn, description: "TRANSFERENCIA" })));
-    assert.deepEqual(result, []);
+    expect(result).toEqual([]);
   });
 
   it("no depende del orden de entrada", () => {
     const input = monthly.map((postedOn) => txn({ postedOn, supplierId: "s" }));
-    assert.deepEqual(detectRecurrences([...input].reverse()), detectRecurrences(input));
+    expect(detectRecurrences([...input].reverse())).toEqual(detectRecurrences(input));
   });
 
   it("jamás produce un permiso: solo sugerencias marcadas", () => {
     const result = detectRecurrences(monthly.map((postedOn) => txn({ postedOn, supplierId: "s" })));
     for (const suggestion of result) {
-      assert.equal(suggestion.isSuggestionOnly, true);
-      assert.equal("authorized" in suggestion, false);
+      expect(suggestion.isSuggestionOnly).toBe(true);
+      expect("authorized" in suggestion).toBe(false);
     }
   });
 });

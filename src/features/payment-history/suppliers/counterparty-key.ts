@@ -4,7 +4,7 @@ import {
   KEY_MAX_TOKENS,
   LEGAL_SUFFIXES,
   NOISE_TOKENS,
-} from "../config.ts";
+} from "../config";
 
 // Clave estable de la contraparte de un movimiento, derivada de su descripción bancaria.
 // Es dato no confiable procesado de forma determinística: el texto nunca se interpreta como instrucción.
