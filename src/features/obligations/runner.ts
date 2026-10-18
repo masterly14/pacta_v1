@@ -2,7 +2,9 @@
  * Purpose: servicio de una ocurrencia de nómina: evaluar con evidencia fresca, guardar las decisiones, avisar y ejecutar
  *   (en simulación). Es el único lugar donde las reglas de seguridad de la ejecución viven:
  *   - se REEVALÚA justo antes de pagar (una novedad posterior revierte una aprobación);
- *   - una aprobación humana vale solo para los motivos que la persona vio; un motivo nuevo exige otra aprobación;
+ *   - una aprobación humana vale solo para los motivos que la persona vio y los términos que aprobó (monto, moneda,
+ *     cuenta); un motivo nuevo o un término distinto exige otra aprobación;
+ *   - con la plantilla pausada o en borrador (releída dentro de la transacción) no se paga nada;
  *   - un bloqueo absoluto prevalece sobre cualquier aprobación humana;
  *   - a lo sumo un pago simulado por línea (único en BD) y nunca sin importe ni moneda.
  * Runs in: servidor y pruebas (el almacén es un puerto).
@@ -83,10 +85,31 @@ export async function evaluateOccurrence(deps: RunDeps, obligation: StoredObliga
 
 const occurrenceStatusOf = (status: PayrollRunResult["status"]): OccurrenceRow["status"] => status;
 
-/** ¿La aprobación humana vigente sigue cubriendo lo que dice la evaluación fresca? */
-export function humanApprovalStillCovers(human: { decision: string; reasonCodes: string[] } | null, fresh: PayrollLineDecision): boolean {
+/**
+ * Términos que una persona aprueba: a quién, qué concepto, cuánto, en qué moneda y a qué cuenta. Se guardan como
+ * `evidenceSha` de la decisión humana; si al pagar cualquiera cambió, la aprobación ya no cubre la línea.
+ */
+export function approvedTermsSha(line: Pick<PayrollLineDecision, "lineId" | "counterpartyRef" | "lineType" | "amountMinor" | "currency">, beneficiaryAccountReference: string | null): string {
+  return sha({ approvedTerms: [line.lineId, line.counterpartyRef, line.lineType, line.amountMinor, line.currency, beneficiaryAccountReference] });
+}
+
+/** Términos de una línea fresca, con la cuenta que trae la evidencia vigente. */
+export function freshTermsSha(evaluation: Evaluation, line: PayrollLineDecision): string {
+  const source = evaluation.facts.lines.find((candidate) => candidate.lineId === line.lineId);
+  return approvedTermsSha(line, source?.beneficiaryAccountReference ?? null);
+}
+
+/** Una plantilla pausada o en borrador no paga, ni siquiera por una aprobación humana anterior. */
+export const isObligationActive = (obligation: StoredObligation) => obligation.status === "active" && obligation.template.status === "active";
+
+/**
+ * ¿La aprobación humana vigente sigue cubriendo lo que dice la evaluación fresca? Solo si no hay bloqueo, no apareció un
+ * motivo que la persona no vio y los términos (monto, moneda, cuenta) son los mismos que aprobó.
+ */
+export function humanApprovalStillCovers(human: { decision: string; reasonCodes: string[]; evidenceSha: string } | null, fresh: PayrollLineDecision, termsSha: string): boolean {
   if (!human || human.decision !== "approved") return false;
   if (fresh.decision === "blocked") return false; // un bloqueo absoluto prevalece
+  if (human.evidenceSha !== termsSha) return false; // otro monto, moneda o cuenta exige otra aprobación
   return fresh.reasonCodes.every((code) => human.reasonCodes.includes(code));
 }
 
@@ -114,7 +137,7 @@ export async function persistEvaluation(deps: RunDeps, obligation: StoredObligat
   for (const line of result.lines) {
     const current = latest.get(line.lineId) ?? null;
     // No pisa una aprobación humana que sigue cubriendo la evaluación fresca; un motivo nuevo o un bloqueo sí la reemplazan.
-    if (current?.decisionSource === "human" && humanApprovalStillCovers(current, line)) continue;
+    if (current?.decisionSource === "human" && humanApprovalStillCovers(current, line, freshTermsSha(evaluation, line))) continue;
     // Una persona que rechazó la línea cierra su historia: reevaluar no la reabre.
     if (current?.decisionSource === "human" && current.decision === "blocked") continue;
     const key = `${occurrence.id}:${line.lineId}:${evaluation.evidenceShaByLine.get(line.lineId)}`;
@@ -184,8 +207,11 @@ export type ExecuteSummary = { occurrenceId: string; status: OccurrenceRow["stat
  * Ejecución SIMULADA. Reevalúa con evidencia vigente y paga solo lo que sigue siendo pagable:
  * aprobada por las reglas, o aprobada por una persona y todavía cubierta por esa aprobación. No mueve dinero.
  */
-export async function executeOccurrence(deps: RunDeps, obligation: StoredObligation, due: ScheduledDue, asOf: string): Promise<ExecuteSummary> {
+export async function executeOccurrence(deps: RunDeps, given: StoredObligation, due: ScheduledDue, asOf: string): Promise<ExecuteSummary> {
   const { store } = deps;
+  // Se relee la plantilla dentro de la transacción: una pausa que entró después de leerla fuera del bloqueo debe valer.
+  const obligation = (await store.getObligation(given.organizationId, given.obligationId, given.version)) ?? given;
+  const active = isObligationActive(obligation);
   const evaluation = await evaluateOccurrence(deps, obligation, due, asOf);
   const occurrence = await persistEvaluation(deps, obligation, due, asOf, evaluation);
   const latest = new Map((await store.latestDecisions(obligation.organizationId, occurrence.id)).map((row) => [row.lineId, row]));
@@ -200,7 +226,8 @@ export async function executeOccurrence(deps: RunDeps, obligation: StoredObligat
       blocked++;
       continue;
     }
-    const payable = line.decision === "approved" || humanApprovalStillCovers(current.decisionSource === "human" ? current : null, line);
+    const payable =
+      active && (line.decision === "approved" || humanApprovalStillCovers(current.decisionSource === "human" ? current : null, line, freshTermsSha(evaluation, line)));
     if (!payable || line.amountMinor === null || line.currency === null) {
       if (line.decision === "blocked") blocked++;
       else pending++;
