@@ -1,0 +1,8 @@
+{
+  "data": {
+    "licence_id": 8101,
+    "date": "2026-10-05T10:00:00-05:00",
+    "event_type": "licence_create",
+    "tenant_url": "andina-demo-fixture.buk.co"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "fixture": true,
+  "note": "Fondos simulados de Pacta (§6.1 OccurrenceContext). Dinero simulado.",
+  "fundsAvailableMinor": 4000000000,
+  "fundsReservedMinor": 200000000
+}

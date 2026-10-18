@@ -1,0 +1,11 @@
+{
+  "fixture": true,
+  "note": "Hora (UTC) en que Pacta capturó cada instantánea de Buk. No es respuesta de Buk.",
+  "capturedAt": {
+    "periods": "2026-06-26T13:55:00Z",
+    "employees": "2026-06-26T13:55:00Z",
+    "payroll": "2026-06-26T13:55:00Z",
+    "licences": "2026-06-26T13:55:00Z",
+    "terminations": "2026-06-26T13:55:00Z"
+  }
+}

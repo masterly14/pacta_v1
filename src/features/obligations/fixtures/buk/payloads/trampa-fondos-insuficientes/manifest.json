@@ -1,0 +1,157 @@
+{
+  "fixture": true,
+  "scenario": "trampa-fondos-insuficientes",
+  "description": "§13 'Fondos insuficientes': disponibles $40.000.000 − reservados $2.000.000 < total de la corrida. FONDOS_INSUFICIENTES bloquea todas las líneas y la ocurrencia queda retenida.",
+  "organization": "Andina Demo S.A.S.",
+  "period": {
+    "month": "2026-10",
+    "startDate": "2026-10-01",
+    "endDate": "2026-10-31"
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/process_periods",
+      "endpoint": "GET /process_periods",
+      "query": {},
+      "file": "process_periods.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-10-31"
+      },
+      "file": "employees_active.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1001",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1001.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1002",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1002.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1003",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1003.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1004",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1004.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1005",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1005.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1006",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1006.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1007",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1007.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1008",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1008.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1009",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1009.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1010",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1010.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1011",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1011.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/1012",
+      "endpoint": "GET /employees/{id}",
+      "query": {},
+      "file": "employees/1012.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-10-2026"
+      },
+      "file": "payroll_detail_month_2026-10.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-10-01",
+        "end_date": "2026-10-31"
+      },
+      "file": "jobs_events_terminations.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-10-01",
+        "to": "2026-10-31"
+      },
+      "file": "absences_licence.json"
+    }
+  ],
+  "pacta": {
+    "obligation": "_pacta/obligation.json",
+    "treasury": "_pacta/treasury.json",
+    "lastConfirmed": "_pacta/last-confirmed.json",
+    "benefitCalendar": "_pacta/benefit-calendar.json",
+    "fetchLog": "_pacta/fetch-log.json",
+    "webhooks": []
+  },
+  "evaluations": [
+    {
+      "stage": "inicial",
+      "asOf": "2026-10-29T14:00:00Z",
+      "description": "fondos_suficientes bloquea la corrida."
+    }
+  ]
+}

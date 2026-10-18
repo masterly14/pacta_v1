@@ -1,0 +1,24 @@
+{
+  "fixture": true,
+  "note": "Plantilla de obligación (ObligationTemplate compartido) de Pacta. No viene de Buk.",
+  "schemaVersion": 1,
+  "obligationId": "obl_nomina_andina",
+  "organizationId": "org_andina_demo",
+  "kind": "payroll",
+  "calendar": {
+    "kind": "payroll",
+    "frequency": "monthly",
+    "anchor": "month_end"
+  },
+  "currency": "COP",
+  "varianceToleranceBps": 1000,
+  "runCapMinor": 12000000000,
+  "evidenceMaxAgeDays": 2,
+  "earlyAlertDays": 7,
+  "urgentAlertDays": 3,
+  "version": 1,
+  "status": "draft",
+  "activatedBy": null,
+  "activatedAt": null,
+  "dataOrigin": "fixture"
+}
