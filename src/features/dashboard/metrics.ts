@@ -208,3 +208,38 @@ export function summarizeReceipts(receipts: readonly ClassifiedReceipt[], topSup
     topUnapprovedSuppliers,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Series diarias para los gráficos (días calendario UTC)
+// ---------------------------------------------------------------------------
+
+// Los `days` días calendario UTC que terminan en `now`, del más antiguo al más reciente.
+export function utcDayRange(now: Date, days: number): string[] {
+  const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Array.from({ length: days }, (_, i) => new Date(end - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10));
+}
+
+export type DailyDecisions = { day: string; approved: number; requiresApproval: number; blocked: number };
+
+// Una factura cuenta en el día de su decisión más reciente (recibe las filas ya filtradas por latestPerInvoice).
+export function dailyDecisionSeries(latest: readonly Pick<DecisionRow, "decision" | "evaluatedAt">[], days: readonly string[]): DailyDecisions[] {
+  const byDay = new Map(days.map((day) => [day, { day, approved: 0, requiresApproval: 0, blocked: 0 }]));
+  for (const d of latest) {
+    const bucket = byDay.get(d.evaluatedAt.toISOString().slice(0, 10));
+    if (bucket === undefined) continue;
+    if (d.decision === "approved") bucket.approved++;
+    else if (d.decision === "blocked") bucket.blocked++;
+    else bucket.requiresApproval++;
+  }
+  return [...byDay.values()];
+}
+
+export function dailyCounts(instants: readonly Date[], days: readonly string[]): { day: string; count: number }[] {
+  const counts = new Map(days.map((day) => [day, 0]));
+  for (const instant of instants) {
+    const day = instant.toISOString().slice(0, 10);
+    const current = counts.get(day);
+    if (current !== undefined) counts.set(day, current + 1);
+  }
+  return [...counts.entries()].map(([day, count]) => ({ day, count }));
+}

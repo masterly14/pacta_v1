@@ -2,7 +2,7 @@
  * Purpose: invoice inbox (A-08): every invoice received by email or uploaded manually, with its
  *   extraction status, resolved supplier and the payment decision; plus the manual upload (A-05).
  * Runs in: server (React Server Component; data streamed inside <Suspense>).
- * Triggered by: GET /platform/invoices and refresh() after an upload or retry.
+ * Triggered by: GET /platform/invoices[?page=N] and refresh() after an upload or retry.
  * Receives → Returns: request → rendered HTML inside the platform shell.
  * Talks to: ensureWorkspaceFromSession, PlatformSection, features/invoices (queries, components),
  *   contracts/money#formatMinor, shadcn Card, Table, Badge.
@@ -10,6 +10,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { Pagination } from "@/components/platform/pagination";
 import { PlatformSection } from "@/components/platform/section";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +37,9 @@ const EXTRACTION = {
 } as const;
 const MATCH = { matched: "confirmado", ambiguous: "ambiguo", not_found: "no reconocido" } as const;
 
-export default function InvoicesPage() {
+type SearchParams = Promise<{ page?: string | string[] }>;
+
+export default function InvoicesPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <PlatformSection
       title="Facturas"
@@ -44,15 +47,15 @@ export default function InvoicesPage() {
     >
       <div className="flex flex-col gap-6">
         <Suspense fallback={<p className="text-sm text-muted-foreground">Cargando facturas…</p>}>
-          <InvoicesData />
+          <InvoicesData searchParams={searchParams} />
         </Suspense>
       </div>
     </PlatformSection>
   );
 }
 
-// La sesión y la BD son datos de ejecución: con cacheComponents deben leerse dentro de <Suspense>.
-async function InvoicesData() {
+// La sesión, la BD y la URL son datos de ejecución: con cacheComponents se leen dentro de <Suspense>.
+async function InvoicesData({ searchParams }: { searchParams: SearchParams }) {
   let workspace;
   try {
     workspace = await ensureWorkspaceFromSession();
@@ -64,7 +67,10 @@ async function InvoicesData() {
       </p>
     );
   }
-  const invoices = await listInvoices(workspace.organization.id);
+  const { page: requestedPage } = await searchParams;
+  const { rows: invoices, total, page, pageCount, pageSize } = await listInvoices(workspace.organization.id, { page: requestedPage });
+  const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, total);
 
   return (
     <>
@@ -84,7 +90,9 @@ async function InvoicesData() {
       <Card>
         <CardHeader>
           <CardTitle>Recibidas</CardTitle>
-          <CardDescription>Las 50 más recientes. Abre una para ver lo extraído, la evidencia y la decisión.</CardDescription>
+          <CardDescription>
+            {total === 0 ? "Abre una para ver lo extraído, la evidencia y la decisión." : `${first}–${last} de ${total}, de la más reciente a la más antigua. Abre una para ver lo extraído, la evidencia y la decisión.`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {invoices.length === 0 ? (
@@ -141,6 +149,12 @@ async function InvoicesData() {
               </TableBody>
             </Table>
           )}
+          <Pagination
+            className="mt-4"
+            page={page}
+            pageCount={pageCount}
+            hrefFor={(p) => (p === 1 ? "/platform/invoices" : `/platform/invoices?page=${p}`)}
+          />
         </CardContent>
       </Card>
     </>

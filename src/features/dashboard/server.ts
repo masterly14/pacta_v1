@@ -19,11 +19,14 @@ import type { RecurrenceSuggestion } from "@/features/payment-history/schemas/hi
 import { ReasonCodeSchema, type ReasonCode } from "@/shared/schemas/payment-decision";
 import {
   classifyReceipt,
+  dailyCounts,
+  dailyDecisionSeries,
   latestPerInvoice,
   sumByCurrency,
   summarizeDecisions,
   summarizeReceipts,
   topReasonCodes,
+  utcDayRange,
   type ClassifiedReceipt,
   type ReceiptFacts,
   type ReceiptStatus,
@@ -31,6 +34,7 @@ import {
 
 const TOP_REASONS = 6;
 const TOP_SUPPLIERS = 3;
+const TREND_DAYS = 30;
 // Tope de seguridad de recibos por consulta; el resumen avisa si se alcanza.
 const MAX_RECEIPTS = 1000;
 export const OUTSIDE_PAYMENTS_PAGE = 200;
@@ -158,6 +162,18 @@ export async function getDashboard(organizationId: string, now: Date = new Date(
   });
   const latest = latestPerInvoice(monthDecisions.map((d) => ({ ...d, reasonCodes: parseReasonCodes(d.reasonCodes) })));
 
+  // Tendencias de los últimos 30 días: decisiones por día (la más reciente de cada factura) y facturas recibidas.
+  const days = utcDayRange(now, TREND_DAYS);
+  const trendStart = new Date(`${days[0]}T00:00:00Z`);
+  const trendDecisions = await db.paymentDecision.findMany({
+    where: { organizationId, evaluatedAt: { gte: trendStart } },
+    select: { invoiceId: true, decision: true, evaluatedAt: true },
+  });
+  const received = await db.invoice.findMany({
+    where: { organizationId, receivedAt: { gte: trendStart } },
+    select: { receivedAt: true },
+  });
+
   const policy = await db.paymentPolicy.findFirst({
     where: { organizationId, effectiveFrom: { lte: now } },
     orderBy: { version: "desc" },
@@ -187,6 +203,11 @@ export async function getDashboard(organizationId: string, now: Date = new Date(
   return {
     month: fromDbDate(start).slice(0, 7),
     decisions: summarizeDecisions(latest),
+    trends: {
+      days: TREND_DAYS,
+      decisionsByDay: dailyDecisionSeries(latestPerInvoice(trendDecisions), days),
+      receivedByDay: dailyCounts(received.map((r) => r.receivedAt), days),
+    },
     safetyCatches: topReasonCodes(latest, TOP_REASONS),
     budget: policy === null || budgetUsedMinor === null
       ? null

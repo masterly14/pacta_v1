@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Menu } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -29,6 +30,9 @@ export function PlatformNavLinks({
   className?: string;
 }) {
   const pathname = usePathname();
+  // Un id por instancia (barra lateral y menú móvil) para que el resaltado no salte entre ambas.
+  const layoutId = `platform-nav-active-${useId()}`;
+  const reduced = useReducedMotion();
 
   return (
     <nav className={cn("flex flex-col gap-1", className)}>
@@ -42,14 +46,22 @@ export function PlatformNavLinks({
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm",
+              "group relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
               active
-                ? "bg-muted font-medium text-foreground"
-                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                ? "font-medium text-foreground"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
           >
-            <Icon className="size-4 shrink-0" />
-            {item.label}
+            {/* El fondo del elemento activo se desliza al cambiar de página. */}
+            {active && (
+              <motion.span
+                layoutId={layoutId}
+                className="absolute inset-0 rounded-lg bg-muted"
+                transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
+              />
+            )}
+            <Icon className="relative size-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+            <span className="relative">{item.label}</span>
           </Link>
         );
       })}
