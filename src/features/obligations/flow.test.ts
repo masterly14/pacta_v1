@@ -10,7 +10,7 @@ import { HISTORY_RESOLUTIONS } from "./fixtures/buk/resolutions";
 import { advanceDemoClock, readClock, setDemoClockDate } from "./clock";
 import { resolveObligationLine } from "./lines";
 import { createMemoryRuntime } from "./memory-store";
-import { openFixturePayroll, type PayrollFacts, type PayrollFactsOpener } from "./runner";
+import { approvedTermsSha, humanApprovalStillCovers, openFixturePayroll, type PayrollFacts, type PayrollFactsOpener } from "./runner";
 import { DEFAULT_SCHEDULE } from "./schedule/calendar";
 import { runTick } from "./tick";
 
@@ -246,5 +246,75 @@ describe("aprobación humana de una línea", () => {
     const occurrence = (await ctx.runtime.store.getOccurrence(ORG, OBLIGATION_BASE.obligationId, "2026-03-01"))!;
     expect(await ctx.runtime.store.listPayments(ORG, occurrence.id)).toHaveLength(11); // 1002 quedó sin pagar
     expect(await ctx.runtime.store.listRequests(ORG, "pending", 10)).toHaveLength(1); // y vuelve a la bandeja
+  });
+});
+
+describe("aprobación humana — lo aprobado queda atado a lo que la persona vio", () => {
+  const salary1002 = (facts: PayrollFacts) => facts.lines.find((l) => l.counterpartyRef === "buk:employee:1002" && l.lineType === "salary")!;
+  const pendingRequest = async (ctx: Awaited<ReturnType<typeof setup>>) => (await ctx.runtime.store.listRequests(ORG, "pending", 10))[0]!;
+  const approve = async (ctx: Awaited<ReturnType<typeof setup>>, now: string, openFacts: PayrollFactsOpener = openFixturePayroll) => {
+    const request = await pendingRequest(ctx);
+    return resolveObligationLine({ runtime: ctx.runtime, actor: admin, input: { requestId: request.id, action: "approve", comment: "ok" }, now, policyCurrency: "USD", openFacts });
+  };
+
+  it("un motivo que apareció después de abrir la solicitud no se aprueba: se cancela y se abre otra con lo vigente", async () => {
+    const ctx = await marchRun();
+    const stale = await pendingRequest(ctx);
+    const withSignal = withFacts((facts) => {
+      salary1002(facts).signals = [proposedSignal];
+    });
+    const result = await approve(ctx, "2026-03-31T20:00:00Z", withSignal);
+    expect(result).toMatchObject({ ok: true, outcome: "superseded" });
+    expect(ctx.runtime.store.requests.find((r) => r.id === stale.id)!.status).toBe("cancelled");
+    const fresh = await pendingRequest(ctx);
+    expect(fresh.id).not.toBe(stale.id);
+    expect((await ctx.runtime.store.getDecision(ORG, fresh.decisionId))!.reasonCodes).toContain("SIGNAL_PENDING_REVIEW");
+    expect(ctx.runtime.store.payments).toHaveLength(11); // 1002 sigue sin pagar
+    expect(ctx.runtime.store.decisions.some((d) => d.decisionSource === "human")).toBe(false);
+  });
+
+  it("con la plantilla pausada nadie aprueba una línea y nada se paga", async () => {
+    const ctx = await marchRun();
+    await ctx.runtime.store.setObligationStatus(ORG, OBLIGATION_BASE.obligationId, 1, { status: "paused", actorId: "usr_admin", at: "2026-03-31T18:00:00Z" });
+    const result = await approve(ctx, "2026-03-31T20:00:00Z");
+    expect(result).toMatchObject({ ok: false });
+    expect((result as { error: string }).error).toMatch(/no está activa/);
+    expect(ctx.runtime.store.payments).toHaveLength(11);
+  });
+
+  it("una aprobación anterior a la pausa no paga el día del vencimiento", async () => {
+    const ctx = await setup();
+    await advanceDemoClock({ ...tickInput(ctx.runtime), to: "2026-03-26", by: "usr_admin", start: start("2026-03-10") });
+    expect(await approve(ctx, "2026-03-26T20:00:00Z")).toMatchObject({ ok: true, outcome: "approved" });
+    await ctx.runtime.store.setObligationStatus(ORG, OBLIGATION_BASE.obligationId, 1, { status: "paused", actorId: "usr_admin", at: "2026-03-27T14:00:00Z" });
+    await advanceDemoClock({ ...tickInput(ctx.runtime), to: "2026-03-31", by: "usr_admin", start: start("2026-03-26") });
+    expect(ctx.runtime.store.payments).toHaveLength(0);
+  });
+
+  it("si el monto cambia después de aprobar, la aprobación no cubre el nuevo monto: no se paga y vuelve a la bandeja", async () => {
+    const ctx = await setup();
+    await advanceDemoClock({ ...tickInput(ctx.runtime), to: "2026-03-26", by: "usr_admin", start: start("2026-03-10") });
+    const approvedLineId = (await pendingRequest(ctx)).lineId;
+    expect(await approve(ctx, "2026-03-26T20:00:00Z")).toMatchObject({ ok: true, outcome: "approved" });
+    const bigger = withFacts((facts, asOf) => {
+      if (asOf < "2026-03-30") return;
+      const line = salary1002(facts);
+      line.amountMinor = line.amountMinor! + 50_000_000;
+      line.components = [{ code: "net_pay", amountMinor: line.amountMinor }];
+    });
+    await advanceDemoClock({ ...tickInput(ctx.runtime, bigger), to: "2026-03-31", by: "usr_admin", start: start("2026-03-26") });
+    const occurrence = (await ctx.runtime.store.getOccurrence(ORG, OBLIGATION_BASE.obligationId, "2026-03-01"))!;
+    const payments = await ctx.runtime.store.listPayments(ORG, occurrence.id);
+    expect(payments).toHaveLength(11);
+    expect(payments.some((p) => p.lineId === approvedLineId)).toBe(false);
+    expect(await ctx.runtime.store.listRequests(ORG, "pending", 10)).toHaveLength(1);
+  });
+
+  it("los términos aprobados incluyen la cuenta: otra cuenta con los mismos motivos no queda cubierta", () => {
+    const line = { lineId: "l1", counterpartyRef: "buk:employee:1", lineType: "salary" as const, amountMinor: 100, currency: "COP", decision: "requires_approval" as const, reasonCodes: ["BENEFICIARY_CHANGED" as const], rules: [], displayName: "x" };
+    const human = { decision: "approved", reasonCodes: ["BENEFICIARY_CHANGED"], evidenceSha: approvedTermsSha(line, "****1111") };
+    expect(humanApprovalStillCovers(human, line, approvedTermsSha(line, "****1111"))).toBe(true);
+    expect(humanApprovalStillCovers(human, line, approvedTermsSha(line, "****2222"))).toBe(false);
+    expect(humanApprovalStillCovers(human, { ...line, amountMinor: 101 }, approvedTermsSha({ ...line, amountMinor: 101 }, "****1111"))).toBe(false);
   });
 });
