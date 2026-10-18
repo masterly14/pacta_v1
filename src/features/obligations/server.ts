@@ -83,7 +83,7 @@ function checkSettings(settings: ObligationSettings): string | null {
 export async function saveObligationDraft(
   runtime: StoreRuntime,
   actor: PolicyActor,
-  input: { schedule: unknown; scenario: string; now: string },
+  input: { schedule: unknown; scenario: string; now: string; varianceToleranceBps?: number; runCapMinor?: number },
 ): Promise<ObligationResult<{ obligation: StoredObligation }>> {
   const denial = checkCanManagePolicies(actor);
   if (denial) return fail(denial);
@@ -93,6 +93,10 @@ export async function saveObligationDraft(
   if (!settings.success) return fail("La fuente de RR. HH. no es válida.");
   const rejection = checkSettings(settings.data);
   if (rejection) return fail(rejection);
+
+  // Reglas de control opcionales (si faltan, valen los valores por omisión de la plantilla).
+  if (input.varianceToleranceBps !== undefined && !(Number.isInteger(input.varianceToleranceBps) && input.varianceToleranceBps >= 0 && input.varianceToleranceBps <= 10_000)) return fail("La tolerancia debe estar entre 0 % y 100 %.");
+  if (input.runCapMinor !== undefined && !(Number.isSafeInteger(input.runCapMinor) && input.runCapMinor > 0)) return fail("El tope de la corrida debe ser un monto mayor que 0.");
 
   const obligationId = payrollObligationIdOf(actor.organizationId);
   return runtime.transaction(actor.organizationId, async (store) => {
@@ -104,7 +108,7 @@ export async function saveObligationDraft(
       version,
       kind: "payroll",
       status: "draft",
-      template: buildPayrollTemplate({ organizationId: actor.organizationId, obligationId, version, status: "draft", activatedBy: null, activatedAt: null }),
+      template: buildPayrollTemplate({ organizationId: actor.organizationId, obligationId, version, status: "draft", activatedBy: null, activatedAt: null, varianceToleranceBps: input.varianceToleranceBps, runCapMinor: input.runCapMinor }),
       settings: settings.data,
       createdBy: actor.userId,
     });
