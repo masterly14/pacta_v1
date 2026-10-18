@@ -81,7 +81,7 @@ export function redactAccountNumbers(text: string): string {
 }
 
 // Busca el fragmento en los textos fuente (ignorando espacios y mayúsculas) y devuelve dónde.
-function locateExcerpt(excerpt: string, transcripts: DocumentTranscript[]) {
+export function locateExcerpt(excerpt: string, transcripts: DocumentTranscript[]) {
   const needle = squash(excerpt);
   if (needle === "") return null;
   for (const transcript of transcripts) {

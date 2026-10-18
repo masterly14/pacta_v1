@@ -1,6 +1,7 @@
 /**
  * Purpose: read invoices for the platform: the inbox (with each invoice's latest decision) and
- *   one invoice's detail (extracted context, evidence, decisions, pending approval).
+ *   one invoice's detail (extracted context, evidence, decisions, pending approval). Receipts
+ *   (payments already made) carry their paid date and masked method instead of a decision.
  * Runs in: server (Node).
  * Triggered by: /platform/invoices and /platform/invoices/[id].
  * Receives → Returns: organizationId → inbox rows; (organizationId, invoiceId) → detail | null.
@@ -37,6 +38,9 @@ export async function listInvoices(organizationId: string, take = 50) {
     invoiceNumber: invoice.invoiceNumber,
     amountMinor: invoice.amountMinor,
     currency: invoice.currency,
+    documentKind: invoice.documentKind,
+    paidOn: invoice.paidOn?.toISOString().slice(0, 10) ?? null,
+    paymentMethod: invoice.paymentMethod,
     decision: latest.get(invoice.id) ?? null,
   }));
 }
@@ -68,6 +72,10 @@ export async function getInvoiceDetail(organizationId: string, invoiceId: string
     extractionError: invoice.extractionError,
     supplierName: invoice.supplier?.name ?? null,
     hasOriginal: invoice.primaryDocumentId !== null,
+    documentKind: invoice.documentKind,
+    paidOn: invoice.paidOn?.toISOString().slice(0, 10) ?? null,
+    paymentMethod: invoice.paymentMethod,
+
     context: parsed?.success ? parsed.data : null,
     decisions: decisions.map((d) => ({ ...PaymentDecisionSchema.parse(d.payload), actorId: d.actorId })),
     hasPendingApproval: pendingRequest !== null,

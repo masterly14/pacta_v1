@@ -1,7 +1,7 @@
 /**
  * Purpose: integration tests for the invoice pipeline against a real PostgreSQL: manual and
  *   email intake → extraction (fake model) → supplier resolution → invoices row → decision;
- *   idempotency, failures and retries.
+ *   idempotency, failures and retries; receipts are stored and never evaluated.
  * Runs in: Vitest, only when TEST_DATABASE_URL points at a disposable database with all
  *   migrations applied (skipped otherwise, so `npm test` needs no database).
  * Triggered by: `TEST_DATABASE_URL=… npx vitest run src/features/invoices/pipeline/pipeline.integration.test.ts`.
@@ -29,11 +29,15 @@ describe.skipIf(!url)("invoice pipeline (integration)", async () => {
 
   const ORG = "org_pipe";
   const PAPELERIA = "sup_papeleria";
-  const TEXT = "Factura PC-901\nProveedor: Papelería Central\nCuenta: 1234504821\nTotal: 45.90 USD\nFecha: 2026-10-05";
+  const TEXT = "Factura PC-901\nProveedor: Papelería Central\nCuenta: 1234504821\nTotal: 45.90 USD\nFecha: 2026-10-05\nEstado: Pagado con Visa terminada en 4242";
   const claim = (value: string, excerpt = value) => ({ value, excerpt });
   const none = { value: null, excerpt: null };
   const raw = (overrides: Partial<RawExtraction> = {}): RawExtraction => ({
     isInvoice: true,
+    documentKind: "invoice",
+    paymentConfirmation: none,
+    paidDate: none,
+    paymentMethod: none,
     invoiceNumber: claim("PC-901", "Factura PC-901"),
     supplierName: claim("Papelería Central", "Proveedor: Papelería Central"),
     beneficiaryAccount: claim("1234504821", "Cuenta: 1234504821"),
@@ -181,5 +185,37 @@ describe.skipIf(!url)("invoice pipeline (integration)", async () => {
     await seedEmail();
     await processInboundMessage("in_1", { blob: fakeBlob, extract: () => fakeModel(new Error("caído")) });
     expect(await reprocessEmailInvoice("inv_grp_a", "org_other", { blob: fakeBlob, extract: () => fakeModel(raw()) })).toBeNull();
+  });
+  it("stores a receipt (payment already made) without evaluating it, even from an authorized supplier", async () => {
+    const receipt = raw({
+      documentKind: "receipt",
+      paymentConfirmation: claim("Pagado", "Estado: Pagado con Visa"),
+      paidDate: claim("2026-10-05"),
+      paymentMethod: claim("Visa terminada en 4242"),
+    });
+    const result = await processInvoice(manualInput("inv_receipt_1"), { extract: fakeModel(receipt) });
+    expect(result).toEqual({ ok: true, invoiceId: "inv_receipt_1", receipt: true });
+    const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: "inv_receipt_1" } });
+    expect(invoice).toMatchObject({ extractionStatus: "extracted", documentKind: "receipt", paymentMethod: "Visa terminada en 4242", amountMinor: 4590 });
+    expect(invoice.paidOn?.toISOString().slice(0, 10)).toBe("2026-10-05");
+    // La misma factura como "invoice" se aprobaría: el recibo evita un segundo pago.
+    expect(await prisma.paymentDecision.count()).toBe(0);
+    expect(await prisma.approvalRequest.count()).toBe(0);
+  });
+
+  it("treats an unverifiable receipt claim as an invoice", async () => {
+    const result = await processInvoice(manualInput("inv_receipt_2"), {
+      extract: fakeModel(raw({ documentKind: "receipt", paymentConfirmation: claim("Paid", "Payment received, thank you") })),
+    });
+    expect(result).toMatchObject({ ok: true, decision: { decision: "approved" } });
+    expect(await prisma.invoice.findUniqueOrThrow({ where: { id: "inv_receipt_2" } })).toMatchObject({ documentKind: "invoice", paidOn: null });
+  });
+
+  it("never evaluates a receipt on retry", async () => {
+    await seedEmail();
+    const receipt = raw({ documentKind: "receipt", paymentConfirmation: claim("Pagado", "Estado: Pagado") });
+    await processInboundMessage("in_1", { blob: fakeBlob, extract: () => fakeModel(receipt) });
+    expect(await reprocessEmailInvoice("inv_grp_a", ORG, { blob: fakeBlob, extract: () => fakeModel(raw()) })).toEqual({ ok: true, invoiceId: "inv_grp_a", skipped: "receipt" });
+    expect(await prisma.paymentDecision.count()).toBe(0);
   });
 });

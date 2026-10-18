@@ -18,6 +18,15 @@ const ClaimSchema = z.strictObject({
 
 export const RawExtractionSchema = z.strictObject({
   isInvoice: z.boolean(),
+  // invoice = pedido de pago; receipt = el documento dice que el pago YA se hizo (cargo a
+  // tarjeta, "paid"); other = ninguno. Ante la duda, el modelo debe responder invoice.
+  documentKind: z.enum(["invoice", "receipt", "other"]),
+  // Frase del documento que dice que el pago ya se realizó (p. ej. "Amount paid $20.00").
+  paymentConfirmation: ClaimSchema,
+  // YYYY-MM-DD; solo en recibos.
+  paidDate: ClaimSchema,
+  // Medio de pago tal como aparece, sin números completos (p. ej. "Visa ending 4242").
+  paymentMethod: ClaimSchema,
   invoiceNumber: ClaimSchema,
   supplierName: ClaimSchema,
   beneficiaryAccount: ClaimSchema,

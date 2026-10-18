@@ -38,6 +38,10 @@ describe.skipIf(!url)("A extraction → B evaluateInvoice (integration)", async 
   const none = { value: null, excerpt: null };
   const raw = (overrides: Partial<RawExtraction> = {}): RawExtraction => ({
     isInvoice: true,
+    documentKind: "invoice",
+    paymentConfirmation: none,
+    paidDate: none,
+    paymentMethod: none,
     invoiceNumber: claim("F-2041", "Factura F-2041"),
     supplierName: claim("Hosting Delta SAS", "Proveedor: Hosting Delta SAS"),
     beneficiaryAccount: claim("1234567890", "Cuenta: 1234567890"),
