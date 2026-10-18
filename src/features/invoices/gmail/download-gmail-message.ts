@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
 import { createComposioGmailPort } from "./composio-adapter.ts";
-import { createPrismaMailboxRepo, type MailboxRepo } from "./mailbox-repo.ts";
+import { planDocumentGroups } from "./group-documents.ts";
+import { createPrismaMailboxRepo, type IgnoredItemInput, type MailboxRepo } from "./mailbox-repo.ts";
 import type { BlobStorePort, GmailComposioPort } from "./ports.ts";
 import { createR2Store } from "./r2-store.ts";
 
@@ -47,10 +48,15 @@ export async function downloadGmailMessage(
       messageId: inbound.gmailMessageId,
     });
 
-    let storedCount = 0;
-    const bodyText = fetched.text;
-    if (isUsefulBody(bodyText)) {
-      const bytes = new TextEncoder().encode(bodyText);
+    // Un reintento reutiliza lo ya guardado; solo lo repetido dentro de este intento es duplicado.
+    const existingDocs = await repo.listDocumentsByInbound(inbound.id);
+    const existingSha = new Set(existingDocs.map((doc) => doc.sha256));
+    const seenSha = new Set<string>();
+    const ignored: IgnoredItemInput[] = [];
+    let fetchFailed = false;
+
+    if (isUsefulBody(fetched.text) && !existingDocs.some((doc) => doc.source === "email_body")) {
+      const bytes = new TextEncoder().encode(fetched.text);
       const documentId = `doc_${nanoid()}`;
       const stored = await blob.put({
         pathname: `org/${inbound.organizationId}/gmail/${inbound.id}/${documentId}.txt`,
@@ -70,23 +76,69 @@ export async function downloadGmailMessage(
         byteSize: bytes.byteLength,
         receivedAt: inbound.receivedAt,
       });
-      storedCount += 1;
     }
 
     for (const meta of fetched.attachments) {
-      const attachment = await composio.fetchAttachment({
-        userId: mailbox.composioUserId,
-        connectedAccountId: mailbox.composioConnectedAccountId,
-        messageId: inbound.gmailMessageId,
-        attachmentId: meta.attachmentId,
-      });
+      const ignore = (
+        reason: IgnoredItemInput["reason"],
+        detail: { mimeType?: string | null; filename?: string | null; byteSize?: number | null } = {},
+      ) => {
+        ignored.push({
+          kind: "attachment",
+          gmailAttachmentId: meta.attachmentId,
+          filename: detail.filename ?? meta.filename,
+          mimeType: detail.mimeType ?? meta.mimeType,
+          byteSize: detail.byteSize ?? null,
+          reason,
+        });
+      };
+
+      let attachment: Awaited<ReturnType<GmailComposioPort["fetchAttachment"]>>;
+      try {
+        attachment = await composio.fetchAttachment({
+          userId: mailbox.composioUserId,
+          connectedAccountId: mailbox.composioConnectedAccountId,
+          messageId: inbound.gmailMessageId,
+          attachmentId: meta.attachmentId,
+          filename: meta.filename,
+        });
+      } catch {
+        // Fallo transitorio: se registra y el correo queda `failed` para poder reintentarlo.
+        ignore("fetch_failed");
+        fetchFailed = true;
+        continue;
+      }
+
       const mimeType = (attachment.mimeType ?? meta.mimeType ?? "").toLowerCase();
-      if (!INVOICE_MIME_TYPES.has(mimeType) || !attachment.bytes) {
+      const filename = attachment.filename ?? meta.filename;
+      const byteSize = attachment.bytes?.byteLength ?? null;
+      if (!INVOICE_MIME_TYPES.has(mimeType)) {
+        ignore("unsupported_mime_type", { mimeType: mimeType || null, filename, byteSize });
         continue;
       }
-      if (attachment.bytes.byteLength === 0 || attachment.bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+      if (!attachment.bytes) {
+        ignore("missing_content", { mimeType, filename });
         continue;
       }
+      if (attachment.bytes.byteLength === 0) {
+        ignore("empty_file", { mimeType, filename, byteSize });
+        continue;
+      }
+      if (attachment.bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+        ignore("file_too_large", { mimeType, filename, byteSize });
+        continue;
+      }
+
+      const sha256 = sha256Hex(attachment.bytes);
+      if (seenSha.has(sha256)) {
+        ignore("duplicate_content", { mimeType, filename, byteSize });
+        continue;
+      }
+      seenSha.add(sha256);
+      if (existingSha.has(sha256)) {
+        continue;
+      }
+
       const documentId = `doc_${nanoid()}`;
       const extension = mimeType === "application/pdf" ? "pdf" : mimeType.split("/")[1] ?? "bin";
       const stored = await blob.put({
@@ -101,22 +153,48 @@ export async function downloadGmailMessage(
         fileRef: stored.fileRef,
         publicUrl: stored.publicUrl,
         mimeType,
-        sha256: sha256Hex(attachment.bytes),
-        originalFilename: attachment.filename ?? meta.filename,
+        sha256,
+        originalFilename: filename,
         source: "invoice_document",
         byteSize: attachment.bytes.byteLength,
         receivedAt: inbound.receivedAt,
       });
-      storedCount += 1;
     }
 
-    if (storedCount === 0) {
+    const documents = await repo.listDocumentsByInbound(inbound.id);
+    if (documents.length === 0 && !fetchFailed) {
+      ignored.push({
+        kind: "message",
+        gmailAttachmentId: null,
+        filename: null,
+        mimeType: null,
+        byteSize: null,
+        reason: "no_usable_content",
+      });
+    }
+    await repo.replaceIgnoredItems({
+      organizationId: inbound.organizationId,
+      inboundId: inbound.id,
+      items: ignored,
+    });
+    await repo.replaceDocumentGroups({
+      organizationId: inbound.organizationId,
+      inboundId: inbound.id,
+      groups: planDocumentGroups(documents).map((group) => ({ ...group, id: `grp_${nanoid()}` })),
+    });
+
+    if (fetchFailed) {
+      await repo.setInboundStatus(inbound.id, "failed");
+      return { status: "failed" };
+    }
+    if (documents.length === 0) {
       await repo.setInboundStatus(inbound.id, "ignored");
       return { status: "ignored" };
     }
     await repo.setInboundStatus(inbound.id, "received");
     return { status: "received" };
-  } catch {
+  } catch (error) {
+    console.error("[gmail] downloadGmailMessage", inbound.id, error);
     await repo.setInboundStatus(inbound.id, "failed");
     return { status: "failed" };
   }

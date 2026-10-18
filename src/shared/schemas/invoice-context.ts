@@ -37,10 +37,13 @@ export const ContractMatchStatusSchema = z.enum(["matched", "mismatch", "ambiguo
 
 export const ContractFrequencySchema = z.enum(["one_time", "weekly", "monthly", "quarterly", "yearly"]);
 
-// Campos extraíbles de la factura que pueden faltar. Debe coincidir con los campos nullable de abajo.
+// Campos extraíbles que pueden faltar. Debe coincidir con los nullable de InvoiceContext.
 export const InvoiceMissingFieldSchema = z.enum([
   "invoiceNumber",
-  "supplierName",
+  "name",
+  "email",
+  "subject",
+  "body",
   "beneficiaryAccountReference",
   "amountMinor",
   "currency",
@@ -132,9 +135,12 @@ export const InvoiceContextSchema = z
     documentType: DocumentTypeSchema,
     receivedAt: UtcInstantSchema,
 
-    // Proveedor: nombre extraído separado de la identidad verificada
+    // Texto extraído del correo o del documento. Otra capa resuelve supplierId; aquí no se identifica al proveedor.
+    name: z.string().trim().min(1).max(200).nullable(),
+    email: z.string().trim().pipe(z.email()).nullable(),
+    subject: z.string().trim().min(1).max(998).nullable(),
+    body: z.string().trim().min(1).max(100_000).nullable(),
     supplierId: EntityIdSchema.nullable(),
-    supplierName: z.string().trim().min(1).nullable(),
     supplierMatchStatus: SupplierMatchStatusSchema,
     beneficiaryAccountReference: z.string().trim().min(1).nullable(), // referencia enmascarada, nunca la cuenta completa
 

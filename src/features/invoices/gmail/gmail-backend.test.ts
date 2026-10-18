@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { Document, GmailConnection, GmailInboundMessage } from "@prisma/client";
+import type { Document, GmailConnection, GmailInboundMessage, IgnoredInboundItem } from "@prisma/client";
 import { completeGmailOauth } from "./complete-oauth.ts";
 import { connectMailbox } from "./connect-mailbox.ts";
+import { attachmentsFromFetchResult } from "./composio-adapter.ts";
 import { downloadGmailMessage } from "./download-gmail-message.ts";
 import { getOrganizationDocument } from "./get-document.ts";
 import { ingestComposioWebhook, ingestSignedWebhook } from "./ingest-webhook.ts";
@@ -14,10 +15,18 @@ const otherOrg = "org_other";
 const userId = "user_demo";
 const now = new Date("2026-10-17T16:00:00.000Z");
 
-function memoryRepo(): MailboxRepo & { connections: Map<string, GmailConnection>; inbounds: Map<string, GmailInboundMessage>; documents: Map<string, Document> } {
+function memoryRepo(): MailboxRepo & {
+  connections: Map<string, GmailConnection>;
+  inbounds: Map<string, GmailInboundMessage>;
+  documents: Map<string, Document>;
+  groups: Map<string, { id: string; kind: string; inboundId: string }>;
+  ignoredItems: IgnoredInboundItem[];
+} {
   const connections = new Map<string, GmailConnection>();
   const inbounds = new Map<string, GmailInboundMessage>();
   const documents = new Map<string, Document>();
+  const groups = new Map<string, { id: string; kind: string; inboundId: string }>();
+  let ignoredItems: IgnoredInboundItem[] = [];
 
   const stamp = (input: CreatePendingMailboxInput): GmailConnection => ({
     ...input,
@@ -34,6 +43,10 @@ function memoryRepo(): MailboxRepo & { connections: Map<string, GmailConnection>
     connections,
     inbounds,
     documents,
+    groups,
+    get ignoredItems() {
+      return ignoredItems;
+    },
     async createPending(input) {
       const row = stamp(input);
       connections.set(row.id, row);
@@ -126,12 +139,51 @@ function memoryRepo(): MailboxRepo & { connections: Map<string, GmailConnection>
       }
     },
     async createDocument(input: CreateDocumentInput) {
-      const row: Document = { ...input, createdAt: now };
+      const row: Document = { ...input, groupId: null, groupRole: null, createdAt: now };
       documents.set(row.id, row);
       return row;
     },
     async getDocument(id) {
       return documents.get(id) ?? null;
+    },
+    async listDocumentsByInbound(inboundId) {
+      return [...documents.values()].filter((doc) => doc.gmailInboundMessageId === inboundId);
+    },
+    async replaceIgnoredItems({ organizationId, inboundId, items }) {
+      ignoredItems = [
+        ...ignoredItems.filter((row) => row.gmailInboundMessageId !== inboundId),
+        ...items.map((item, index) => ({
+          ...item,
+          id: `ign_${inboundId}_${index}`,
+          organizationId,
+          gmailInboundMessageId: inboundId,
+          createdAt: now,
+        })),
+      ];
+    },
+    async listIgnoredItems({ organizationId, inboundId }) {
+      return ignoredItems.filter((row) => row.organizationId === organizationId && row.gmailInboundMessageId === inboundId);
+    },
+    async replaceDocumentGroups({ inboundId, groups: planned }) {
+      for (const [id, group] of groups) {
+        if (group.inboundId === inboundId) {
+          groups.delete(id);
+        }
+      }
+      for (const doc of documents.values()) {
+        if (doc.gmailInboundMessageId === inboundId) {
+          documents.set(doc.id, { ...doc, groupId: null, groupRole: null });
+        }
+      }
+      for (const group of planned) {
+        groups.set(group.id, { id: group.id, kind: group.kind, inboundId });
+        for (const member of group.members) {
+          const doc = documents.get(member.documentId);
+          if (doc) {
+            documents.set(doc.id, { ...doc, groupId: group.id, groupRole: member.role });
+          }
+        }
+      }
     },
   };
 }
@@ -364,6 +416,159 @@ describe("downloadGmailMessage", () => {
     assert.equal(docs.some((doc) => doc.publicUrl.includes("pacta/invoices/") && doc.publicUrl.startsWith("https://")), true);
     assert.equal(docs.some((doc) => doc.originalFilename === "virus.exe"), false);
     assert.equal(repo.inbounds.get("inb_1")?.processingStatus, "received");
+    assert.deepEqual(
+      repo.ignoredItems.map((item) => [item.gmailAttachmentId, item.reason]),
+      [["att-exe", "unsupported_mime_type"]],
+    );
+  });
+
+  async function seededRepo() {
+    const repo = memoryRepo();
+    await repo.createPending({
+      id: "gc_1",
+      organizationId: orgId,
+      connectedByUserId: userId,
+      composioUserId: orgId,
+      composioConnectedAccountId: "ca_work",
+      composioAuthConfigId: "ac_gmail",
+      alias: null,
+    });
+    await repo.markActive({ id: "gc_1", emailAddress: "facturas@demo.com", composioTriggerId: "ti_inbox", connectedAt: now });
+    await repo.createInbound({
+      id: "inb_1",
+      organizationId: orgId,
+      gmailConnectionId: "gc_1",
+      composioEventId: "msg_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeee1",
+      gmailMessageId: "18f1gmail",
+      gmailThreadId: null,
+      sender: "a@example.com",
+      subject: "x",
+      receivedAt: now,
+    });
+    return repo;
+  }
+
+  type FakeAttachment = { id: string; mimeType: string; bytes: Uint8Array | null; fail?: boolean };
+
+  function composioWith(text: string | null, attachments: FakeAttachment[]): GmailComposioPort {
+    const failing = new Set(attachments.filter((item) => item.fail).map((item) => item.id));
+    return fakeComposio({
+      async fetchMessage() {
+        return {
+          messageId: "18f1gmail",
+          threadId: null,
+          sender: null,
+          subject: null,
+          text,
+          attachments: attachments.map((item) => ({
+            attachmentId: item.id,
+            filename: `${item.id}.bin`,
+            mimeType: item.mimeType,
+            bytes: null,
+          })),
+        };
+      },
+      async fetchAttachment(input) {
+        if (failing.has(input.attachmentId)) {
+          failing.delete(input.attachmentId);
+          throw new Error("transient");
+        }
+        const item = attachments.find((candidate) => candidate.id === input.attachmentId);
+        return { attachmentId: input.attachmentId, filename: `${input.attachmentId}.bin`, mimeType: item?.mimeType ?? null, bytes: item?.bytes ?? null };
+      },
+    });
+  }
+
+  const bytes = (text: string) => new TextEncoder().encode(text);
+
+  it("un correo con una factura y cuerpo agrupa el cuerpo como apoyo", async () => {
+    const repo = await seededRepo();
+    const composio = composioWith("Factura adjunta", [{ id: "a1", mimeType: "application/pdf", bytes: bytes("pdf-1") }]);
+    await downloadGmailMessage("inb_1", { repo, blob: memoryBlob(), composio });
+    const docs = [...repo.documents.values()];
+    assert.equal(repo.groups.size, 1);
+    assert.equal(new Set(docs.map((doc) => doc.groupId)).size, 1);
+    assert.deepEqual(
+      docs.map((doc) => [doc.source, doc.groupRole]).sort(),
+      [["email_body", "supporting"], ["invoice_document", "primary"]],
+    );
+  });
+
+  it("con varias facturas cada adjunto es un grupo y el cuerpo queda como contexto aparte", async () => {
+    const repo = await seededRepo();
+    const composio = composioWith("Dos facturas", [
+      { id: "a1", mimeType: "application/pdf", bytes: bytes("pdf-1") },
+      { id: "a2", mimeType: "image/png", bytes: bytes("png-2") },
+    ]);
+    await downloadGmailMessage("inb_1", { repo, blob: memoryBlob(), composio });
+    const groups = [...repo.groups.values()];
+    assert.equal(groups.filter((group) => group.kind === "invoice_candidate").length, 2);
+    assert.equal(groups.filter((group) => group.kind === "message_context").length, 1);
+    const attachments = [...repo.documents.values()].filter((doc) => doc.source === "invoice_document");
+    assert.equal(new Set(attachments.map((doc) => doc.groupId)).size, 2);
+    const body = [...repo.documents.values()].find((doc) => doc.source === "email_body");
+    assert.equal(groups.find((group) => group.id === body?.groupId)?.kind, "message_context");
+    assert.equal(body?.groupRole, "supporting");
+  });
+
+  it("sin adjuntos el cuerpo es el candidato", async () => {
+    const repo = await seededRepo();
+    await downloadGmailMessage("inb_1", { repo, blob: memoryBlob(), composio: composioWith("Factura 42 por 100 USD", []) });
+    const [group] = [...repo.groups.values()];
+    assert.equal(group?.kind, "invoice_candidate");
+    assert.equal([...repo.documents.values()][0]?.groupRole, "primary");
+  });
+
+  it("registra por qué se ignoró cada adjunto", async () => {
+    const repo = await seededRepo();
+    const composio = composioWith("hola", [
+      { id: "ok", mimeType: "application/pdf", bytes: bytes("pdf-1") },
+      { id: "exe", mimeType: "application/x-msdownload", bytes: bytes("MZ") },
+      { id: "vacio", mimeType: "application/pdf", bytes: new Uint8Array(0) },
+      { id: "sinbytes", mimeType: "image/png", bytes: null },
+      { id: "grande", mimeType: "application/pdf", bytes: new Uint8Array(10 * 1024 * 1024 + 1) },
+      { id: "copia", mimeType: "application/pdf", bytes: bytes("pdf-1") },
+    ]);
+    const result = await downloadGmailMessage("inb_1", { repo, blob: memoryBlob(), composio });
+    assert.equal(result.status, "received");
+    assert.deepEqual(
+      repo.ignoredItems.map((item) => [item.gmailAttachmentId, item.reason]),
+      [
+        ["exe", "unsupported_mime_type"],
+        ["vacio", "empty_file"],
+        ["sinbytes", "missing_content"],
+        ["grande", "file_too_large"],
+        ["copia", "duplicate_content"],
+      ],
+    );
+  });
+
+  it("un correo sin contenido útil queda ignorado con motivo", async () => {
+    const repo = await seededRepo();
+    const result = await downloadGmailMessage("inb_1", { repo, blob: memoryBlob(), composio: composioWith("  ", []) });
+    assert.equal(result.status, "ignored");
+    assert.deepEqual(repo.ignoredItems.map((item) => [item.kind, item.reason]), [["message", "no_usable_content"]]);
+    assert.equal(repo.groups.size, 0);
+  });
+
+  it("un adjunto que falla deja el correo en failed y el reintento no duplica documentos", async () => {
+    const repo = await seededRepo();
+    const blob = memoryBlob();
+    const composio = composioWith("Facturas", [
+      { id: "a1", mimeType: "application/pdf", bytes: bytes("pdf-1") },
+      { id: "a2", mimeType: "application/pdf", bytes: bytes("pdf-2"), fail: true },
+    ]);
+    const first = await downloadGmailMessage("inb_1", { repo, blob, composio });
+    assert.equal(first.status, "failed");
+    assert.deepEqual(repo.ignoredItems.map((item) => [item.gmailAttachmentId, item.reason]), [["a2", "fetch_failed"]]);
+    assert.equal(repo.documents.size, 2);
+
+    const retry = await downloadGmailMessage("inb_1", { repo, blob, composio });
+    assert.equal(retry.status, "received");
+    assert.equal(repo.documents.size, 3);
+    assert.equal(repo.ignoredItems.length, 0);
+    assert.equal(repo.groups.size, 3);
+    assert.equal([...repo.documents.values()].every((doc) => doc.groupId !== null), true);
   });
 });
 
@@ -387,5 +592,26 @@ describe("getOrganizationDocument", () => {
       () => getOrganizationDocument({ documentId: "doc_1", organizationId: orgId }, { repo }),
       { name: "DocumentNotFoundError" },
     );
+  });
+});
+
+describe("attachmentsFromFetchResult", () => {
+  const pdf = { attachmentId: "att_1", filename: "recibo.pdf", mimeType: "application/pdf" };
+
+  it("lee data.attachmentList, el formato real de Composio", () => {
+    assert.deepEqual(attachmentsFromFetchResult({ data: { attachmentList: [pdf] } }), [
+      { attachmentId: "att_1", filename: "recibo.pdf", mimeType: "application/pdf", bytes: null },
+    ]);
+  });
+
+  it("sigue aceptando attachment_list y attachments, en la raíz o en data", () => {
+    assert.equal(attachmentsFromFetchResult({ attachment_list: [pdf] }).length, 1);
+    assert.equal(attachmentsFromFetchResult({ data: { attachments: [pdf] } }).length, 1);
+  });
+
+  it("devuelve vacío sin lista y omite elementos sin attachmentId", () => {
+    assert.deepEqual(attachmentsFromFetchResult({ data: {} }), []);
+    assert.deepEqual(attachmentsFromFetchResult(null), []);
+    assert.deepEqual(attachmentsFromFetchResult({ data: { attachmentList: [{ filename: "x.pdf" }] } }), []);
   });
 });

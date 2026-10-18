@@ -27,8 +27,11 @@ export function makeInvoice(overrides: Partial<InvoiceContext> = {}): InvoiceCon
     documentId: "doc_current",
     documentType: "pdf",
     receivedAt: "2026-10-17T11:00:00Z",
+    name: "Vercel Inc.",
+    email: "billing@vercel.com",
+    subject: "Invoice VER-2026-10",
+    body: "Pro plan, October 2026",
     supplierId: SUPPLIER_ID,
-    supplierName: "Vercel Inc.",
     supplierMatchStatus: "matched",
     beneficiaryAccountReference: ACCOUNT,
     amountMinor: 2000, // 20.00 USD
