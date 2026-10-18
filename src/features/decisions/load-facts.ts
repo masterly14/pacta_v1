@@ -5,18 +5,16 @@
  * Triggered by: server.ts#evaluateInvoice.
  * Receives → Returns: (tx, InvoiceContext, { now, decisionId }) → EngineFacts (plain data for decide()).
  * Talks to: PaymentPolicy, PaymentAuthorization, PaymentDecision, Document, GmailInboundMessage,
- *   BankTransaction (read only); ./periods.ts.
+ *   BankTransaction (read only, via the payment-history recurrence store); ./periods.ts.
  */
 import type { Prisma } from "@prisma/client";
+import { hasRecurrenceSuggestion, type RecurrenceStore } from "@/features/payment-history/recurrence/recurrence-service";
+import { createPrismaRecurrenceStore } from "@/features/payment-history/suppliers/prisma-store";
 import type { InvoiceContext } from "@/shared/schemas/invoice-context";
 import type { EngineAuthorization, EngineFacts, EnginePriorDecision } from "./engine/facts";
 import { monthBoundsUtc, periodBounds } from "./periods";
 
 type Tx = Prisma.TransactionClient;
-
-// Historial considerado para sugerir una recurrencia (solo cambia el motivo, nunca el resultado).
-const RECURRENCE_MIN_PAYMENTS = 3;
-const RECURRENCE_LOOKBACK_MONTHS = 18;
 
 // Fechas de calendario (@db.Date) se guardan como medianoche UTC.
 function toDbDate(calendarDate: string): Date {
@@ -45,7 +43,7 @@ export async function loadEngineFacts(
   const priorDecisions = await loadPriorDecisions(tx, invoice);
   const documentDuplicateInvoiceIds = await loadDocumentDuplicates(tx, invoice);
   const budgetUsedMinor = policy === null ? null : await loadBudgetUsed(tx, organizationId, policy.currency, now);
-  const recurrenceSuggested = await loadRecurrenceSuggested(tx, invoice, now);
+  const recurrenceSuggested = await loadRecurrenceSuggested(createPrismaRecurrenceStore(tx), invoice, now);
 
   return {
     policy:
@@ -177,16 +175,18 @@ async function loadBudgetUsed(tx: Tx, organizationId: string, currency: string, 
   return result._sum.amountMinor ?? 0;
 }
 
-async function loadRecurrenceSuggested(tx: Tx, invoice: InvoiceContext, now: Date): Promise<boolean> {
+// Sugerencia del historial CSV. Solo cambia el motivo (RECURRENCE_NOT_AUTHORIZED); nunca autoriza.
+// Usa el detector de payment-history (cadencia y tolerancia de monto). Si no se puede calcular, false:
+// la regla del motor escala igual por falta de autorización.
+export async function loadRecurrenceSuggested(
+  store: RecurrenceStore,
+  invoice: Pick<InvoiceContext, "organizationId" | "supplierId">,
+  now: Date,
+): Promise<boolean> {
   if (invoice.supplierId === null) return false;
-  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - RECURRENCE_LOOKBACK_MONTHS, now.getUTCDate()));
-  const outflows = await tx.bankTransaction.count({
-    where: {
-      organizationId: invoice.organizationId,
-      supplierId: invoice.supplierId,
-      amountMinor: { lt: 0 },
-      postedOn: { gte: since },
-    },
+  return hasRecurrenceSuggestion(store, {
+    organizationId: invoice.organizationId,
+    supplierId: invoice.supplierId,
+    now,
   });
-  return outflows >= RECURRENCE_MIN_PAYMENTS;
 }
