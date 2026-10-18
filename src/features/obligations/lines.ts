@@ -1,7 +1,9 @@
 /**
  * Purpose: aprobación humana de una línea de nómina que escaló. Una persona autenticada con permiso aprueba o rechaza; la
  *   aprobación NO salta las reglas: se reevalúa con la evidencia vigente y un bloqueo absoluto gana. Lo que la persona
- *   aprueba queda atado a los motivos que vio: un motivo nuevo antes de pagar exige otra aprobación (runner.ts).
+ *   aprueba queda atado a los motivos que vio y a los términos (monto, moneda, cuenta): si al aprobar ya hay un motivo
+ *   nuevo o cambió el monto, la solicitud se reemplaza por otra; si cambian antes de pagar, se exige otra aprobación
+ *   (runner.ts). Con la plantilla pausada o en borrador no se aprueba nada.
  * Runs in: servidor (acción de la bandeja) y pruebas.
  * Receives → Returns: { actor, solicitud, acción, comentario, reloj } → resultado legible, sin lanzar por casos de negocio.
  * Talks to: runner (evaluar, ejecutar), store, policies/permissions (PolicyActor).
@@ -10,7 +12,7 @@
  */
 import { z } from "zod";
 import type { PolicyActor } from "@/features/policies/permissions";
-import { evaluateOccurrence, executeOccurrence, type LearnedProvider, type PayrollFactsOpener, type RunDeps } from "./runner";
+import { evaluateOccurrence, executeOccurrence, freshTermsSha, isObligationActive, persistEvaluation, type LearnedProvider, type PayrollFactsOpener, type RunDeps } from "./runner";
 import type { ScheduledDue } from "./schedule/dates";
 import type { ObligationStore, StoreRuntime } from "./store";
 
@@ -21,7 +23,10 @@ export const ResolveLineInputSchema = z.strictObject({
 });
 export type ResolveLineInput = z.infer<typeof ResolveLineInputSchema>;
 
-export type ResolveLineResult = { ok: true; outcome: "approved" | "rejected" | "blocked_on_revalidation"; message: string } | { ok: false; error: string };
+// `superseded`: lo que hay que aprobar cambió desde que se abrió la solicitud; se cierra y se abre otra con lo vigente.
+export type ResolveLineResult =
+  | { ok: true; outcome: "approved" | "rejected" | "blocked_on_revalidation" | "superseded"; message: string }
+  | { ok: false; error: string };
 
 export type ResolveLineContext = {
   runtime: StoreRuntime;
@@ -57,6 +62,8 @@ export async function resolveObligationLine(ctx: ResolveLineContext): Promise<Re
       // Límite del aprobador: solo comparable en la moneda de la política; si es otra, se exige un administrador.
       let limitNote: string | null = null;
       if (input.action === "approve") {
+        // Una plantilla pausada o en borrador ya no tiene autorización: nadie aprueba pagos sobre ella.
+        if (!isObligationActive(obligation)) return deny("La plantilla de la obligación no está activa (pausada o en borrador): no se aprueban pagos sobre ella.");
         if (decision.amountMinor === null || decision.currency === null) return deny("La línea no tiene importe ni moneda: una persona no puede aprobar un dato desconocido.");
         if (ctx.policyCurrency !== null && decision.currency === ctx.policyCurrency) {
           const limit = actor.permission?.approvalLimitMinor ?? null;
@@ -111,7 +118,25 @@ export async function resolveObligationLine(ctx: ResolveLineContext): Promise<Re
         await store.audit({ organizationId: actor.organizationId, entityType: "obligation_line", entityId: decision.lineId, eventType: "obligation_line.blocked_on_revalidation", actorId: actor.userId, payload: { requestId: request.id, reasonCodes: fresh.reasonCodes } });
         return { ok: true, outcome: "blocked_on_revalidation", message: "Al revalidar, la línea quedó bloqueada y no se puede aprobar." };
       }
-      await record("approved", fresh.reasonCodes, fresh.rules, input.comment, evaluation.evidenceShaByLine.get(fresh.lineId)!);
+      // La persona aprueba lo que vio. Si desde la solicitud apareció un motivo nuevo o cambió el monto o la moneda, esta
+      // aprobación no vale: se cancela la solicitud y se abre otra con la evaluación vigente.
+      const unseen = fresh.reasonCodes.filter((code) => !decision.reasonCodes.includes(code));
+      const termsChanged = fresh.amountMinor !== decision.amountMinor || fresh.currency !== decision.currency;
+      if (unseen.length > 0 || termsChanged) {
+        const why = [unseen.length > 0 ? `motivos nuevos: ${unseen.join(", ")}` : null, termsChanged ? "cambió el monto o la moneda" : null].filter(Boolean).join("; ");
+        await store.resolveRequest(actor.organizationId, request.id, { status: "cancelled", by: actor.userId, comment: `Reemplazada al revalidar (${why}).`, at: ctx.now });
+        const current = await persistEvaluation(deps, obligation, due, ctx.now, evaluation);
+        const latest = (await store.latestDecisions(actor.organizationId, current.id)).find((row) => row.lineId === decision.lineId);
+        if (latest?.decision === "requires_approval") {
+          await store.insertRequest({ organizationId: actor.organizationId, occurrenceId: current.id, lineId: decision.lineId, decisionId: latest.id, at: ctx.now });
+        }
+        await store.audit({ organizationId: actor.organizationId, entityType: "obligation_line", entityId: decision.lineId, eventType: "obligation_line.request_superseded", actorId: actor.userId, payload: { requestId: request.id, unseen, termsChanged } });
+        return { ok: true, outcome: "superseded", message: `No se aprobó: ${why}. Se abrió una solicitud nueva con la evaluación vigente; revísala.` };
+      }
+
+      // Se guardan los motivos que la persona vio y los términos que aprobó (monto, moneda, cuenta). Al pagar, un motivo
+      // nuevo o un término distinto exigen otra aprobación (runner.ts#humanApprovalStillCovers).
+      await record("approved", decision.reasonCodes, fresh.rules, input.comment, freshTermsSha(evaluation, fresh));
       await store.resolveRequest(actor.organizationId, request.id, { status: "approved", by: actor.userId, comment: input.comment, at: ctx.now });
       await store.audit({
         organizationId: actor.organizationId,
