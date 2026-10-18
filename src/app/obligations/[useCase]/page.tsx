@@ -1,9 +1,8 @@
 /**
- * Purpose: flujo de una obligación a pantalla completa, fuera del shell de la plataforma (sin
- *   sidebar): nómina (recursos humanos, Buk simulado) o impuestos (contabilidad simulada). Todo
- *   son datos ficticios y el pago es simulado.
+ * Purpose: flujo proactivo a pantalla completa, fuera del shell de la plataforma (sin sidebar):
+ *   nómina (recursos humanos), impuestos (tributación) o un lienzo en blanco. Se abre desde Contratos.
  * Runs in: server (React Server Component; datos dentro de <Suspense>).
- * Triggered by: GET /obligations/payroll y /obligations/fiscal (el proxy exige sesión; aquí se
+ * Triggered by: GET /obligations/payroll, /obligations/fiscal y /obligations/blank (el proxy exige sesión; aquí se
  *   vuelve a exigir una organización).
  * Receives → Returns: request → el lienzo de React Flow del caso de uso elegido.
  * Talks to: ensureWorkspaceFromSession, features/obligations/flow (payroll-actions, components).
@@ -13,14 +12,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
-import { FiscalFlowLoader, PayrollFlowLoader } from "@/features/obligations/flow/components/process-loader";
+import { BlankFlowLoader, FiscalFlowLoader, PayrollFlowLoader } from "@/features/obligations/flow/components/process-loader";
 import { listPayrollScenarios } from "@/features/obligations/flow/payroll-actions";
 import { cn } from "@/lib/utils";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
 
 export const metadata: Metadata = { title: "Flujo de obligación" };
 
-const BACK = "/platform/obligations";
+const BACK = "/platform/contracts";
 
 export default function ObligationFlowPage({ params }: { params: Promise<{ useCase: string }> }) {
   return (
@@ -34,7 +33,7 @@ export default function ObligationFlowPage({ params }: { params: Promise<{ useCa
 
 async function FlowData({ params }: { params: Promise<{ useCase: string }> }) {
   const { useCase } = await params;
-  if (useCase !== "payroll" && useCase !== "fiscal") notFound();
+  if (useCase !== "payroll" && useCase !== "fiscal" && useCase !== "blank") notFound();
 
   try {
     await ensureWorkspaceFromSession();
@@ -50,6 +49,7 @@ async function FlowData({ params }: { params: Promise<{ useCase: string }> }) {
     );
   }
 
+  if (useCase === "blank") return <BlankFlowLoader backHref={BACK} />;
   if (useCase === "fiscal") return <FiscalFlowLoader backHref={BACK} />;
   return <PayrollFlowLoader scenarios={await listPayrollScenarios()} backHref={BACK} />;
 }

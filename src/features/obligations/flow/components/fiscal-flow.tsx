@@ -21,7 +21,8 @@ import { formatMinor, parseAmountToMinor } from "@/features/contracts/money";
 import { decideFiscalRun, fiscalAlerts, fiscalProvision, type FiscalRunResult } from "@/features/decisions/engine/obligations/fiscal";
 import { cn } from "@/lib/utils";
 import { FISCAL_SCENARIO_NAMES, loadFiscalScenario, type FiscalScenarioName } from "../../fiscal/fixture-source";
-import { FISCAL_OUTCOME, FISCAL_REASON, FISCAL_RULE, FISCAL_TYPE } from "../../fiscal/labels";
+import { FISCAL_REASON, FISCAL_RULE, FISCAL_TYPE } from "../../fiscal/labels";
+import { FLOW_OUTCOME } from "../labels";
 import { periodKey, type FiscalRunContext, type FiscalScenario, type FiscalTemplate, type FiscalType, type Settlement } from "../../fiscal/schemas";
 import { asOfFor, buildFiscalTemplate, DEMO_USER, FISCAL_DATES, rulesFrom, toDecimal, type RulesDraft } from "../fiscal-logic";
 import { ProcessCanvas, type ProcessStep, type StepStatus } from "./process-canvas";
@@ -190,7 +191,7 @@ function Inner({ scenario, controls, backHref }: { scenario: FiscalScenario; con
     if (payable.length === 0) return setNotice("Nada que pagar: no hay líneas aprobadas ni aprobadas por una persona.");
     const total = payable.reduce((sum, l) => sum + (l.amountMinor as number), 0);
     setPaid((current) => [...current, ...payable.map((l) => ({ fiscalType: l.fiscalType, periodStart: l.periodStart, amountMinor: l.amountMinor as number }))]);
-    setNotice(`Pago simulado registrado: ${payable.length} ${payable.length === 1 ? "impuesto" : "impuestos"} por ${formatMinor(total, currency)}. No se movió dinero. Si vuelves a evaluar, esos periodos aparecen como ya pagados.`);
+    setNotice(`Pago registrado: ${payable.length} ${payable.length === 1 ? "impuesto" : "impuestos"} por ${formatMinor(total, currency)}. Si vuelves a evaluar, esos periodos aparecen como ya pagados.`);
     setResult(null);
     setResolution({});
   }
@@ -205,14 +206,14 @@ function Inner({ scenario, controls, backHref }: { scenario: FiscalScenario; con
   const allConfirmed = pendingConfirm.every((item) => settlementFor(item.fiscalType, item.periodStart)?.status === "confirmed");
   const st = (s: StepStatus) => s;
   const steps: ProcessStep[] = [
-    { id: "source", title: "Contabilidad (simulada)", icon: "source", summary: connected ? `${snapshot.items.length} borradores · ${snapshot.capturedAt.slice(0, 10)}` : "Sin conectar", status: st(connected ? "done" : "ready"), x: 0, y: 0 },
+    { id: "source", title: "Contabilidad", icon: "source", summary: connected ? `${snapshot.items.length} borradores · ${snapshot.capturedAt.slice(0, 10)}` : "Sin conectar", status: st(connected ? "done" : "ready"), x: 0, y: 0 },
     { id: "rules", title: "Reglas de la empresa", icon: "rules", summary: template === null ? "Plantilla sin activar" : `Activa · versión ${template.version}`, status: st(!connected ? "idle" : template ? "done" : "ready"), x: 330, y: 0 },
     { id: "clock", title: "Reloj de demo", icon: "clock", summary: FISCAL_DATES.find((d) => d.date === date)?.label ?? date, status: st(template ? "done" : "idle"), x: 660, y: 0 },
     { id: "proposal", title: "Propuesta de Pacta", icon: "proposal", summary: template ? `${alerts.length} aviso${alerts.length === 1 ? "" : "s"} T-7/T-3` : "Sin plantilla", status: st(!template ? "idle" : alerts.some((a) => a.level === "urgent") ? "attention" : "done"), x: 990, y: 0 },
     { id: "settlements", title: "Liquidaciones", icon: "settlements", summary: template ? `${pendingConfirm.filter((i) => settlementFor(i.fiscalType, i.periodStart)?.status === "confirmed").length}/${pendingConfirm.length} confirmadas` : "Sin plantilla", status: st(!template ? "idle" : allConfirmed ? "done" : "attention"), x: 0, y: 220 },
     { id: "evaluate", title: "Evaluar pagos", icon: "evaluate", summary: result ? `${result.run.lines.filter((l) => l.decision === "approved").length} aprobadas · ${result.run.lines.filter((l) => l.decision === "blocked").length} bloqueadas` : "Sin evaluar", status: st(!template ? "idle" : result ? (result.run.held ? "blocked" : "done") : "ready"), x: 330, y: 220 },
     { id: "approvals", title: "Aprobaciones", icon: "approvals", summary: result ? (unresolved.length > 0 ? `${unresolved.length} por resolver` : "Sin pendientes") : "Sin resultado", status: st(!result ? "idle" : unresolved.length > 0 ? "attention" : "done"), x: 660, y: 220 },
-    { id: "payment", title: "Pago simulado", icon: "payment", summary: paid.length > 0 ? `${paid.length} pagos simulados` : "Nada pagado", status: st(paid.length > 0 ? "done" : result ? "ready" : "idle"), x: 990, y: 220 },
+    { id: "payment", title: "Pago", icon: "payment", summary: paid.length > 0 ? `${paid.length} pagos registrados` : "Nada pagado", status: st(paid.length > 0 ? "done" : result ? "ready" : "idle"), x: 990, y: 220 },
   ];
 
   const titles: Record<string, string> = Object.fromEntries(steps.map((s) => [s.id, s.title]));
@@ -221,17 +222,17 @@ function Inner({ scenario, controls, backHref }: { scenario: FiscalScenario; con
   const panel = (
     <>
       {stepOf === "source" && (
-        <Section description="Pacta lee los borradores que ya calculó el sistema contable de la empresa. Aquí es una contabilidad simulada.">
+        <Section description="Pacta lee los borradores que ya calculó el sistema contable de la empresa.">
           {!connected ? (
             <Button onClick={connect} disabled={connecting}>
               {connecting && <Loader2 className="animate-spin" />}
-              {connecting ? "Conectando…" : "Conectar contabilidad (simulada)"}
+              {connecting ? "Conectando…" : "Conectar contabilidad"}
             </Button>
           ) : (
             <div className="flex flex-col gap-3">
               <p className="text-sm">
                 <Check className="mr-1 inline size-4 text-emerald-600" />
-                Conectado a <span className="font-medium">{snapshot.sourceLabel}</span> · datos del {snapshot.capturedAt.slice(0, 10)}
+                Conectado a <span className="font-medium">Contabilidad</span> · datos del {snapshot.capturedAt.slice(0, 10)}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <Fact label={`Ingresos ${snapshot.income?.periodStart.slice(0, 7) ?? ""}`} value={snapshot.income === null ? "No reportados" : formatMinor(snapshot.income.amountMinor, currency)} />
@@ -368,7 +369,7 @@ function Inner({ scenario, controls, backHref }: { scenario: FiscalScenario; con
         ))}
 
       {stepOf === "evaluate" && (
-        <Section description="El motor determinista aplica las reglas por línea y por corrida. Aprobada significa aprobada para pago simulado.">
+        <Section description="El motor determinista aplica las reglas por línea y por corrida. Aprobada significa lista para pago.">
           <Button onClick={runEvaluation} disabled={template === null || beforeSnapshot}>
             Evaluar pagos al {date}
           </Button>
@@ -389,8 +390,8 @@ function Inner({ scenario, controls, backHref }: { scenario: FiscalScenario; con
       )}
 
       {stepOf === "payment" && (
-        <Section description="El agente «paga» en simulación: revalida con la evidencia vigente y registra el pago. No se mueve dinero.">
-          <Button onClick={paySimulated} disabled={!result}>Registrar pago simulado</Button>
+        <Section description="El agente revalida con la evidencia vigente y registra el pago.">
+          <Button onClick={paySimulated} disabled={!result}>Registrar pago</Button>
           {notice !== null && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
           {paid.length > 0 && (
             <ul className="divide-y rounded-lg text-sm ring-1 ring-black/5">
@@ -453,7 +454,7 @@ function Lines({
   return (
     <ul className="flex flex-col gap-2">
       {lines.map((line) => {
-        const outcome = FISCAL_OUTCOME[line.decision];
+        const outcome = FLOW_OUTCOME[line.decision];
         const resolved = resolution?.[line.lineId];
         return (
           <li key={line.lineId} className="flex flex-col gap-1.5 rounded-lg p-2 text-sm ring-1 ring-black/5">

@@ -13,7 +13,6 @@ import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, t
 import { ArrowLeft, Banknote, CalendarClock, ClipboardCheck, Database, FileCheck2, Lightbulb, ListChecks, Scale, ShieldCheck, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +73,7 @@ function StepCard({ data }: NodeProps<StepNode>) {
 }
 
 const nodeTypes = { step: StepCard };
+export { nodeTypes as processNodeTypes };
 
 export type ProcessCanvasProps = {
   title: string;
@@ -131,7 +131,6 @@ function Canvas({ title, steps, edges, selectedId, onSelect, controls, panelTitl
             <ArrowLeft aria-hidden /> Volver
           </Link>
           <span className="text-sm font-semibold">{title}</span>
-          <Badge variant="outline">Simulación · datos ficticios</Badge>
         </div>
         {controls !== undefined && <div className={`${overlay} ml-auto flex flex-wrap items-center gap-2 rounded-xl p-1.5`}>{controls}</div>}
       </header>
