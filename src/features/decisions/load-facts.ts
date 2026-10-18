@@ -165,8 +165,8 @@ async function loadDocumentDuplicates(tx: Tx, invoice: InvoiceContext): Promise<
 }
 
 // Presupuesto consumido = aprobaciones del mes calendario UTC en la moneda de la política.
-// El historial CSV no cuenta (evita contar dos veces el mismo pago).
-async function loadBudgetUsed(tx: Tx, organizationId: string, currency: string, now: Date): Promise<number> {
+// El historial CSV no cuenta (evita contar dos veces el mismo pago). También lo usa el dashboard.
+export async function loadBudgetUsed(tx: Tx, organizationId: string, currency: string, now: Date): Promise<number> {
   const { start, endExclusive } = monthBoundsUtc(now);
   const result = await tx.paymentDecision.aggregate({
     where: { organizationId, decision: "approved", currency, evaluatedAt: { gte: start, lt: endExclusive } },
