@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { loadFiscalScenario, parseFiscalScenario, FISCAL_SCENARIO_NAMES } from "@/features/obligations/fiscal/fixture-source";
 import { FiscalLineDecisionSchema, type FiscalScenario, type FiscalType } from "@/features/obligations/fiscal/schemas";
-import { decideFiscalRun, fiscalAlerts, fiscalProvision, FISCAL_LINE_RULE_IDS, type FiscalRunInput } from "./fiscal";
+import { decideFiscalRun, fiscalAlerts, fiscalLineId, fiscalProvision, FISCAL_LINE_RULE_IDS, type FiscalRunInput } from "./fiscal";
 
 function inputOf(scenario: FiscalScenario, overrides: Partial<FiscalRunInput> = {}): FiscalRunInput {
   return { template: scenario.template, snapshot: scenario.snapshot, settlements: scenario.settlements, run: scenario.run, asOf: scenario.asOf, ...overrides };
@@ -336,5 +336,51 @@ describe("simulated accounting connector — input boundary", () => {
     const raw = structuredClone(loadFiscalScenario("fiscal-limpio"));
     raw.snapshot.organizationId = "org_otra";
     expect(parseFiscalScenario(raw).ok).toBe(false);
+  });
+});
+
+describe("fiscal engine — human approval and time traps", () => {
+  it("a human-approved line counts toward the run total: funds that no longer fit block the run", () => {
+    const scenario = clean((s) => {
+      s.settlements = s.settlements.filter((x) => x.fiscalType !== "vat"); // IVA: solo borrador → requires_approval
+      s.run.fundsAvailableMinor = s.run.fundsReservedMinor + 700_000_000; // cada línea cabe sola; las tres juntas no
+    });
+    const vat = item(scenario, "vat");
+    const before = decideFiscalRun(inputOf(scenario));
+    expect(before.lines.find((l) => l.fiscalType === "vat")?.decision).toBe("requires_approval");
+    expect(before.held).toBe(false);
+
+    const after = decideFiscalRun(inputOf(scenario, { humanApprovedLineIds: [fiscalLineId(scenario.template, vat)] }));
+    expect(after.held).toBe(true);
+    for (const l of after.lines) expect(l.decision).toBe("blocked");
+  });
+
+  it("a human-approved line over the run cap escalates instead of slipping through", () => {
+    const scenario = clean((s) => {
+      s.settlements = s.settlements.filter((x) => x.fiscalType !== "vat");
+      s.template.runCapMinor = 500_000_000; // withholding + social_security = 439M caben; con IVA no
+    });
+    const vat = item(scenario, "vat");
+    const withHuman = decideFiscalRun(inputOf(scenario, { humanApprovedLineIds: [fiscalLineId(scenario.template, vat)] }));
+    for (const l of withHuman.lines) expect(l.decision).not.toBe("approved");
+    expect(withHuman.lines.find((l) => l.fiscalType === "withholding")?.reasonCodes).toContain("OBLIGATION_NOT_AUTHORIZED");
+  });
+
+  it("a template activated after asOf does not authorize the run", () => {
+    const scenario = clean((s) => {
+      s.template.activatedAt = "2026-12-01T00:00:00Z"; // asOf del escenario es 7 nov
+    });
+    const l = line(scenario, "vat");
+    expect(l.decision).toBe("requires_approval");
+    expect(l.reasonCodes).toContain("OBLIGATION_NOT_AUTHORIZED");
+  });
+
+  it("a settlement confirmed after asOf does not count as confirmed", () => {
+    const scenario = clean((s) => {
+      settlement(s, "vat").confirmedAt = "2026-12-01T13:00:00Z";
+    });
+    const l = line(scenario, "vat");
+    expect(l.decision).toBe("requires_approval");
+    expect(l.reasonCodes).toContain("SETTLEMENT_UNCONFIRMED");
   });
 });
