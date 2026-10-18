@@ -161,3 +161,50 @@ export function classifyReceipt(receipt: ReceiptRow, facts: ReceiptFacts): { sta
   }
   return { status, signals };
 }
+
+// Totales de recibos para el resumen: por estado, señales y proveedores con más pagos sin aprobación.
+export type ClassifiedReceipt = ReceiptRow & { supplierName: string | null; status: ReceiptStatus; signals: ReceiptSignal[] };
+
+export type ReceiptSummary = {
+  count: number;
+  byStatus: Record<ReceiptStatus, { count: number; amountByCurrency: Record<string, number> }>;
+  likelyRecurring: number;
+  bankConfirmed: number;
+  topUnapprovedSuppliers: { supplierId: string | null; name: string; count: number; amountByCurrency: Record<string, number> }[];
+};
+
+const RECEIPT_STATUSES: readonly ReceiptStatus[] = ["unapproved", "covered_by_authorization", "approved_in_pacta"];
+
+export function summarizeReceipts(receipts: readonly ClassifiedReceipt[], topSuppliers: number): ReceiptSummary {
+  const byStatus = Object.fromEntries(
+    RECEIPT_STATUSES.map((status) => {
+      const rows = receipts.filter((r) => r.status === status);
+      return [status, { count: rows.length, amountByCurrency: sumByCurrency(rows) }];
+    }),
+  ) as ReceiptSummary["byStatus"];
+
+  // Sin proveedor reconocido se agrupan juntos: no se infiere identidad por el nombre.
+  const groups = new Map<string, ClassifiedReceipt[]>();
+  for (const r of receipts) {
+    if (r.status !== "unapproved") continue;
+    const key = r.supplierId ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  const topUnapprovedSuppliers = [...groups.values()]
+    .map((rows) => ({
+      supplierId: rows[0].supplierId,
+      name: rows[0].supplierId === null ? "Proveedor no reconocido" : (rows[0].supplierName ?? "—"),
+      count: rows.length,
+      amountByCurrency: sumByCurrency(rows),
+    }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, topSuppliers);
+
+  return {
+    count: receipts.length,
+    byStatus,
+    likelyRecurring: receipts.filter((r) => r.signals.includes("likely_recurring")).length,
+    bankConfirmed: receipts.filter((r) => r.signals.includes("bank_confirmed")).length,
+    topUnapprovedSuppliers,
+  };
+}
