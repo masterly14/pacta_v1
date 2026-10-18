@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EntityIdSchema, UtcInstantSchema } from "./invoice-context";
+import { EntityIdSchema, UtcInstantSchema } from "./invoice-context.ts";
 
 // Salida del motor determinístico de B (PLAN.md §6.2). `approved` = aprobado para pago SIMULADO.
 

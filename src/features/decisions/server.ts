@@ -7,13 +7,14 @@
  * Receives → Returns: evaluateInvoice(InvoiceContext) → PaymentDecision (throws on invalid
  *   input or database errors; never approves by default); list* (organizationId) → rows.
  * Talks to: db (src/lib/db.ts) — Organization (row lock), PaymentDecision, ApprovalRequest,
- *   AuditEvent; ./load-facts.ts; ./engine/decide.ts. No AI.
+ *   AuditEvent; ./load-facts.ts; ./engine/decide.ts; notifications/dispatch (after commit). No AI.
  */
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { InvoiceContextSchema } from "@/shared/schemas/invoice-context";
 import { PaymentDecisionSchema, type PaymentDecision } from "@/shared/schemas/payment-decision";
+import { notifyDecision } from "@/features/notifications/dispatch";
 import { decide } from "./engine/decide";
 import { loadEngineFacts } from "./load-facts";
 
@@ -40,7 +41,7 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
   const invoice = InvoiceContextSchema.parse(input);
   const organizationId = invoice.organizationId;
 
-  return db.$transaction(async (tx) => {
+  const decision = await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM organizations WHERE id = ${organizationId} FOR UPDATE`;
     if (locked.length === 0) {
       throw new Error(`Organización ${organizationId} no existe`);
@@ -111,6 +112,11 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
 
     return decision;
   }, TRANSACTION_OPTIONS);
+
+  // Tras el commit: avisar por los canales configurados es best-effort, idempotente por decisión
+  // y nunca altera la decisión ya guardada.
+  await notifyDecision(decision.decisionId);
+  return decision;
 }
 
 // ---------------------------------------------------------------------------
