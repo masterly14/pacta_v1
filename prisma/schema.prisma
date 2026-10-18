@@ -43,6 +43,7 @@ model Organization {
   invoices               Invoice[]
   notificationRecipients NotificationRecipient[]
   inboundChannelMessages InboundChannelMessage[]
+  archivedInvoices       ArchivedInvoice[]
 
   // Vertical A
   contracts Contract[]
@@ -701,4 +702,25 @@ model InboundChannelMessage {
   @@index([organizationId, receivedAt])
   @@index([approvalRequestId])
   @@map("inbound_channel_messages")
+}
+
+// ---------------------------------------------------------------------------
+// Facturas archivadas: ocultas de listados, gráficos y aprobaciones sin borrar nada.
+// Por id de factura (también las del simulador, que no tienen fila en `invoices`). El motor de
+// decisiones NO las excluye: duplicados y presupuesto siguen contándolas (más estricto, nunca menos).
+// Desarchivar = borrar la fila de esta tabla.
+// ---------------------------------------------------------------------------
+
+model ArchivedInvoice {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  invoiceId      String   @map("invoice_id")
+  reason         String
+  archivedBy     String?  @map("archived_by") // null = script de mantenimiento
+  archivedAt     DateTime @default(now()) @map("archived_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, invoiceId])
+  @@map("archived_invoices")
 }

@@ -160,7 +160,7 @@ describe.skipIf(!url)("evaluateInvoice (integration)", async () => {
     expect((await evaluateInvoice(invoice({ invoiceDate: "2026-10-05" }))).decision).toBe("approved");
     const sameMonth = await evaluateInvoice(invoice({ invoiceDate: "2026-10-20" }));
     expect(sameMonth.decision).toBe("requires_approval");
-    expect(sameMonth.rulesEvaluated.find((r) => r.ruleId === "supplier_authorized")?.explanation).toContain("already covered");
+    expect(sameMonth.rulesEvaluated.find((r) => r.ruleId === "supplier_authorized")?.explanation).toContain("ya cubrió");
     expect((await evaluateInvoice(invoice({ invoiceDate: "2026-11-05" }))).decision).toBe("approved");
   });
 

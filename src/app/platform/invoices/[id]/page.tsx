@@ -18,6 +18,7 @@ import { formatMinor } from "@/features/contracts/money";
 import { RetryInvoiceButton } from "@/features/invoices/components/invoice-forms";
 import { getInvoiceDetail, type InvoiceDetail } from "@/features/invoices/queries";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
+import { REASON_LABEL, ruleLabel } from "@/features/decisions/labels";
 
 export const metadata: Metadata = { title: "Factura" };
 export const maxDuration = 60;
@@ -110,8 +111,8 @@ function InvoiceView({ invoice }: { invoice: InvoiceDetail }) {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={DECISION[latest.decision].variant}>{DECISION[latest.decision].label}</Badge>
                 {latest.reasonCodes.map((code) => (
-                  <Badge key={code} variant="outline" className="font-mono text-[10px]">
-                    {code}
+                  <Badge key={code} variant="outline" className="text-[11px]">
+                    {REASON_LABEL[code]}
                   </Badge>
                 ))}
                 {invoice.hasPendingApproval && (
@@ -124,7 +125,7 @@ function InvoiceView({ invoice }: { invoice: InvoiceDetail }) {
               <ul className="flex flex-col gap-1 text-xs">
                 {latest.rulesEvaluated.map((rule) => (
                   <li key={rule.ruleId}>
-                    {RESULT_ICON[rule.result]} <span className="font-mono">{rule.ruleId}</span>
+                    {RESULT_ICON[rule.result]} <span className="font-medium">{ruleLabel(rule.ruleId)}</span>
                     {rule.result !== "pass" && <span className="text-muted-foreground"> · {rule.explanation}</span>}
                   </li>
                 ))}
