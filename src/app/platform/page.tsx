@@ -40,6 +40,20 @@ const REASON: Record<ReasonCode, string> = {
   AUTO_APPROVAL_RULES_PASSED: "Reglas cumplidas",
   BENEFICIARY_CHANGED: "Cambio de cuenta beneficiaria",
   CURRENCY_NOT_SUPPORTED: "Moneda no soportada",
+  EMPLOYEE_TERMINATED: "Empleado desvinculado",
+  EMPLOYEE_NOT_FOUND: "Empleado no encontrado",
+  PAYROLL_OMISSION: "Nómina incompleta",
+  VARIANCE_EXCEEDED: "Variación sobre la tolerancia",
+  BENEFIT_MISMATCH: "Beneficio no coincide",
+  DUPLICATE_LINE: "Línea duplicada",
+  FUNDS_INSUFFICIENT: "Fondos insuficientes",
+  OBLIGATION_NOT_AUTHORIZED: "Obligación sin autorizar",
+  SETTLEMENT_UNCONFIRMED: "Liquidación sin confirmar",
+  SETTLEMENT_AMOUNT_MISMATCH: "Monto distinto de la liquidación",
+  DEADLINE_PASSED: "Plazo vencido",
+  DEADLINE_AT_RISK: "Plazo en riesgo",
+  STALE_EVIDENCE: "Evidencia desactualizada",
+  SIGNAL_PENDING_REVIEW: "Señal pendiente de revisión",
 };
 const CADENCE = { weekly: "semanal", monthly: "mensual", quarterly: "trimestral", yearly: "anual" } as const;
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
