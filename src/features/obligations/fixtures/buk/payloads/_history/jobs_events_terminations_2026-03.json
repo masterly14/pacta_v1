@@ -1,0 +1,9 @@
+{
+  "pagination": {
+    "next": null,
+    "previous": null,
+    "count": 0,
+    "total_pages": 1
+  },
+  "data": []
+}

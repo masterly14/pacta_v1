@@ -1,0 +1,36 @@
+{
+  "pagination": {
+    "next": null,
+    "previous": null,
+    "count": 1,
+    "total_pages": 1
+  },
+  "data": [
+    {
+      "id": 8017,
+      "start_date": "2026-05-06",
+      "end_date": "2026-05-13",
+      "days_count": 8,
+      "day_percent": 1,
+      "contribution_days": 2,
+      "workday_stage": "full_working_day",
+      "application_date": "2026-05-06",
+      "application_end_date": "2026-05-13",
+      "justification": "Incapacidad por enfermedad general (FICTICIO)",
+      "employee_id": 1004,
+      "status": "aprobado",
+      "created_at": "2026-05-06",
+      "updated_at": "2026-05-06",
+      "licence_type_id": 3,
+      "format": "electronica",
+      "type": "remunerada",
+      "codigo_incapacidad_colombia": "J069",
+      "descripcion_codigo_incapacidad_colombia": "INFECCION AGUDA DE LAS VIAS RESPIRATORIAS SUPERIORES, NO ESPECIFICADA",
+      "licence_type_code": "incapacidad_enfermedad_general",
+      "licence_number": "FICT-000123",
+      "medic_name": "Médico Ficticio",
+      "custom_attributes": {},
+      "medic_rut": "9990009999"
+    }
+  ]
+}

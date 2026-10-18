@@ -29,6 +29,8 @@ export interface ScenarioManifest {
     obligation: string;
     treasury: string;
     lastConfirmed: string;
+    /** Libro de decisiones de Pacta sobre la historia (solo escenarios con historia). */
+    decisionHistory?: string;
     benefitCalendar: string;
     fetchLog: string;
     /** Webhooks de Buk recibidos por Pacta, con hora de recepción (UTC). */
@@ -70,8 +72,16 @@ export function loadManifest(scenario: string): ScenarioManifest {
   return JSON.parse(readFileSync(join(PAYLOADS_DIR, scenario, "manifest.json"), "utf8")) as ScenarioManifest;
 }
 
+/** Archivos compartidos por varios escenarios (meses de historia): `shared:<archivo>` -> `payloads/_history/<archivo>`. */
+const SHARED_PREFIX = "shared:";
+
 export function readScenarioJson<T = unknown>(scenario: string, file: string): T {
   if (file.includes("..")) throw new Error("ruta inválida");
+  if (file.startsWith(SHARED_PREFIX)) {
+    const name = file.slice(SHARED_PREFIX.length);
+    if (name.includes("/") || name.includes("\\")) throw new Error("ruta inválida");
+    return JSON.parse(readFileSync(join(PAYLOADS_DIR, "_history", name), "utf8")) as T;
+  }
   return JSON.parse(readFileSync(join(PAYLOADS_DIR, scenario, file), "utf8")) as T;
 }
 
