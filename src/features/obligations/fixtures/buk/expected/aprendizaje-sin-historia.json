@@ -1,0 +1,249 @@
+{
+  "fixture": true,
+  "simulatedMoney": true,
+  "scenario": "aprendizaje-sin-historia",
+  "description": "Mismo mes de prueba que aprendizaje-trimestral, pero Buk no expone meses anteriores y el libro no tiene decisiones: es el punto de partida (historia 0) del agente. Pacta solo conoce lo último confirmado.",
+  "organization": "Andina Demo S.A.S.",
+  "occurrenceId": "obl_nomina_andina:2026-12-01",
+  "period": "2026-12",
+  "amountsUnit": "COP en unidades menores (centavos)",
+  "authority": "Oráculo escrito a mano por escenario según platform-core §7.1 y §13. El motor real de Pacta es la fuente de verdad.",
+  "totalMinor": 7649311600,
+  "evaluations": [
+    {
+      "stage": "inicial",
+      "asOf": "2026-12-31T14:00:00Z",
+      "description": "Sin historia rigen solo las reglas fijas: igual resultado que aprendizaje-trimestral.",
+      "occurrenceStatus": "in_approval",
+      "counts": {
+        "approved": 23,
+        "blocked": 0,
+        "requires_approval": 1
+      },
+      "runFindings": [],
+      "lines": [
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724001:salary",
+          "counterpartyRef": "buk:employee:1001",
+          "displayName": "Valentina Rojas Castaño",
+          "lineType": "salary",
+          "amountMinor": 319309500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724001:bonus",
+          "counterpartyRef": "buk:employee:1001",
+          "displayName": "Valentina Rojas Castaño",
+          "lineType": "bonus",
+          "amountMinor": 172454800,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724002:salary",
+          "counterpartyRef": "buk:employee:1002",
+          "displayName": "Andrés Felipe Arango Ríos",
+          "lineType": "salary",
+          "amountMinor": 1184456000,
+          "decision": "requires_approval",
+          "reasons": [
+            "VARIANCE_EXCEEDED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724002:bonus",
+          "counterpartyRef": "buk:employee:1002",
+          "displayName": "Andrés Felipe Arango Ríos",
+          "lineType": "bonus",
+          "amountMinor": 325000000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724003:salary",
+          "counterpartyRef": "buk:employee:1003",
+          "displayName": "Laura Marcela Gómez Ospina",
+          "lineType": "salary",
+          "amountMinor": 185992800,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724003:bonus",
+          "counterpartyRef": "buk:employee:1003",
+          "displayName": "Laura Marcela Gómez Ospina",
+          "lineType": "bonus",
+          "amountMinor": 100000000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724004:salary",
+          "counterpartyRef": "buk:employee:1004",
+          "displayName": "Juan Sebastián Martínez Duque",
+          "lineType": "salary",
+          "amountMinor": 386400000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724004:bonus",
+          "counterpartyRef": "buk:employee:1004",
+          "displayName": "Juan Sebastián Martínez Duque",
+          "lineType": "bonus",
+          "amountMinor": 210000000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724005:salary",
+          "counterpartyRef": "buk:employee:1005",
+          "displayName": "Camila Andrea Torres Restrepo",
+          "lineType": "salary",
+          "amountMinor": 349600000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724005:bonus",
+          "counterpartyRef": "buk:employee:1005",
+          "displayName": "Camila Andrea Torres Restrepo",
+          "lineType": "bonus",
+          "amountMinor": 190000000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724006:salary",
+          "counterpartyRef": "buk:employee:1006",
+          "displayName": "Diego Alejandro Herrera Mejía",
+          "lineType": "salary",
+          "amountMinor": 291985500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724006:bonus",
+          "counterpartyRef": "buk:employee:1006",
+          "displayName": "Diego Alejandro Herrera Mejía",
+          "lineType": "bonus",
+          "amountMinor": 152454800,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724007:salary",
+          "counterpartyRef": "buk:employee:1007",
+          "displayName": "Natalia Ramírez Zuluaga",
+          "lineType": "salary",
+          "amountMinor": 546112000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724007:bonus",
+          "counterpartyRef": "buk:employee:1007",
+          "displayName": "Natalia Ramírez Zuluaga",
+          "lineType": "bonus",
+          "amountMinor": 296800000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724008:salary",
+          "counterpartyRef": "buk:employee:1008",
+          "displayName": "Carlos Mario Londoño Vélez",
+          "lineType": "salary",
+          "amountMinor": 199709500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724008:bonus",
+          "counterpartyRef": "buk:employee:1008",
+          "displayName": "Carlos Mario Londoño Vélez",
+          "lineType": "bonus",
+          "amountMinor": 107454800,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724009:salary",
+          "counterpartyRef": "buk:employee:1009",
+          "displayName": "María José Cárdenas Giraldo",
+          "lineType": "salary",
+          "amountMinor": 337709500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724009:bonus",
+          "counterpartyRef": "buk:employee:1009",
+          "displayName": "María José Cárdenas Giraldo",
+          "lineType": "bonus",
+          "amountMinor": 182454800,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724010:salary",
+          "counterpartyRef": "buk:employee:1010",
+          "displayName": "Felipe Ortiz Salazar",
+          "lineType": "salary",
+          "amountMinor": 854035000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724010:bonus",
+          "counterpartyRef": "buk:employee:1010",
+          "displayName": "Felipe Ortiz Salazar",
+          "lineType": "bonus",
+          "amountMinor": 469250000,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724011:salary",
+          "counterpartyRef": "buk:employee:1011",
+          "displayName": "Daniela Suárez Montoya",
+          "lineType": "salary",
+          "amountMinor": 245709500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724011:bonus",
+          "counterpartyRef": "buk:employee:1011",
+          "displayName": "Daniela Suárez Montoya",
+          "lineType": "bonus",
+          "amountMinor": 132454800,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724012:salary",
+          "counterpartyRef": "buk:employee:1012",
+          "displayName": "Julián David Moreno Patiño",
+          "lineType": "salary",
+          "amountMinor": 267513500,
+          "decision": "approved",
+          "reasons": []
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-12-01:buk-liquidacion-724012:bonus",
+          "counterpartyRef": "buk:employee:1012",
+          "displayName": "Julián David Moreno Patiño",
+          "lineType": "bonus",
+          "amountMinor": 142454800,
+          "decision": "approved",
+          "reasons": []
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Con historia 0 el agente no tiene perfiles ni precedentes; no cambia nada respecto a las reglas fijas."
+  ]
+}

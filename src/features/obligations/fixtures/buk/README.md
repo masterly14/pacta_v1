@@ -24,9 +24,24 @@ npm run mock:verify     # vitest de src/features/obligations
 
 La app usa el mismo handler en proceso (`fetch: (u, i) => handleBukMock(new Request(u, i))`); no llama a su propia ruta por red.
 
-## Escenarios (12 escenarios, 13 evaluaciones)
+## Escenarios de nómina (12 escenarios, 13 evaluaciones)
 
 `nomina-limpia`, `nomina-anomalias` (inicial 9/1/2 y reevaluación 8/1/3 tras el webhook de Laura Gómez), `trampa-plantilla-borrador`, `trampa-omision`, `trampa-duplicado`, `trampa-licencia`, `trampa-sin-historial`, `trampa-prima-sin-concepto`, `trampa-prima-otro-monto`, `trampa-liquidacion-final`, `trampa-evidencia-desactualizada`, `trampa-fondos-insuficientes`.
+
+## Historia y aprendizaje (F1)
+
+| Archivo | Rol |
+|---|---|
+| `builders.ts` | Constructores con la forma de Buk (colaborador, liquidación, licencia, página), la plantilla de 12 personas y la plantilla base de la obligación |
+| `history.ts` | Línea de tiempo **declarativa** de eventos de vida (aumentos de 1010 y 1007, bonificación trimestral de 1002, pago variable de 1006 y 1012, incapacidad de 1004, cambio de cuenta de 1005, prima en jun/dic) + PRNG con semilla `HISTORY_SEED`. `buildMonth(mes, { injections })` devuelve los payloads de Buk de cualquier mes; `Injection` agrega anomalías (`bump_pct`, `bonus_multiple`, `unexpected_bonus`, `account_change`, `omit`, `duplicate`, `terminated_paid`) |
+| `memory-transport.ts` | `BukTransport` en memoria sobre `buildMonth` (mismos paths y sobre que el mock HTTP) |
+| `ledger.ts` + `resolutions.ts` | Libro de decisiones de Pacta: replay mes a mes con el adaptador real y las reglas; las resoluciones humanas (actor y comentario ficticios) son datos de fixture y el replay falla si una no corresponde a una línea que escaló. De ahí salen el último monto y la última cuenta confirmados |
+| `payloads/_history/` | Meses anteriores compartidos por los escenarios con historia (rutas `shared:<archivo>` en el manifiesto) |
+| `expected/learning/*.labels.json` | Verdad de terreno de las anomalías sembradas. **Nada de `learning/` puede leerlas** (lo verifica una prueba) |
+
+Escenarios: `aprendizaje-trimestral` (Buk expone 2025-10 a 2026-12; el libro cubre hasta 2026-11; en 2026-12 la bonificación de 1002 sale 3 veces mayor y 1010 recibe +5 % fuera de enero: con reglas fijas solo escala 1002) y `aprendizaje-sin-historia` (mismo mes, sin meses anteriores ni decisiones previas). El demo siembra el libro hasta `seedThrough` (2026-02) y decide el resto en vivo.
+
+Se regenera con `npm run mock:generate` (byte-determinista). Los 12 escenarios de nómina anteriores no cambian.
 
 ## Mapeo a los contratos compartidos
 

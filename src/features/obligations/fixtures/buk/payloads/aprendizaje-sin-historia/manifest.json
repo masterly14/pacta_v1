@@ -1,0 +1,74 @@
+{
+  "fixture": true,
+  "scenario": "aprendizaje-sin-historia",
+  "description": "Mismo mes de prueba que aprendizaje-trimestral, pero Buk no expone meses anteriores y el libro no tiene decisiones: es el punto de partida (historia 0) del agente. Pacta solo conoce lo último confirmado.",
+  "organization": "Andina Demo S.A.S.",
+  "period": {
+    "month": "2026-12",
+    "startDate": "2026-12-01",
+    "endDate": "2026-12-31"
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/process_periods",
+      "endpoint": "GET /process_periods",
+      "query": {},
+      "file": "process_periods.json"
+    },
+    {
+      "method": "GET",
+      "path": "/employees/active",
+      "endpoint": "GET /employees/active",
+      "query": {
+        "date": "2026-12-31"
+      },
+      "file": "employees_active.json"
+    },
+    {
+      "method": "GET",
+      "path": "/payroll_detail/month",
+      "endpoint": "GET /payroll_detail/month",
+      "query": {
+        "date": "01-12-2026"
+      },
+      "file": "payroll_detail_month_2026-12.json"
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/events/terminations",
+      "endpoint": "GET /jobs/events/terminations",
+      "query": {
+        "start_date": "2026-12-01",
+        "end_date": "2026-12-31"
+      },
+      "file": "jobs_events_terminations.json"
+    },
+    {
+      "method": "GET",
+      "path": "/absences/licence",
+      "endpoint": "GET /absences/licence",
+      "query": {
+        "from": "2026-12-01",
+        "to": "2026-12-31"
+      },
+      "file": "absences_licence.json"
+    }
+  ],
+  "pacta": {
+    "obligation": "_pacta/obligation.json",
+    "treasury": "_pacta/treasury.json",
+    "lastConfirmed": "_pacta/last-confirmed.json",
+    "decisionHistory": "_pacta/decision-history.json",
+    "benefitCalendar": "_pacta/benefit-calendar.json",
+    "fetchLog": "_pacta/fetch-log.json",
+    "webhooks": []
+  },
+  "evaluations": [
+    {
+      "stage": "inicial",
+      "asOf": "2026-12-31T14:00:00Z",
+      "description": "Sin historia rigen solo las reglas fijas: igual resultado que aprendizaje-trimestral."
+    }
+  ]
+}
