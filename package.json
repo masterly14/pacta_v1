@@ -15,7 +15,8 @@
     "test:node": "node --experimental-strip-types --test src/shared/auth/membership-role.test.ts src/shared/schemas/gmail-contracts.test.ts src/shared/schemas/notification-contracts.test.ts src/features/invoices/gmail/gmail-backend.test.ts src/lib/r2.test.ts",
     "test:watch": "vitest",
     "mock:generate": "node ./node_modules/vite-node/vite-node.mjs --config vitest.config.ts src/features/obligations/fixtures/buk/generate.ts",
-    "mock:verify": "vitest run src/features/obligations"
+    "mock:verify": "vitest run src/features/obligations",
+    "learning:backtest": "node ./node_modules/vite-node/vite-node.mjs --config vitest.config.ts src/features/obligations/learning/backtest-cli.ts"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.67",
