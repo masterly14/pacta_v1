@@ -15,6 +15,7 @@ import type { FormActionState } from "@/shared/forms/use-form-action";
 import { buildCustomInvoice, CustomInvoiceInputSchema } from "./fixtures/custom-invoice";
 import { buildDemoInvoice } from "./fixtures/demo-invoices";
 import { DEMO_SCENARIOS, isDemoScenario } from "./fixtures/scenarios";
+import { devToolsEnabled } from "@/shared/config/dev-tools";
 import { evaluateInvoice } from "./server";
 
 const OUTCOME_LABEL = { approved: "✅ aprobada", blocked: "🔴 bloqueada", requires_approval: "🟡 requiere aprobación" } as const;
@@ -29,6 +30,9 @@ export async function simulateInvoiceAction(_previous: FormActionState, formData
     // Escribe decisiones en la organización: solo administradores, verificado en servidor.
     if (workspace.membership.role !== "admin") {
       return { ok: false, message: "Solo un administrador puede usar el simulador." };
+    }
+    if (!devToolsEnabled()) {
+      return { ok: false, message: "Las herramientas de prueba están desactivadas (PACTA_SHOW_DEV_TOOLS)." };
     }
     const built = await buildDemoInvoice(scenario, workspace.organization.id, new Date());
     if (!built.ok) {
@@ -58,6 +62,9 @@ export async function evaluateCustomInvoiceAction(_previous: FormActionState, fo
     // Escribe decisiones en la organización: solo administradores, verificado en servidor.
     if (workspace.membership.role !== "admin") {
       return { ok: false, message: "Solo un administrador puede usar el simulador." };
+    }
+    if (!devToolsEnabled()) {
+      return { ok: false, message: "Las herramientas de prueba están desactivadas (PACTA_SHOW_DEV_TOOLS)." };
     }
     const built = await buildCustomInvoice(parsed.data, workspace.organization.id, new Date());
     if (!built.ok) {

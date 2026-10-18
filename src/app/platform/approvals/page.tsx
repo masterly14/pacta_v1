@@ -21,6 +21,7 @@ import { formatUsd, toUsdInput } from "@/features/policies/money";
 import { checkCanManagePolicies } from "@/features/policies/permissions";
 import { loadPolicyActor } from "@/features/policies/server";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
+import { REASON_LABEL } from "@/features/decisions/labels";
 
 export const metadata: Metadata = { title: "Aprobaciones" };
 
@@ -98,8 +99,8 @@ async function ApprovalsData() {
                   <TableCell className="max-w-56 whitespace-normal">
                     <div className="flex flex-wrap gap-1">
                       {p.reasonCodes.map((code) => (
-                        <Badge key={code} variant="outline" className="font-mono text-[10px]">
-                          {code}
+                        <Badge key={code} variant="outline" className="text-[11px]">
+                          {REASON_LABEL[code]}
                         </Badge>
                       ))}
                     </div>

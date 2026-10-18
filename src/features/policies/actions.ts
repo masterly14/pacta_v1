@@ -10,6 +10,7 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
+import { devToolsEnabled } from "@/shared/config/dev-tools";
 import type { PolicyActor } from "./permissions";
 import {
   AuthorizationInputSchema,
@@ -83,6 +84,9 @@ export async function setApprovalPermissionAction(_prev: ActionState, formData: 
 }
 
 export async function loadDemoDataAction(_prev: ActionState, formData: FormData) {
+  if (!devToolsEnabled()) {
+    return { ok: false, message: "Las herramientas de prueba están desactivadas (PACTA_SHOW_DEV_TOOLS)." };
+  }
   const today = new Date().toISOString().slice(0, 10);
   return run("load-demo-data", z.object({}), formData, (actor) => loadDemoData(actor, today));
 }

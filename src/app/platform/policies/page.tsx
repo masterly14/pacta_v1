@@ -25,6 +25,7 @@ import {
 import { formatUsd, toUsdInput } from "@/features/policies/money";
 import { checkCanGrantPermissions, checkCanManagePolicies } from "@/features/policies/permissions";
 import { getPoliciesOverview, loadPolicyActor } from "@/features/policies/server";
+import { devToolsEnabled } from "@/shared/config/dev-tools";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
 
 export const metadata: Metadata = { title: "Políticas" };
@@ -70,7 +71,7 @@ async function PoliciesData() {
 
   return (
     <>
-      {canGrant && policy === null && overview.suppliers.length === 0 && (
+      {canGrant && devToolsEnabled() && policy === null && overview.suppliers.length === 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Organización vacía</CardTitle>

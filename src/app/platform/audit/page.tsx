@@ -17,7 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatMinor } from "@/features/contracts/money";
 import { CustomInvoiceForm, DecisionSimulator } from "@/features/decisions/components/simulator";
 import { listRecentDecisions, listSupplierOptions } from "@/features/decisions/server";
+import { devToolsEnabled } from "@/shared/config/dev-tools";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
+import { REASON_LABEL, ruleLabel } from "@/features/decisions/labels";
 
 export const metadata: Metadata = { title: "Auditoría" };
 
@@ -58,13 +60,14 @@ async function AuditData() {
     );
   }
   const decisions = await listRecentDecisions(workspace.organization.id);
-  const isAdmin = workspace.membership.role === "admin";
-  const suppliers = isAdmin ? await listSupplierOptions(workspace.organization.id) : [];
+  // El simulador y la factura de prueba solo aparecen con PACTA_SHOW_DEV_TOOLS=true (no en una demo).
+  const showTools = workspace.membership.role === "admin" && devToolsEnabled();
+  const suppliers = showTools ? await listSupplierOptions(workspace.organization.id) : [];
   const today = new Date().toISOString().slice(0, 10);
 
   return (
     <>
-      {isAdmin && (
+      {showTools && (
         <Card>
           <CardHeader>
             <CardTitle>Simulador · datos ficticios</CardTitle>
@@ -82,7 +85,7 @@ async function AuditData() {
         </Card>
       )}
 
-      {isAdmin && (
+      {showTools && (
         <Card>
           <CardHeader>
             <CardTitle>Factura de prueba · datos ficticios</CardTitle>
@@ -131,7 +134,7 @@ async function AuditData() {
                         <ul className="mt-1 flex flex-col gap-1">
                           {d.rulesEvaluated.map((rule) => (
                             <li key={rule.ruleId}>
-                              {RESULT_ICON[rule.result]} <span className="font-mono">{rule.ruleId}</span>
+                              {RESULT_ICON[rule.result]} <span className="font-medium">{ruleLabel(rule.ruleId)}</span>
                               {rule.result !== "pass" && <span className="text-muted-foreground"> · {rule.explanation}</span>}
                             </li>
                           ))}
@@ -147,8 +150,8 @@ async function AuditData() {
                     <TableCell className="max-w-56 whitespace-normal">
                       <div className="flex flex-wrap gap-1">
                         {d.reasonCodes.map((code) => (
-                          <Badge key={code} variant="outline" className="font-mono text-[10px]">
-                            {code}
+                          <Badge key={code} variant="outline" className="text-[11px]">
+                            {REASON_LABEL[code]}
                           </Badge>
                         ))}
                       </div>
