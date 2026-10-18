@@ -1,0 +1,9 @@
+{
+  "data": {
+    "employee_id": 1005,
+    "date": "2026-10-20T11:12:00-05:00",
+    "event_type": "employee_update",
+    "tenant_url": "andina-demo-fixture.buk.co",
+    "employment_status": "activo"
+  }
+}

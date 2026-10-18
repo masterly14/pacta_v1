@@ -1,0 +1,11 @@
+{
+  "fixture": true,
+  "note": "Calendario de beneficios del escenario. Fórmula SIMPLIFICADA y ficticia: prima = (salario base + auxilio de transporte si salario ≤ 2 SMMLV) / 2, redondeada a peso. No es cálculo laboral legal.",
+  "primaMonths": [
+    "06",
+    "12"
+  ],
+  "formula": "prima_semestral_simplificada",
+  "smmlvMinor": 175090500,
+  "auxTransporteMinor": 24909500
+}

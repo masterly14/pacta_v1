@@ -1,0 +1,170 @@
+{
+  "fixture": true,
+  "simulatedMoney": true,
+  "scenario": "trampa-plantilla-borrador",
+  "description": "§13 'Plantilla en borrador': la obligación de nómina no fue activada. Todas las líneas requiere_aprobacion (OBLIGACION_NO_AUTORIZADA).",
+  "organization": "Andina Demo S.A.S.",
+  "occurrenceId": "obl_nomina_andina:2026-10-01",
+  "period": "2026-10",
+  "amountsUnit": "COP en unidades menores (centavos)",
+  "authority": "Oráculo escrito a mano por escenario según platform-core §7.1 y §13. El motor real de Pacta es la fuente de verdad.",
+  "totalMinor": 4430449800,
+  "evaluations": [
+    {
+      "stage": "inicial",
+      "asOf": "2026-10-29T14:00:00Z",
+      "description": "Regla de corrida obligacion_autorizada escala todas las líneas.",
+      "occurrenceStatus": "in_approval",
+      "counts": {
+        "approved": 0,
+        "blocked": 0,
+        "requires_approval": 12
+      },
+      "runFindings": [
+        {
+          "ruleId": "obligacion_autorizada",
+          "code": "OBLIGATION_NOT_AUTHORIZED",
+          "effect": "requires_approval",
+          "counterpartyRef": null
+        }
+      ],
+      "lines": [
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703001:salary",
+          "counterpartyRef": "buk:employee:1001",
+          "displayName": "Valentina Rojas Castaño",
+          "lineType": "salary",
+          "amountMinor": 319309500,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703002:salary",
+          "counterpartyRef": "buk:employee:1002",
+          "displayName": "Andrés Felipe Arango Ríos",
+          "lineType": "salary",
+          "amountMinor": 598000000,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703003:salary",
+          "counterpartyRef": "buk:employee:1003",
+          "displayName": "Laura Marcela Gómez Ospina",
+          "lineType": "salary",
+          "amountMinor": 185992800,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703004:salary",
+          "counterpartyRef": "buk:employee:1004",
+          "displayName": "Juan Sebastián Martínez Duque",
+          "lineType": "salary",
+          "amountMinor": 386400000,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703005:salary",
+          "counterpartyRef": "buk:employee:1005",
+          "displayName": "Camila Andrea Torres Restrepo",
+          "lineType": "salary",
+          "amountMinor": 349600000,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703006:salary",
+          "counterpartyRef": "buk:employee:1006",
+          "displayName": "Diego Alejandro Herrera Mejía",
+          "lineType": "salary",
+          "amountMinor": 282509500,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703007:salary",
+          "counterpartyRef": "buk:employee:1007",
+          "displayName": "Natalia Ramírez Zuluaga",
+          "lineType": "salary",
+          "amountMinor": 515200000,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703008:salary",
+          "counterpartyRef": "buk:employee:1008",
+          "displayName": "Carlos Mario Londoño Vélez",
+          "lineType": "salary",
+          "amountMinor": 199709500,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703009:salary",
+          "counterpartyRef": "buk:employee:1009",
+          "displayName": "María José Cárdenas Giraldo",
+          "lineType": "salary",
+          "amountMinor": 337709500,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703010:salary",
+          "counterpartyRef": "buk:employee:1010",
+          "displayName": "Felipe Ortiz Salazar",
+          "lineType": "salary",
+          "amountMinor": 746200000,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703011:salary",
+          "counterpartyRef": "buk:employee:1011",
+          "displayName": "Daniela Suárez Montoya",
+          "lineType": "salary",
+          "amountMinor": 245709500,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        },
+        {
+          "lineId": "obl_nomina_andina:2026-10-01:buk-liquidacion-703012:salary",
+          "counterpartyRef": "buk:employee:1012",
+          "displayName": "Julián David Moreno Patiño",
+          "lineType": "salary",
+          "amountMinor": 264109500,
+          "decision": "requires_approval",
+          "reasons": [
+            "OBLIGATION_NOT_AUTHORIZED"
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Las líneas individuales están limpias: lo que falla es la autorización de la plantilla (§9 status)."
+  ]
+}

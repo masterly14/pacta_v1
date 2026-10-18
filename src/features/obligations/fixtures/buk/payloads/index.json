@@ -1,0 +1,19 @@
+{
+  "fixture": true,
+  "organization": "Andina Demo S.A.S.",
+  "provider": "Buk (Colombia) — forma de respuesta según https://demo.buk.cl/apidocs?country=colombia, consultado 2026-10-17",
+  "scenarios": [
+    "nomina-limpia",
+    "nomina-anomalias",
+    "trampa-plantilla-borrador",
+    "trampa-omision",
+    "trampa-duplicado",
+    "trampa-licencia",
+    "trampa-sin-historial",
+    "trampa-prima-sin-concepto",
+    "trampa-prima-otro-monto",
+    "trampa-liquidacion-final",
+    "trampa-evidencia-desactualizada",
+    "trampa-fondos-insuficientes"
+  ]
+}

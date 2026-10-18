@@ -1,0 +1,54 @@
+{
+  "fixture": true,
+  "note": "Último monto (línea salario, neto) y última cuenta confirmados por Pacta en la corrida de 2026-05. Solo cuentas enmascaradas.",
+  "byCounterparty": {
+    "buk:employee:1001": {
+      "beneficiaryReference": "****4821",
+      "amountMinor": 319309500
+    },
+    "buk:employee:1002": {
+      "beneficiaryReference": "****7310",
+      "amountMinor": 598000000
+    },
+    "buk:employee:1003": {
+      "beneficiaryReference": "****1157",
+      "amountMinor": 185992800
+    },
+    "buk:employee:1004": {
+      "beneficiaryReference": "****9046",
+      "amountMinor": 386400000
+    },
+    "buk:employee:1005": {
+      "beneficiaryReference": "****4417",
+      "amountMinor": 349600000
+    },
+    "buk:employee:1006": {
+      "beneficiaryReference": "****6602",
+      "amountMinor": 282509500
+    },
+    "buk:employee:1007": {
+      "beneficiaryReference": "****3389",
+      "amountMinor": 515200000
+    },
+    "buk:employee:1008": {
+      "beneficiaryReference": "****5524",
+      "amountMinor": 199709500
+    },
+    "buk:employee:1009": {
+      "beneficiaryReference": "****8873",
+      "amountMinor": 337709500
+    },
+    "buk:employee:1010": {
+      "beneficiaryReference": "****2290",
+      "amountMinor": 746200000
+    },
+    "buk:employee:1011": {
+      "beneficiaryReference": "****7765",
+      "amountMinor": 245709500
+    },
+    "buk:employee:1012": {
+      "beneficiaryReference": "****4038",
+      "amountMinor": 264109500
+    }
+  }
+}

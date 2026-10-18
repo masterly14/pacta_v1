@@ -1,0 +1,9 @@
+{
+  "data": {
+    "employee_id": 1008,
+    "date": "2026-09-30T17:05:00-05:00",
+    "event_type": "job_termination",
+    "tenant_url": "andina-demo-fixture.buk.co",
+    "employment_status": "terminado"
+  }
+}
