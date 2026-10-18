@@ -13,6 +13,19 @@
 - [ ] **`feature/b-payment-history`**: importación CSV + sugerencias de recurrencia.
 - [ ] Páginas de B: `/platform/policies`, `/platform/approvals`, `/platform/payment-history`, `/platform/audit`.
 
+### Core proactivo: obligaciones (pendiente de aprobar `docs/plans/platform-core.md`)
+
+Nómina y obligaciones fiscales/parafiscales con fixtures; reutilizan políticas, aprobaciones, notificaciones y auditoría. Hitos completos en `platform-core.md` §11.
+
+- [ ] **OB-01 (A + B)** · aprobar contratos §6 (`ObligationContext`, `subject` en `PaymentDecision` con `schemaVersion` 2, códigos de motivo nuevos) y fixtures.
+- [ ] **OB-02 · `feature/b-obligations-db`**: tablas `payment_obligations`, `obligation_occurrences`, `obligation_lines`, `evidence_snapshots` y columnas `subject_type`/`subject_id` en `payment_decisions`; una migración.
+- [ ] **OB-03 · `feature/b-obligations-nomina-engine`**: `decideLine` y `decideOccurrence` puros, oracle `nomina-limpia` y `nomina-anomalias`, sin BD ni IA.
+- [ ] **OB-04 · `feature/b-obligations-runs`**: generador de ocurrencias, cron idempotente (`CRON_SECRET`), `Clock`/`DemoClock`, persistencia, ejecución simulada con revalidación y avisos (ampliar la lista cerrada de eventos de notificación).
+- [ ] **OB-05 · `feature/b-obligations-ui`**: obligaciones activas, corridas con líneas, evidencia y razones, selector de escenario y reloj de demo.
+- [ ] **OB-08 · `feature/b-obligations-fiscal`**: reglas fiscales, fixtures, alertas T-7/T-3 y confirmación de liquidación.
+- [ ] **OB-11 (P1)** · `consistente_con_nomina`.
+- Decisión: B no lee correo ni llama al LLM; consume `inbox_signals` por el puerto `InboxSignals`.
+
 ## 2. Motor determinístico (sin IA, 10 reglas)
 
 La IA solo interviene antes (vertical A) para leer documentos. El motor compara datos estructurados con reglas TypeScript.

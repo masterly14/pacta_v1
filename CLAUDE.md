@@ -6,6 +6,8 @@ Construimos en **48 horas** un MVP que recibe facturas de una empresa ficticia, 
 
 **El objetivo principal es seguridad + autonomía + explicabilidad.** Una aprobación indebida es un fallo crítico. **No se mueve dinero real**: `approved` significa *aprobado para pago simulado*, nunca *pagado*.
 
+**Core proactivo (pivote acordado):** además del flujo reactivo a facturas, Pacta conoce las obligaciones recurrentes de la empresa (nómina y obligaciones fiscales/parafiscales), reúne evidencia por su cuenta y valida cada pago antes de soltarlo. Alcance: **nómina, obligaciones fiscales/parafiscales e Inbox**; todo dato de negocio es **fixture** y lo único real es el Inbox de Gmail. Definición en `docs/plans/platform-core.md`.
+
 Priorizar siempre un flujo **end-to-end desplegado y verificable** sobre funcionalidades adicionales. El primer recorrido debe ser: **email → factura estructurada → políticas → decisión → dashboard**. Mantener una carga manual de prueba como alternativa si falla el correo durante la demo.
 
 ## 2. Stack acordado
@@ -25,6 +27,7 @@ No introducir Mastra, LangGraph, pgvector, múltiples agentes ni un workflow dur
 ## 3. Fuentes de verdad (leer antes de trabajar)
 
 1. [`PLAN.md`](http://PLAN.md): alcance, arquitectura, hitos y criterios de aceptación.
+1b. `docs/plans/platform-core.md`: definición del Core proactivo (obligaciones, evidencia, señales del Inbox, reglas de nómina y fiscales, hitos OB-xx).
 2. Plan del responsable:
    - **A — Invoice Intelligence:** `docs/plans/[developer-a-invoices.md](http://developer-a-invoices.md)`.
    - **B — Payment Autopilot:** `docs/plans/[developer-b-payment-decisions.md](http://developer-b-payment-decisions.md)`.
@@ -42,11 +45,15 @@ Responsable de **recepción, extracción y contextualización** de facturas: Res
 
 **A no aprueba ni bloquea pagos** y no modifica políticas ni el motor de decisiones.
 
+En el Core proactivo, A es dueño del **Inbox genérico** (`src/features/inbox/`): clasifica correos y publica `InboxSignal` validadas (novedades laborales, liquidaciones fiscales) como señales **propuestas**, sin efecto de autorización.
+
 ### Desarrollador B — Payment Autopilot
 
 Responsable de **historial CSV, recurrencias, proveedores y políticas autorizadas, motor determinístico, detección de duplicados, presupuesto, decisiones, aprobaciones humanas, auditoría e interfaces correspondientes**. Consume un `InvoiceContext` y produce un `PaymentDecision` validado por Zod.
 
 **B puede trabajar desde el primer momento con fixtures de** `InvoiceContext`, sin esperar a Resend ni a la extracción real.
+
+En el Core proactivo, B es dueño de las **obligaciones**: plantillas, ocurrencias, líneas, reloj, cron, fixtures de nómina y fiscales, reglas por línea y de corrida, ejecución simulada y su UI (`src/features/obligations/`, `src/features/decisions/engine/obligations/`). B consume `inbox_signals` por un puerto y no lee correo ni llama al LLM.
 
 ### Archivos y fronteras
 
@@ -78,6 +85,10 @@ Responsable de **historial CSV, recurrencias, proveedores y políticas autorizad
 8. `approved` es una decisión de **pago simulado**. No integrar bancos, mover fondos ni afirmar que se ejecutó una transferencia.
 9. Solo usuarios **autenticados y autorizados** pueden aprobar, rechazar o modificar políticas. Enviar un correo no concede autoridad para aprobar.
 10. Nunca utilizar datos reales de clientes o empresas en el MVP o su demo.
+11. **Confianza asimétrica.** Una señal no verificada (correo, mensaje de chat, salida del LLM) solo puede aumentar la cautela (escalar o retener); jamás reduce una restricción ni habilita un pago. Verificar una señal es una acción humana autorizada y auditada.
+12. **Plantilla recurrente ≠ autorización.** Una obligación (nómina, impuesto) solo opera en automático después de que una persona autorizada la active con tolerancia, topes y beneficiario. Un cambio de cuenta o de referencia de pago nunca se aprueba automáticamente.
+13. **Fecha explícita y revalidación.** El motor evalúa a un `asOf` recibido (no lee el reloj); la ejecución simulada revalida con la evidencia vigente y una señal nueva puede revertir una `aprobada` antes de ejecutarse.
+14. Los datos de **fixture** se etiquetan como tales en la UI y los logs; el sistema no calcula impuestos, intereses ni prestaciones legales, solo compara contra datos confirmados.
 
 ## 7. Seguridad y datos no confiables
 
