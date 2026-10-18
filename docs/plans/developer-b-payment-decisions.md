@@ -23,6 +23,8 @@ Nómina y obligaciones fiscales/parafiscales con fixtures; reutilizan políticas
 - [ ] **OB-04 · `feature/b-obligations-runs`**: generador de ocurrencias, cron idempotente (`CRON_SECRET`), `Clock`/`DemoClock`, persistencia, ejecución simulada con revalidación y avisos (ampliar la lista cerrada de eventos de notificación).
 - [ ] **OB-05 · `feature/b-obligations-ui`**: obligaciones activas, corridas con líneas, evidencia y razones, selector de escenario y reloj de demo.
 - [ ] **OB-08 · `feature/b-obligations-fiscal`**: reglas fiscales, fixtures, alertas T-7/T-3 y confirmación de liquidación.
+  - [x] Motor puro + fuente contable simulada (`feature/b-fiscal-accounting`, §7.2.1): `decideFiscalRun`, `fiscalAlerts`, escenarios `fiscal-limpio` y `fiscal-anomalias` con oracle, 28 tests. Salida local `FiscalLineDecision`.
+  - [ ] Pendiente: emitir `PaymentDecision` v2 cuando el PR #58 esté en `main`; persistencia, UI de "Confirmar liquidación" y avisos (dependen de OB-02/04/05).
 - [ ] **OB-11 (P1)** · `consistente_con_nomina`.
 - Decisión: B no lee correo ni llama al LLM; consume `inbox_signals` por el puerto `InboxSignals`.
 
@@ -92,6 +94,7 @@ Todas con `organization_id` → `organizations` e índices por organización.
 
 ## 6. Registro
 
+- 2026-10-18: fiscal (OB-08, parte pura) en `feature/b-fiscal-accounting`, desde `main` e independiente del PR #58. El monto sale del borrador de la "Contabilidad (simulada)" (fixture JSON validado con Zod); Pacta no calcula impuestos, compara borrador vs. liquidación confirmada y avisa en T-7/T-3. 11 reglas por línea + 2 de corrida (fondos totales, tope). No toca `src/shared/`: esquemas locales en `src/features/obligations/fiscal/` con los mismos códigos de motivo y tipos de impuesto que el PR #58. Observaciones al PR #58 (no implementadas aquí): la regla de monto vs. liquidación nunca puede fallar en `fiscalLines`, un solo periodo por impuesto, mapa de etiquetas de motivos duplicado. El `package-lock.json` de `main` no está sincronizado (`npm ci` falla por chokidar/readdirp).
 - 2026-10-17: plan acordado en sesión de diseño. Orden elegido: tablas primero, luego motor.
 - 2026-10-17: tablas de B aplicadas en Neon (`20261017163245_add_payment_autopilot_tables`).
 - 2026-10-17: aprobaciones: cada decisión guarda el `InvoiceContext` evaluado (`invoice_context`, migración `20261017202352`) para poder reevaluar al aprobar y como evidencia. Reglas fail-closed: no se aprueba sin monto, moneda o política, ni en moneda distinta a la de la política; la autorización creada al aprobar debe cubrir la factura y consume su periodo. Un bloqueo al revalidar resuelve la solicitud como bloqueada. Corregido: los formularios fallaban si un campo oculto no se enviaba (rechazar, aprobar sin autorización, permiso sin "Aprueba", autorización de pago único).
