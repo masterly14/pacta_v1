@@ -79,7 +79,7 @@ Estados laterales: `retenida` (una regla de corrida bloqueó todo), `fallida` (e
 | Puerto | Responsabilidad | Implementación en el MVP |
 |---|---|---|
 | `Clock` | `now(): Date` | `SystemClock` en producción; `DemoClock` por organización, solo con `DEMO_MODE=true` y rol `admin` |
-| `ObligationSource` | `generateLines(obligation, period, asOf)` y `getFacts(counterpartyRef, asOf)` | `NominaFixtureSource`, `FiscalFixtureSource` (JSON versionado en el repositorio, con escenarios) |
+| `ObligationSource` | `generateLines(obligation, period, asOf)` y `getFacts(counterpartyRef, asOf)` | `NominaFixtureSource`, `FiscalFixtureSource` (JSON versionado en el repositorio, con escenarios; lo fiscal es una instantánea de la contabilidad simulada, §7.2.1) |
 | `InboxSignals` | Entrega señales verificadas/propuestas por contraparte y periodo | Lectura de `inbox_signals` (real: nace de Gmail) |
 | `Notifier` | Avisos multicanal | `src/features/notifications/` existente (Slack, WhatsApp); se amplía la lista cerrada de eventos |
 | `Executor` | Registrar la ejecución | `SimulatedExecutor` (evento de auditoría); no existe adaptador bancario |
@@ -90,7 +90,7 @@ Estados laterales: `retenida` (una regla de corrida bloqueó todo), `fallida` (e
 
 ## 6. Contratos (propuesta; requieren aprobación de ambos)
 
-Los contratos viven en `src/shared/schemas/`. Los valores de enums usan **español**, como el código vigente (`aprobada | bloqueada | requiere_aprobacion`, `cumple | incumple | desconocido`).
+Los contratos viven en `src/shared/schemas/`. Los valores de enums van en **inglés**, como el código vigente (`approved | blocked | requires_approval`), con el término en español en un comentario. Los nombres en español de este documento son la traducción de esos valores.
 
 ### 6.1 `ObligationContext` (nuevo; producido por el adaptador/pipeline, consumido por el motor)
 
@@ -161,6 +161,35 @@ Campos: `signalId`, `organizationId`, `gmailInboundMessageId`, `kind` (`novedad_
 | `consistente_con_nomina` (**P1**) | Aportes distintos, dentro de la tolerancia del escenario, de lo derivado de la corrida de nómina del periodo | escala |
 
 **Bloqueos absolutos fiscales:** periodo ya pagado y fondos insuficientes.
+
+#### 7.2.1 Fuente contable (simulada)
+
+**De dónde sale el monto.** Pacta no calcula impuestos ni conoce tarifas. El monto lo calcula el **sistema contable** de la empresa (el papel que en Colombia cumplen herramientas como Siigo o Alegra, alimentadas por la factura electrónica de la DIAN). En el MVP ese sistema es un **fixture**: un JSON versionado, "Contabilidad (simulada)", validado con Zod y servido detrás del puerto de la fuente. No hay conexión real con ningún proveedor contable ni una ruta propia: es una lectura del servidor. La UI lo etiqueta como dato simulado.
+
+**Qué expone el fixture por impuesto y periodo:** `fiscalType`, periodo, vencimiento (calendario inventado), `draftAmountMinor` (borrador de la declaración que calculó la contabilidad, `null` si no existe), `accountingPeriodClosed` (si el mes contable ya se cerró), `previousConfirmedAmountMinor` (último monto confirmado del mismo impuesto) y la referencia de pago del borrador (enmascarada). La instantánea lleva `capturedAt` y moneda (COP, sin conversión).
+
+**Dos fuentes que se cruzan:**
+
+1. **Borrador contable** → monto de la línea (lo que se va a pagar).
+2. **Liquidación** `propuesta | confirmada` → la confirma una persona en el dashboard, o llega por el Inbox (`liquidacion_fiscal`, OB-09) como `propuesta` y una persona la verifica. Nunca se paga sobre un borrador.
+
+**Reglas que añade la fuente contable** (solo aumentan la cautela; complementan la tabla de §7.2):
+
+| `ruleId` | Falla con | Código | Resultado |
+|---|---|---|---|
+| `datos_completos` | Sin borrador o sin referencia de pago | `INSUFFICIENT_DATA` | escala |
+| `evidencia_vigente` | Instantánea contable más antigua que `evidenceMaxAgeDays`, o posterior a `asOf` | `STALE_EVIDENCE` | escala |
+| `periodo_contable_cerrado` | El mes contable sigue abierto: el borrador puede cambiar | `STALE_EVIDENCE` | escala |
+| `variacion_vs_periodos_previos` | `|borrador − último confirmado|` mayor que la tolerancia de la plantilla; sin histórico → `INSUFFICIENT_DATA` | `VARIANCE_EXCEEDED` | escala |
+| `monto_coincide_con_liquidacion` | Borrador ≠ liquidación confirmada (exacto, sin tolerancia) | `SETTLEMENT_AMOUNT_MISMATCH` | escala |
+
+**Reglas de la corrida fiscal:** si la suma de las líneas aprobables supera los fondos libres, esas líneas quedan `bloqueada` (`FUNDS_INSUFFICIENT`, corrida retenida); si supera el tope de la plantilla, escalan (`OBLIGATION_NOT_AUTHORIZED`).
+
+**Qué fija la organización (reglas de control, no tributarias):** al activar la plantilla "Impuestos" una persona autorizada define qué impuestos vigilar, la referencia de pago autorizada de cada uno, la tolerancia de variación, el tope de la corrida y los días de aviso (T-7, T-3).
+
+**Avisos (no son decisiones):** en T-7 y T-3 Pacta avisa con el monto del borrador, el vencimiento y la brecha de fondos, p. ej.: *"IVA sep–oct ≈ COP 6.680.000 según tu contabilidad, vence el 2026-11-10. Fondos libres COP 4.000.000: faltan COP 2.680.000"*. En T-3 con brecha se marca `DEADLINE_AT_RISK`.
+
+**Implementación inicial (rama `feature/b-fiscal-accounting`, desde `main`):** esquemas locales en `src/features/obligations/fiscal/` y motor puro en `src/features/decisions/engine/obligations/fiscal.ts`, que devuelve un `FiscalLineDecision` local con los mismos códigos de motivo que propone el PR #58. Cuando los contratos compartidos estén en `main`, se envuelve en el puerto `ObligationSource` y se emite como `PaymentDecision` v2 (`subject: fiscal_payment`).
 
 ### 7.3 Inbox (único componente real)
 
@@ -250,7 +279,7 @@ Cada hito termina con pruebas Vitest y el flujo verificable; ninguno requiere di
 3. Llega por Gmail (real) un correo de RR. HH.: "Laura Gómez deja de laborar". El Inbox crea una señal `propuesta`, reevalúa la corrida y su línea pasa de `aprobada` a `requiere_aprobacion` **antes de ejecutarse** (principio 7).
 4. Aviso por Slack/WhatsApp con el resumen. Un usuario autorizado aprueba el caso de la cuenta cambiada en el dashboard; el sistema reevalúa y registra la aprobación humana.
 5. Se ejecutan en simulación las líneas aprobadas; la auditoría muestra actor, versión y evidencia.
-6. Fiscal: el reloj llega a T-3 del vencimiento; alerta con el monto y la liquidación pendiente. Llega la liquidación por correo (`propuesta`), una persona la confirma, y el pago se aprueba al coincidir el monto. Con el escenario `fiscal-anomalias`, la referencia cambiada o los fondos insuficientes lo frenan.
+6. Fiscal: el reloj llega a T-7 y Pacta lee la contabilidad simulada: *"IVA sep–oct ≈ COP 6.680.000 según tu contabilidad, vence el 2026-11-10; fondos libres COP 4.000.000"*. Nadie subió nada. Llega la liquidación por correo (`propuesta`) o una persona la confirma; en T-3 el pago se aprueba al coincidir el borrador con la liquidación. Con el escenario `fiscal-anomalias`: el IVA se triplica frente al periodo anterior (escala), la retención trae otra referencia de pago (escala), el ICA solo está `propuesta` (escala), la seguridad social está en un mes contable abierto (escala), la parafiscal ya se pagó (bloquea) y los fondos no alcanzan.
 7. Cierre con las métricas: porcentaje del ciclo resuelto sin humano, anomalías detectadas, y **aprobaciones indebidas = 0**.
 
 ## 13. Casos trampa (oracle definido antes de ejecutar)
@@ -274,6 +303,10 @@ Cada hito termina con pruebas Vitest y el flujo verificable; ninguno requiere di
 | Liquidación fiscal `propuesta` sin confirmar | `requiere_aprobacion` (`LIQUIDACION_NO_CONFIRMADA`) |
 | Monto fiscal ±1 unidad menor distinto de la liquidación | `requiere_aprobacion` |
 | Periodo fiscal ya pagado | `bloqueada` |
+| Solo hay borrador contable, sin liquidación | `requiere_aprobacion` (`SETTLEMENT_UNCONFIRMED`) |
+| Borrador que triplica el periodo anterior / sin histórico | `requiere_aprobacion` |
+| Mes contable abierto o instantánea contable vieja | `requiere_aprobacion` (`STALE_EVIDENCE`) |
+| Suma de impuestos aprobables mayor que los fondos libres | `bloqueada` (corrida retenida) |
 | Vencimiento pasado | `requiere_aprobacion` (`PLAZO_VENCIDO`) |
 | Dos aprobaciones concurrentes sobre fondos para una | A lo sumo una aprobada |
 | Reintento del cron o del webhook | Una sola ocurrencia, una sola decisión, un solo pago simulado |
@@ -299,3 +332,4 @@ Rentas cortas, contratistas, cuentas por pagar con orden de compra, integración
 ## 16. Registro
 
 - 2026-10-17: documento creado tras acordar el alcance de tres casos (nómina, fiscal/parafiscal e Inbox). Rentas cortas, contratistas y orden de compra quedan fuera. Sin código ni migraciones todavía.
+- 2026-10-18: §7.2.1 "Fuente contable (simulada)": el monto fiscal sale del borrador de la contabilidad (fixture), se cruza con la liquidación confirmada y Pacta solo compara y avisa. Enums en inglés (como el código). Motor fiscal puro empezado en `feature/b-fiscal-accounting`, independiente del PR #58.
