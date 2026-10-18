@@ -7,10 +7,12 @@
  * Triggered by: /platform (dashboard) and /platform/outside-payments (detail).
  * Receives → Returns: (organizationId, now) → Dashboard; (organizationId, filters) → OutsidePayments.
  * Talks to: db (PaymentDecision, PaymentPolicy, ApprovalRequest, Invoice, PaymentAuthorization,
- *   BankTransaction, Supplier), decisions/load-facts#loadBudgetUsed, payment-history recurrence, ./metrics.ts.
+ *   BankTransaction, Supplier), decisions/load-facts#loadBudgetUsed, decisions/archive (archived
+ *   invoices are left out of every number), payment-history recurrence, ./metrics.ts.
  */
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { notArchived } from "@/features/decisions/archive";
 import { loadBudgetUsed } from "@/features/decisions/load-facts";
 import { monthBoundsUtc } from "@/features/decisions/periods";
 import { getRecurrenceSuggestions, recurrenceWindowStart } from "@/features/payment-history/recurrence/recurrence-service";
@@ -81,9 +83,10 @@ async function loadClassifiedReceipts(
   context: RecurringContext,
   where: Prisma.InvoiceWhereInput,
   take: number,
+  hidden: { notIn: string[] },
 ): Promise<{ receipts: (ClassifiedReceipt & { extractedName: string | null; paymentMethod: string | null })[]; truncated: boolean }> {
   const rows = await db.invoice.findMany({
-    where: { ...where, organizationId, documentKind: "receipt" },
+    where: { ...where, organizationId, documentKind: "receipt", id: hidden },
     orderBy: [{ paidOn: { sort: "desc", nulls: "last" } }, { receivedAt: "desc" }],
     take: take + 1,
     include: { supplier: { select: { name: true } } },
@@ -106,7 +109,7 @@ async function loadClassifiedReceipts(
       });
   const receiptCounts = await db.invoice.groupBy({
     by: ["supplierId"],
-    where: { organizationId, documentKind: "receipt", supplierId: { not: null } },
+    where: { organizationId, documentKind: "receipt", supplierId: { not: null }, id: hidden },
     _count: { _all: true },
   });
 
@@ -154,10 +157,12 @@ function receiptsInMonth(now: Date): Prisma.InvoiceWhereInput {
 export async function getDashboard(organizationId: string, now: Date = new Date()) {
   const { start, endExclusive } = monthBoundsUtc(now);
   const today = fromDbDate(now);
+  // Facturas archivadas (pruebas, correos que no son facturas): fuera de todos los números.
+  const hidden = await notArchived(organizationId);
 
   // Decisiones del mes: la más reciente de cada factura.
   const monthDecisions = await db.paymentDecision.findMany({
-    where: { organizationId, evaluatedAt: { gte: start, lt: endExclusive } },
+    where: { organizationId, evaluatedAt: { gte: start, lt: endExclusive }, invoiceId: hidden },
     select: { invoiceId: true, decision: true, decisionSource: true, reasonCodes: true, evaluatedAt: true },
   });
   const latest = latestPerInvoice(monthDecisions.map((d) => ({ ...d, reasonCodes: parseReasonCodes(d.reasonCodes) })));
@@ -166,11 +171,11 @@ export async function getDashboard(organizationId: string, now: Date = new Date(
   const days = utcDayRange(now, TREND_DAYS);
   const trendStart = new Date(`${days[0]}T00:00:00Z`);
   const trendDecisions = await db.paymentDecision.findMany({
-    where: { organizationId, evaluatedAt: { gte: trendStart } },
+    where: { organizationId, evaluatedAt: { gte: trendStart }, invoiceId: hidden },
     select: { invoiceId: true, decision: true, evaluatedAt: true },
   });
   const received = await db.invoice.findMany({
-    where: { organizationId, receivedAt: { gte: trendStart } },
+    where: { organizationId, receivedAt: { gte: trendStart }, id: hidden },
     select: { receivedAt: true },
   });
 
@@ -181,14 +186,14 @@ export async function getDashboard(organizationId: string, now: Date = new Date(
   const budgetUsedMinor = policy === null ? null : await loadBudgetUsed(db, organizationId, policy.currency, now);
 
   const pendingRequests = await db.approvalRequest.findMany({
-    where: { organizationId, status: "pending" },
+    where: { organizationId, status: "pending", invoiceId: hidden },
     orderBy: { requestedAt: "asc" },
     select: { requestedAt: true, decision: { select: { amountMinor: true, currency: true } } },
   });
 
   const context = await loadRecurringContext(organizationId, now);
-  const month = await loadClassifiedReceipts(organizationId, now, context, receiptsInMonth(now), MAX_RECEIPTS);
-  const allReceipts = await db.invoice.count({ where: { organizationId, documentKind: "receipt" } });
+  const month = await loadClassifiedReceipts(organizationId, now, context, receiptsInMonth(now), MAX_RECEIPTS, hidden);
+  const allReceipts = await db.invoice.count({ where: { organizationId, documentKind: "receipt", id: hidden } });
 
   // Suscripciones del historial sin autorización recurrente vigente para ese proveedor.
   const suggestions = context.recurrence.ok ? context.recurrence.suggestions : [];
@@ -244,7 +249,7 @@ export type Dashboard = Awaited<ReturnType<typeof getDashboard>>;
 // después de clasificar sobre una ventana de MAX_RECEIPTS recibos.
 export async function listOutsidePayments(organizationId: string, filters: { status: ReceiptStatus | null }, now: Date = new Date()) {
   const context = await loadRecurringContext(organizationId, now);
-  const { receipts, truncated } = await loadClassifiedReceipts(organizationId, now, context, {}, MAX_RECEIPTS);
+  const { receipts, truncated } = await loadClassifiedReceipts(organizationId, now, context, {}, MAX_RECEIPTS, await notArchived(organizationId));
   const matching = filters.status === null ? receipts : receipts.filter((r) => r.status === filters.status);
   return {
     summary: summarizeReceipts(receipts, TOP_SUPPLIERS),

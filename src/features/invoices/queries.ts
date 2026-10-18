@@ -10,6 +10,7 @@
  */
 import { clampPage } from "@/components/platform/page-window";
 import { db } from "@/lib/db";
+import { notArchived } from "@/features/decisions/archive";
 import { InvoiceContextSchema } from "@/shared/schemas/invoice-context";
 import { PaymentDecisionSchema } from "@/shared/schemas/payment-decision";
 
@@ -17,10 +18,12 @@ export const INVOICES_PAGE_SIZE = 20;
 
 export async function listInvoices(organizationId: string, options: { page?: unknown; pageSize?: number } = {}) {
   const pageSize = options.pageSize ?? INVOICES_PAGE_SIZE;
-  const total = await db.invoice.count({ where: { organizationId } });
+  // Las archivadas (pruebas, correos que no son facturas) no se listan; siguen en la base.
+  const where = { organizationId, id: await notArchived(organizationId) };
+  const total = await db.invoice.count({ where });
   const { page, pageCount } = clampPage(options.page, total, pageSize);
   const invoices = await db.invoice.findMany({
-    where: { organizationId },
+    where,
     // id desempata facturas recibidas en el mismo instante: el orden entre páginas es estable.
     orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * pageSize,

@@ -153,7 +153,7 @@ describe("matchContract", () => {
     expect(result?.contractId).toBe("ctr_2025");
     expect(result?.matchStatus).toBe("mismatch");
     expect(result?.discrepancies).toEqual([
-      expect.objectContaining({ field: "period", expected: "2025-01-01 to 2025-12-31", actual: "2026-02-01" }),
+      expect.objectContaining({ field: "period", expected: "2025-01-01 a 2025-12-31", actual: "2026-02-01" }),
     ]);
     expectValid(result);
   });
