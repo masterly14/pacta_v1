@@ -13,3 +13,23 @@ export const FLOW_OUTCOME: Record<FlowDecision, { label: string; variant: "defau
   requires_approval: { label: "Requiere aprobación", variant: "secondary" },
   blocked: { label: "Bloqueada", variant: "destructive" },
 };
+
+// Estados de una corrida con las palabras que usa la interfaz de Contratos.
+export const RUN_STATUS_LABEL: Record<string, string> = {
+  scheduled: "Programada",
+  collecting_evidence: "Reuniendo datos",
+  evaluated: "Evaluada",
+  in_approval: "Con excepciones por resolver",
+  ready_to_execute: "Lista para pagar",
+  simulated_executed: "Pagada",
+  held: "Retenida",
+  failed: "Con error",
+  cancelled: "Cancelada",
+};
+
+export const RUN_PHASE_LABEL: Record<string, string> = {
+  prepare: "Preparar corrida",
+  alert_early: "Aviso temprano",
+  alert_urgent: "Aviso urgente",
+  execute: "Pagar",
+};

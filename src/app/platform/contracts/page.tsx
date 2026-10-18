@@ -21,6 +21,9 @@ import { FREQUENCY_LABEL } from "@/features/contracts/components/flow/flow-model
 import { formatMinor } from "@/features/contracts/money";
 import { checkCanManageContracts } from "@/features/contracts/permissions";
 import { contractActorFromWorkspace, getContractsOverview } from "@/features/contracts/server";
+import { loadProactiveData, latestObligations } from "@/features/obligations/flow/data";
+import { OBLIGATION_STATUS_LABEL } from "@/features/obligations/labels";
+import { SCHEDULE_RULE_LABELS } from "@/features/obligations/schedule/calendar";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +61,8 @@ async function ContractsData() {
   const overview = await getContractsOverview(workspace.organization.id);
   const canManage = checkCanManageContracts(actor) === null;
   const today = new Date().toISOString().slice(0, 10);
+  const proactive = await loadProactiveData(workspace);
+  const proactiveContracts = proactive.available ? latestObligations(proactive.overview) : [];
   const active = overview.contracts.filter((c) => c.status === "active");
   const terminated = overview.contracts.filter((c) => c.status === "terminated");
 
@@ -69,12 +74,55 @@ async function ContractsData() {
         </div>
       )}
 
+      {proactive.available && proactiveContracts.length > 0 && (
+        <section aria-labelledby="proactive-contracts" className="flex flex-col gap-3">
+          <h2 id="proactive-contracts" className="text-sm font-medium text-muted-foreground">
+            Contratos proactivos ({proactiveContracts.length})
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {proactiveContracts.map((o) => {
+              const runs = proactive.overview.runs.filter((r) => r.occurrence.obligationId === o.obligationId);
+              const last = runs[0] ?? null;
+              const pending = runs.reduce((sum, r) => sum + r.requests.filter((q) => q.status === "pending").length, 0);
+              return (
+                <Card key={o.obligationId}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between gap-2">
+                      {o.kind === "payroll" ? "Nómina" : "Impuestos"}
+                      <Badge variant={o.status === "active" ? "default" : "secondary"}>{OBLIGATION_STATUS_LABEL[o.status]}</Badge>
+                    </CardTitle>
+                    <CardDescription>Recursos humanos · versión {o.version}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-3 text-sm">
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      <dt className="text-muted-foreground">Calendario</dt>
+                      <dd>{SCHEDULE_RULE_LABELS[o.settings.schedule.rule]}</dd>
+                      <dt className="text-muted-foreground">Tope</dt>
+                      <dd>{formatMinor(o.template.runCapMinor, o.template.currency)}</dd>
+                      <dt className="text-muted-foreground">Última corrida</dt>
+                      <dd>{last === null ? "—" : last.occurrence.periodStart.slice(0, 7)}</dd>
+                      <dt className="text-muted-foreground">Por resolver</dt>
+                      <dd>{pending}</dd>
+                    </dl>
+                    <div>
+                      <Link href="/obligations/payroll" className={cn(buttonVariants({ size: "sm" }))}>
+                        Abrir flujo
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <section aria-labelledby="active-contracts" className="flex flex-col gap-3">
         <h2 id="active-contracts" className="text-sm font-medium text-muted-foreground">
-          Contratos activos ({active.length})
+          Contratos reactivos ({active.length})
         </h2>
         {active.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin contratos activos.</p>
+          <p className="text-sm text-muted-foreground">Sin contratos reactivos activos.</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {active.map((contract) => (

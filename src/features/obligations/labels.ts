@@ -11,7 +11,7 @@ export const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
   evaluated: "Evaluada",
   in_approval: "Con excepciones por resolver",
   ready_to_execute: "Lista para ejecutar",
-  simulated_executed: "Ejecutada (simulada)",
+  simulated_executed: "Ejecutada",
   held: "Retenida",
   failed: "Con error",
   cancelled: "Cancelada",
@@ -21,7 +21,7 @@ export const PHASE_LABEL: Record<Phase, string> = {
   prepare: "Preparar corrida",
   alert_early: "Aviso temprano",
   alert_urgent: "Aviso urgente",
-  execute: "Ejecutar (simulado)",
+  execute: "Ejecutar",
 };
 
 export const OUTCOME_LABEL = { approved: "Aprobada", blocked: "Bloqueada", requires_approval: "Requiere aprobación" } as const;

@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { BlankFlowLoader, FiscalFlowLoader, PayrollFlowLoader } from "@/features/obligations/flow/components/process-loader";
-import { listPayrollScenarios } from "@/features/obligations/flow/payroll-actions";
+import { loadProactiveData } from "@/features/obligations/flow/data";
 import { cn } from "@/lib/utils";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
 
@@ -35,8 +35,9 @@ async function FlowData({ params }: { params: Promise<{ useCase: string }> }) {
   const { useCase } = await params;
   if (useCase !== "payroll" && useCase !== "fiscal" && useCase !== "blank") notFound();
 
+  let workspace;
   try {
-    await ensureWorkspaceFromSession();
+    workspace = await ensureWorkspaceFromSession();
   } catch (error) {
     if (!(error instanceof OrganizationRequiredError)) throw error;
     return (
@@ -51,5 +52,5 @@ async function FlowData({ params }: { params: Promise<{ useCase: string }> }) {
 
   if (useCase === "blank") return <BlankFlowLoader backHref={BACK} />;
   if (useCase === "fiscal") return <FiscalFlowLoader backHref={BACK} />;
-  return <PayrollFlowLoader scenarios={await listPayrollScenarios()} backHref={BACK} />;
+  return <PayrollFlowLoader data={await loadProactiveData(workspace)} backHref={BACK} />;
 }
