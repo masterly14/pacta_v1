@@ -63,6 +63,19 @@ export function maskAccount(raw: string | null | undefined): string | null {
   return `****${digits.slice(-4)}`;
 }
 
+/** Conceptos variables que el perfil histórico sigue por separado. El resto del neto es la base (`net_base`). */
+export const TRACKED_CONCEPT_CODES = ["bonificacion", "recargos", "incapacidad_general"] as const;
+
+/** Haberes rastreables de una liquidación, sumados por código, en unidades menores. */
+export function trackedConcepts(settlement: Pick<BukSettlement, "lines_settlement">): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const line of settlement.lines_settlement) {
+    const code = line.code ?? "";
+    if (line.type === "haber" && (TRACKED_CONCEPT_CODES as readonly string[]).includes(code)) out[code] = (out[code] ?? 0) + toMinor(line.amount);
+  }
+  return out;
+}
+
 /** Buk no publica el catálogo de conceptos: la prima se reconoce por código o nombre. */
 export const isPrimaLine = (line: { code?: string | null; name: string; type: string }) =>
   line.type === "haber" && /prima/i.test(`${line.code ?? ""} ${line.name}`);
@@ -120,6 +133,9 @@ function expectedPrimaMinor(employee: BukEmployee, raw: BukRawBundle, calendar: 
   const aux = wageMinor <= 2 * calendar.smmlvMinor ? calendar.auxTransporteMinor : 0;
   return Math.round((wageMinor + aux) / 2 / 100) * 100;
 }
+
+const sumsTo = (components: { amountMinor: number }[] | undefined, amountMinor: number): components is { code: string; amountMinor: number }[] =>
+  components !== undefined && components.length > 0 && components.every((component) => component.amountMinor > 0) && components.reduce((total, component) => total + component.amountMinor, 0) === amountMinor;
 
 const positiveOrNull = (value: number | null | undefined) => (value != null && value > 0 ? value : null);
 
@@ -190,6 +206,8 @@ export function buildLines(raw: BukRawBundle, pacta: PactaData, template: Obliga
     lineType: ObligationLineType;
     amountMinor: number | null;
     componentCode: string;
+    /** Componentes por concepto; deben sumar el importe, si no se usa un solo componente. */
+    components?: { code: string; amountMinor: number }[];
     evidence: EvidenceSnapshotRef[];
   }) => {
     const employee = findEmployee(raw, input.employeeId);
@@ -228,7 +246,7 @@ export function buildLines(raw: BukRawBundle, pacta: PactaData, template: Obliga
         displayName: employee?.full_name ?? `Colaborador Buk ${input.employeeId}`,
         lineType: input.lineType,
         ...amounts,
-        components: amountMinor === null ? [] : [{ code: input.componentCode, amountMinor }],
+        components: amountMinor === null ? [] : sumsTo(input.components, amountMinor) ? input.components : [{ code: input.componentCode, amountMinor }],
         evidence: input.evidence,
         signals: pendingSignals(raw, pacta, input.employeeId, asOf, hrCaptured),
         missingFields: obligationMissingFields(amounts),
@@ -240,12 +258,16 @@ export function buildLines(raw: BukRawBundle, pacta: PactaData, template: Obliga
   for (const settlement of raw.payrollCurrent) {
     const primaMinor = settlement.lines_settlement.filter(isPrimaLine).reduce((total, line) => total + toMinor(line.amount), 0);
     const evidence = [...raw.evidence.payroll, ...raw.evidence.employees];
+    const salaryMinor = toMinor(settlement.liquid_reach) - primaMinor;
+    const concepts = Object.entries(trackedConcepts(settlement)).map(([code, amountMinor]) => ({ code, amountMinor }));
+    const base = salaryMinor - concepts.reduce((total, concept) => total + concept.amountMinor, 0);
     push({
       employeeId: settlement.employee_id,
       suffix: `buk-liquidacion-${settlement.liquidacion_id}:salary`,
       lineType: "salary",
-      amountMinor: toMinor(settlement.liquid_reach) - primaMinor,
+      amountMinor: salaryMinor,
       componentCode: "net_pay",
+      components: concepts.length > 0 && base > 0 ? [{ code: "net_base", amountMinor: base }, ...concepts] : undefined,
       evidence,
     });
     if (primaMinor > 0) {
