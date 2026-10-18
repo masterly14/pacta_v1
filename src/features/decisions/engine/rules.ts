@@ -43,7 +43,7 @@ function unknown(
 // Formato solo para explicaciones; sin floats. Fuera de USD se muestran unidades menores.
 export function formatAmount(amountMinor: number, currency: string): string {
   if (currency !== "USD") {
-    return `${amountMinor} minor units ${currency}`;
+    return `${amountMinor} unidades menores ${currency}`;
   }
   const cents = String(amountMinor % 100).padStart(2, "0");
   return `${Math.trunc(amountMinor / 100)}.${cents} USD`;
@@ -108,7 +108,7 @@ const authorizationRef = (auth: EngineAuthorization): DecisionEvidenceReference 
 const priorRef = (prior: EnginePriorDecision): DecisionEvidenceReference => ({
   type: "payment_decision",
   id: prior.decisionId,
-  description: `invoice ${prior.invoiceId}`,
+  description: `factura ${prior.invoiceId}`,
 });
 
 // 1. Campos esenciales: proveedor confirmado, monto, moneda, número y cuenta beneficiaria.
@@ -121,9 +121,9 @@ const essentialFieldsPresent: Rule = (invoice) => {
   if (invoice.invoiceNumber === null) missing.push("invoice number");
   if (invoice.beneficiaryAccountReference === null) missing.push("beneficiary account");
   if (missing.length > 0) {
-    return fail(ruleId, "INSUFFICIENT_DATA", `Missing essential data: ${missing.join(", ")}.`);
+    return fail(ruleId, "INSUFFICIENT_DATA", `Faltan datos esenciales: ${missing.join(", ")}.`);
   }
-  return pass(ruleId, "Supplier, amount, currency, invoice number and beneficiary account are present.");
+  return pass(ruleId, "Proveedor, monto, moneda, número de factura y cuenta beneficiaria están presentes.");
 };
 
 // 2. Una extracción con advertencias es dato dudoso: nunca se aprueba sola.
@@ -131,21 +131,21 @@ const noExtractionWarnings: Rule = (invoice) => {
   const ruleId = "no_extraction_warnings";
   if (invoice.extractionWarnings.length > 0) {
     const codes = invoice.extractionWarnings.map((w) => w.code).join(", ");
-    return fail(ruleId, "INSUFFICIENT_DATA", `Extraction reported warnings (${codes}); the data needs human review.`);
+    return fail(ruleId, "INSUFFICIENT_DATA", `La lectura reportó advertencias (${codes}); los datos necesitan revisión humana.`);
   }
-  return pass(ruleId, "Extraction reported no warnings.");
+  return pass(ruleId, "La lectura no reportó advertencias.");
 };
 
 // 3. Solo USD en P0; no se inventan tasas de cambio.
 const currencySupported: Rule = (invoice) => {
   const ruleId = "currency_supported";
   if (invoice.currency === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Invoice currency is unknown.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "Se desconoce la moneda de la factura.");
   }
   if (invoice.currency !== P0_CURRENCY) {
-    return fail(ruleId, "CURRENCY_NOT_SUPPORTED", `Currency ${invoice.currency} is not supported for automatic approval (USD only).`);
+    return fail(ruleId, "CURRENCY_NOT_SUPPORTED", `La moneda ${invoice.currency} no admite aprobación automática (solo USD).`);
   }
-  return pass(ruleId, "Invoice currency is USD.");
+  return pass(ruleId, "La factura está en USD.");
 };
 
 // 4. Duplicados: confirmado bloquea; reenvío de una bloqueada, sospechoso o no determinable escala.
@@ -156,13 +156,13 @@ const notDuplicate: Rule = (invoice, facts) => {
     return fail(
       ruleId,
       "DUPLICATE_INVOICE",
-      `The same document was already submitted as invoice ${sameFile.join(", ")}.`,
-      sameFile.map((id) => ({ type: "invoice", id, description: "same document fingerprint" })),
+      `El mismo documento ya se recibió como la factura ${sameFile.join(", ")}.`,
+      sameFile.map((id) => ({ type: "invoice", id, description: "misma huella del documento" })),
       true,
     );
   }
   if (invoice.supplierId === null || invoice.invoiceNumber === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Duplicate check needs a confirmed supplier and an invoice number.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "Para revisar duplicados se necesita un proveedor confirmado y un número de factura.");
   }
 
   const number = normalizeInvoiceNumber(invoice.invoiceNumber);
@@ -178,7 +178,7 @@ const notDuplicate: Rule = (invoice, facts) => {
     return fail(
       ruleId,
       "DUPLICATE_INVOICE",
-      `Invoice number ${invoice.invoiceNumber} from this supplier was already processed.`,
+      `La factura ${invoice.invoiceNumber} de este proveedor ya se procesó.`,
       confirmed.map(priorRef),
       true,
     );
@@ -187,7 +187,7 @@ const notDuplicate: Rule = (invoice, facts) => {
     return fail(
       ruleId,
       "DUPLICATE_INVOICE",
-      `Invoice number ${invoice.invoiceNumber} was previously blocked or rejected; a person must confirm this resubmission.`,
+      `La factura ${invoice.invoiceNumber} se bloqueó o rechazó antes; una persona debe confirmar este reenvío.`,
       sameNumber.map(priorRef),
     );
   }
@@ -203,11 +203,11 @@ const notDuplicate: Rule = (invoice, facts) => {
     return fail(
       ruleId,
       "DUPLICATE_INVOICE",
-      "Another invoice from this supplier has the same amount and date with a different number (suspected duplicate).",
+      "Otra factura de este proveedor tiene el mismo monto y fecha con otro número (posible duplicado).",
       suspected.map(priorRef),
     );
   }
-  return pass(ruleId, "No previous invoice matches this supplier and invoice number or document.");
+  return pass(ruleId, "Ninguna factura anterior coincide con este proveedor y número de factura o documento.");
 };
 
 // 5. Debe existir una autorización explícita vigente y sin usar en su periodo.
@@ -215,7 +215,7 @@ const notDuplicate: Rule = (invoice, facts) => {
 const supplierAuthorized: Rule = (invoice, facts) => {
   const ruleId = "supplier_authorized";
   if (invoice.supplierId === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Supplier is not confirmed, so authorizations cannot be checked.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "El proveedor no está confirmado, así que no se pueden revisar autorizaciones.");
   }
   const match = matchAuthorizations(invoice, facts);
   if (match.valid.length === 0) {
@@ -223,65 +223,65 @@ const supplierAuthorized: Rule = (invoice, facts) => {
       return fail(
         ruleId,
         "RECURRENCE_NOT_AUTHORIZED",
-        "Payment history shows recurring payments to this supplier, but there is no explicit authorization. History is not authorization.",
+        "El historial muestra pagos recurrentes a este proveedor, pero no hay una autorización explícita. El historial no es una autorización.",
       );
     }
     return fail(
       ruleId,
       "SUPPLIER_NOT_AUTHORIZED",
-      "There is no active authorization for this supplier covering today and the invoice date.",
+      "No hay una autorización activa para este proveedor que cubra hoy y la fecha de la factura.",
     );
   }
   if (match.available.length === 0) {
     return fail(
       ruleId,
       "SUPPLIER_NOT_AUTHORIZED",
-      "This supplier's authorization already covered an invoice in its current period.",
+      "La autorización de este proveedor ya cubrió una factura en su periodo actual.",
       match.valid.map(authorizationRef),
     );
   }
-  return pass(ruleId, "An active, unused authorization exists for this supplier.", match.available.map(authorizationRef));
+  return pass(ruleId, "Existe una autorización activa y sin usar para este proveedor.", match.available.map(authorizationRef));
 };
 
 // 6. La cuenta beneficiaria debe ser la de una autorización aplicable; no se transfiere.
 const beneficiaryMatchesAuthorization: Rule = (invoice, facts) => {
   const ruleId = "beneficiary_matches_authorization";
   if (invoice.beneficiaryAccountReference === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Beneficiary account is unknown.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "Se desconoce la cuenta beneficiaria.");
   }
   const match = matchAuthorizations(invoice, facts);
   if (match.available.length === 0) {
-    return unknown(ruleId, "SUPPLIER_NOT_AUTHORIZED", "No applicable authorization to compare the beneficiary account against.");
+    return unknown(ruleId, "SUPPLIER_NOT_AUTHORIZED", "No hay una autorización aplicable con la cual comparar la cuenta beneficiaria.");
   }
   if (match.sameAccount.length === 0) {
     return fail(
       ruleId,
       "BENEFICIARY_CHANGED",
-      `Beneficiary account ${invoice.beneficiaryAccountReference} does not match any authorized account for this supplier.`,
+      `La cuenta beneficiaria ${invoice.beneficiaryAccountReference} no coincide con ninguna cuenta autorizada de este proveedor.`,
       match.available.map(authorizationRef),
     );
   }
-  return pass(ruleId, "Beneficiary account matches an authorized account.", match.sameAccount.map(authorizationRef));
+  return pass(ruleId, "La cuenta beneficiaria coincide con una cuenta autorizada.", match.sameAccount.map(authorizationRef));
 };
 
 // 7. El monto no supera el máximo de la autorización aplicable (misma cuenta y moneda).
 const withinAuthorizationLimit: Rule = (invoice, facts) => {
   const ruleId = "within_authorization_limit";
   if (invoice.amountMinor === null || invoice.currency === null || invoice.beneficiaryAccountReference === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Amount, currency or beneficiary account is unknown.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "Se desconoce el monto, la moneda o la cuenta beneficiaria.");
   }
   const match = matchAuthorizations(invoice, facts);
   if (match.available.length === 0) {
-    return unknown(ruleId, "SUPPLIER_NOT_AUTHORIZED", "No applicable authorization to compare the amount against.");
+    return unknown(ruleId, "SUPPLIER_NOT_AUTHORIZED", "No hay una autorización aplicable con la cual comparar el monto.");
   }
   if (match.sameAccount.length === 0) {
-    return unknown(ruleId, "BENEFICIARY_CHANGED", "No authorization for this beneficiary account to compare the amount against.");
+    return unknown(ruleId, "BENEFICIARY_CHANGED", "No hay una autorización para esta cuenta beneficiaria con la cual comparar el monto.");
   }
   if (match.sameCurrency.length === 0) {
     return fail(
       ruleId,
       "CURRENCY_NOT_SUPPORTED",
-      `No authorization for this account covers currency ${invoice.currency}.`,
+      `Ninguna autorización de esta cuenta cubre la moneda ${invoice.currency}.`,
       match.sameAccount.map(authorizationRef),
     );
   }
@@ -292,13 +292,13 @@ const withinAuthorizationLimit: Rule = (invoice, facts) => {
     return fail(
       ruleId,
       "AMOUNT_LIMIT_EXCEEDED",
-      `Amount ${formatAmount(amount, invoice.currency)} exceeds the authorized maximum of ${formatAmount(highest, invoice.currency)}.`,
+      `El monto ${formatAmount(amount, invoice.currency)} supera el máximo autorizado de ${formatAmount(highest, invoice.currency)}.`,
       match.sameCurrency.map(authorizationRef),
     );
   }
   return pass(
     ruleId,
-    `Amount ${formatAmount(amount, invoice.currency)} is within the authorized maximum of ${formatAmount(covering.maxAmountMinor, invoice.currency)}.`,
+    `El monto ${formatAmount(amount, invoice.currency)} está dentro del máximo autorizado de ${formatAmount(covering.maxAmountMinor, invoice.currency)}.`,
     [authorizationRef(covering)],
   );
 };
@@ -308,26 +308,26 @@ const withinPolicyAutoLimit: Rule = (invoice, facts) => {
   const ruleId = "within_policy_auto_limit";
   const policy = facts.policy;
   if (policy === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Payment policy could not be loaded.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "No se pudo cargar la política de pagos.");
   }
   if (invoice.amountMinor === null || invoice.currency === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Amount or currency is unknown.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "Se desconoce el monto o la moneda.");
   }
-  const ref: DecisionEvidenceReference = { type: "payment_policy", id: policy.policyId, description: `version ${policy.version}` };
+  const ref: DecisionEvidenceReference = { type: "payment_policy", id: policy.policyId, description: `versión ${policy.version}` };
   if (invoice.currency !== policy.currency) {
-    return unknown(ruleId, "CURRENCY_NOT_SUPPORTED", `Policy limits are in ${policy.currency}; invoice is in ${invoice.currency}.`);
+    return unknown(ruleId, "CURRENCY_NOT_SUPPORTED", `Los límites de la política están en ${policy.currency}; la factura está en ${invoice.currency}.`);
   }
   if (invoice.amountMinor > policy.autoApprovalLimitMinor) {
     return fail(
       ruleId,
       "AMOUNT_LIMIT_EXCEEDED",
-      `Amount ${formatAmount(invoice.amountMinor, invoice.currency)} exceeds the automatic approval limit of ${formatAmount(policy.autoApprovalLimitMinor, policy.currency)}.`,
+      `El monto ${formatAmount(invoice.amountMinor, invoice.currency)} supera el límite de aprobación automática de ${formatAmount(policy.autoApprovalLimitMinor, policy.currency)}.`,
       [ref],
     );
   }
   return pass(
     ruleId,
-    `Amount is within the automatic approval limit of ${formatAmount(policy.autoApprovalLimitMinor, policy.currency)}.`,
+    `El monto está dentro del límite de aprobación automática de ${formatAmount(policy.autoApprovalLimitMinor, policy.currency)}.`,
     [ref],
   );
 };
@@ -337,18 +337,18 @@ const contractConsistent: Rule = (invoice) => {
   const ruleId = "contract_consistent";
   const match = invoice.contractMatch;
   if (match === null || match.matchStatus === "not_found") {
-    return pass(ruleId, "No contract applies; the explicit authorization governs this payment.");
+    return pass(ruleId, "No aplica ningún contrato; la autorización explícita rige este pago.");
   }
   const ref: DecisionEvidenceReference[] =
     match.contractId === null ? [] : [{ type: "contract", id: match.contractId, description: null }];
   if (match.matchStatus === "ambiguous") {
-    return fail(ruleId, "CONTRACT_MISMATCH", "It is ambiguous which contract applies to this invoice.", ref);
+    return fail(ruleId, "CONTRACT_MISMATCH", "No está claro qué contrato aplica a esta factura.", ref);
   }
   if (match.matchStatus === "mismatch") {
     const details = match.discrepancies.map((d) => d.description).join("; ");
-    return fail(ruleId, "CONTRACT_MISMATCH", `Invoice contradicts its contract: ${details}`, ref);
+    return fail(ruleId, "CONTRACT_MISMATCH", `La factura contradice su contrato: ${details}`, ref);
   }
-  return pass(ruleId, "Invoice is consistent with its contract.", ref);
+  return pass(ruleId, "La factura es coherente con su contrato.", ref);
 };
 
 // 10. Presupuesto mensual disponible. Si no alcanza, bloquea; si no es calculable, escala.
@@ -356,32 +356,32 @@ const budgetAvailable: Rule = (invoice, facts) => {
   const ruleId = "budget_available";
   const policy = facts.policy;
   if (policy === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Payment policy could not be loaded, so the budget is unknown.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "No se pudo cargar la política de pagos, así que se desconoce el presupuesto.");
   }
   if (facts.budgetUsedMinor === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Budget used this month could not be calculated.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "No se pudo calcular el presupuesto usado este mes.");
   }
   if (invoice.amountMinor === null || invoice.currency === null) {
-    return unknown(ruleId, "INSUFFICIENT_DATA", "Amount or currency is unknown.");
+    return unknown(ruleId, "INSUFFICIENT_DATA", "Se desconoce el monto o la moneda.");
   }
   if (invoice.currency !== policy.currency) {
-    return unknown(ruleId, "CURRENCY_NOT_SUPPORTED", `Budget is in ${policy.currency}; invoice is in ${invoice.currency}.`);
+    return unknown(ruleId, "CURRENCY_NOT_SUPPORTED", `El presupuesto está en ${policy.currency}; la factura está en ${invoice.currency}.`);
   }
   const ref: DecisionEvidenceReference[] = [
-    { type: "payment_policy", id: policy.policyId, description: `version ${policy.version}` },
-    { type: "budget_snapshot", id: today(facts).slice(0, 7), description: `used ${formatAmount(facts.budgetUsedMinor, policy.currency)}` },
+    { type: "payment_policy", id: policy.policyId, description: `versión ${policy.version}` },
+    { type: "budget_snapshot", id: today(facts).slice(0, 7), description: `usado ${formatAmount(facts.budgetUsedMinor, policy.currency)}` },
   ];
   const remaining = policy.monthlyBudgetMinor - facts.budgetUsedMinor;
   if (invoice.amountMinor > remaining) {
     return fail(
       ruleId,
       "BUDGET_INSUFFICIENT",
-      `Amount ${formatAmount(invoice.amountMinor, invoice.currency)} exceeds the remaining monthly budget of ${formatAmount(Math.max(remaining, 0), policy.currency)}.`,
+      `El monto ${formatAmount(invoice.amountMinor, invoice.currency)} supera el presupuesto mensual restante de ${formatAmount(Math.max(remaining, 0), policy.currency)}.`,
       ref,
       true,
     );
   }
-  return pass(ruleId, `Remaining monthly budget of ${formatAmount(remaining, policy.currency)} covers this invoice.`, ref);
+  return pass(ruleId, `El presupuesto mensual restante de ${formatAmount(remaining, policy.currency)} cubre esta factura.`, ref);
 };
 
 // Orden fijo: también es el orden en que se muestran en el dashboard.

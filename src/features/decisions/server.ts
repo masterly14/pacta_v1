@@ -15,6 +15,7 @@ import { db } from "@/lib/db";
 import { InvoiceContextSchema } from "@/shared/schemas/invoice-context";
 import { PaymentDecisionSchema, type PaymentDecision } from "@/shared/schemas/payment-decision";
 import { notifyDecision } from "@/features/notifications/dispatch";
+import { notArchived } from "./archive";
 import { decide } from "./engine/decide";
 import { loadEngineFacts } from "./load-facts";
 
@@ -37,9 +38,12 @@ function coveringAuthorizationId(decision: PaymentDecision): string | null {
  * esa decisión sin crear otra. Las decisiones de una organización se serializan con un
  * bloqueo de fila, así dos facturas no consumen el mismo presupuesto.
  */
-export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> {
+// `now` permite evaluar con la fecha de otro momento (datos demo históricos, pruebas); `notify: false`
+// no avisa por WhatsApp/Slack. Por defecto: ahora y con aviso.
+export async function evaluateInvoice(input: unknown, options: { now?: Date; notify?: boolean } = {}): Promise<PaymentDecision> {
   const invoice = InvoiceContextSchema.parse(input);
   const organizationId = invoice.organizationId;
+  const now = options.now ?? new Date();
 
   const decision = await db.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM organizations WHERE id = ${organizationId} FOR UPDATE`;
@@ -55,7 +59,7 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
       return PaymentDecisionSchema.parse(alreadyApproved.payload);
     }
 
-    const facts = await loadEngineFacts(tx, invoice, { now: new Date(), decisionId: randomUUID() });
+    const facts = await loadEngineFacts(tx, invoice, { now, decisionId: randomUUID() });
     const decision = decide(invoice, facts);
 
     await tx.paymentDecision.create({
@@ -86,12 +90,12 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
     });
     if (decision.decision === "requires_approval" && pending === null) {
       await tx.approvalRequest.create({
-        data: { organizationId, invoiceId: invoice.invoiceId, decisionId: decision.decisionId },
+        data: { organizationId, invoiceId: invoice.invoiceId, decisionId: decision.decisionId, requestedAt: now },
       });
     }
     // Una reevaluación que ya no necesita persona (aprobada o bloqueada) cierra la solicitud.
     if (decision.decision !== "requires_approval" && pending !== null) {
-      await tx.approvalRequest.update({ where: { id: pending.id }, data: { status: "cancelled", resolvedAt: new Date() } });
+      await tx.approvalRequest.update({ where: { id: pending.id }, data: { status: "cancelled", resolvedAt: now } });
     }
 
     await tx.auditEvent.create({
@@ -115,7 +119,7 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
 
   // Tras el commit: avisar por los canales configurados es best-effort, idempotente por decisión
   // y nunca altera la decisión ya guardada.
-  await notifyDecision(decision.decisionId);
+  if (options.notify !== false) await notifyDecision(decision.decisionId);
   return decision;
 }
 
@@ -125,7 +129,7 @@ export async function evaluateInvoice(input: unknown): Promise<PaymentDecision> 
 
 export async function listRecentDecisions(organizationId: string, take = 50) {
   const rows = await db.paymentDecision.findMany({
-    where: { organizationId },
+    where: { organizationId, invoiceId: await notArchived(organizationId) },
     orderBy: { evaluatedAt: "desc" },
     take,
     include: { supplier: { select: { name: true } } },
@@ -152,7 +156,7 @@ export async function listRecentDecisions(organizationId: string, take = 50) {
 
 export async function listPendingApprovals(organizationId: string) {
   const rows = await db.approvalRequest.findMany({
-    where: { organizationId, status: "pending" },
+    where: { organizationId, status: "pending", invoiceId: await notArchived(organizationId) },
     orderBy: { requestedAt: "asc" },
     include: { decision: { include: { supplier: { select: { name: true } } } } },
   });

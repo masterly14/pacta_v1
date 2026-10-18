@@ -81,9 +81,9 @@ export function matchContract(
   );
   const period: Discrepancy = {
     field: "period",
-    expected: `${closest.validFrom} to ${closest.validTo ?? "open-ended"}`,
+    expected: `${closest.validFrom} a ${closest.validTo ?? "sin fin"}`,
     actual: invoiceDate,
-    description: `Invoice date ${invoiceDate} is outside the contract validity period.`,
+    description: `La fecha de la factura ${invoiceDate} está fuera de la vigencia del contrato.`,
   };
   return compare(invoice, closest, [period]);
 }
@@ -103,8 +103,8 @@ function compare(
       actual: invoice.currency,
       description:
         invoice.currency === null
-          ? `Invoice currency is unknown; the contract is in ${contract.currency}.`
-          : `Invoice is in ${invoice.currency}; the contract is in ${contract.currency}.`,
+          ? `Se desconoce la moneda de la factura; el contrato está en ${contract.currency}.`
+          : `La factura está en ${invoice.currency}; el contrato está en ${contract.currency}.`,
     });
   } else if (invoice.amountMinor !== contract.agreedAmountMinor) {
     // Comparación exacta: cualquier diferencia escala, nunca aprueba.
@@ -115,8 +115,8 @@ function compare(
       actual,
       description:
         actual === null
-          ? `Invoice amount is unknown; the contract agrees ${agreed}.`
-          : `Invoice amount ${actual} differs from the agreed ${agreed}.`,
+          ? `Se desconoce el monto de la factura; el contrato acuerda ${agreed}.`
+          : `El monto de la factura ${actual} difiere del acordado de ${agreed}.`,
     });
   }
 
@@ -127,7 +127,7 @@ function compare(
       field: "beneficiary_account",
       expected: contractAccount,
       actual: invoiceAccount,
-      description: `Invoice asks for payment to ${invoiceAccount}; the contract names ${contractAccount}.`,
+      description: `La factura pide el pago a ${invoiceAccount}; el contrato indica ${contractAccount}.`,
     });
   }
 
