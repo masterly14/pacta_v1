@@ -4,7 +4,9 @@ import {
   latestPerInvoice,
   sumByCurrency,
   summarizeDecisions,
+  summarizeReceipts,
   topReasonCodes,
+  type ClassifiedReceipt,
   type DecisionRow,
   type ReceiptFacts,
   type ReceiptRow,
@@ -137,5 +139,52 @@ describe("classifyReceipt", () => {
   it("marks an unknown supplier and gives it no other signal", () => {
     const result = classifyReceipt(receipt({ supplierId: null }), facts({ recurringAuthorizations: [authorization] }));
     expect(result).toEqual({ status: "unapproved", signals: ["supplier_unknown"] });
+  });
+});
+
+describe("summarizeReceipts", () => {
+  const classified = (overrides: Partial<ClassifiedReceipt>): ClassifiedReceipt => ({
+    invoiceId: "r",
+    supplierId: "sup_nube",
+    supplierName: "Nube Hosting",
+    invoiceNumber: null,
+    amountMinor: 1_000,
+    currency: "USD",
+    paidOn: "2027-01-05",
+    receivedOn: "2027-01-05",
+    status: "unapproved",
+    signals: [],
+    ...overrides,
+  });
+
+  it("totals by status, counts signals and ranks unapproved suppliers", () => {
+    const summary = summarizeReceipts([
+      classified({ invoiceId: "a", signals: ["likely_recurring", "bank_confirmed"] }),
+      classified({ invoiceId: "b", signals: ["likely_recurring"] }),
+      classified({ invoiceId: "c", supplierId: null, supplierName: null, amountMinor: 500, currency: "EUR", signals: ["supplier_unknown"] }),
+      classified({ invoiceId: "d", supplierId: "sup_soft", supplierName: "Soft", status: "covered_by_authorization", amountMinor: 200 }),
+      classified({ invoiceId: "e", supplierId: "sup_pap", supplierName: "Papelería", status: "approved_in_pacta", amountMinor: 300 }),
+    ], 5);
+    expect(summary.count).toBe(5);
+    expect(summary.byStatus).toEqual({
+      unapproved: { count: 3, amountByCurrency: { USD: 2_000, EUR: 500 } },
+      covered_by_authorization: { count: 1, amountByCurrency: { USD: 200 } },
+      approved_in_pacta: { count: 1, amountByCurrency: { USD: 300 } },
+    });
+    expect(summary.likelyRecurring).toBe(2);
+    expect(summary.bankConfirmed).toBe(1);
+    expect(summary.topUnapprovedSuppliers).toEqual([
+      { supplierId: "sup_nube", name: "Nube Hosting", count: 2, amountByCurrency: { USD: 2_000 } },
+      { supplierId: null, name: "Proveedor no reconocido", count: 1, amountByCurrency: { EUR: 500 } },
+    ]);
+  });
+
+  it("limits the supplier ranking and handles no receipts", () => {
+    const many = ["a", "b", "c"].map((id) => classified({ invoiceId: id, supplierId: `sup_${id}`, supplierName: id }));
+    expect(summarizeReceipts(many, 2).topUnapprovedSuppliers).toHaveLength(2);
+    const empty = summarizeReceipts([], 3);
+    expect(empty.count).toBe(0);
+    expect(empty.byStatus.unapproved).toEqual({ count: 0, amountByCurrency: {} });
+    expect(empty.topUnapprovedSuppliers).toEqual([]);
   });
 });

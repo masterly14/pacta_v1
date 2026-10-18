@@ -1,7 +1,8 @@
 /**
- * Purpose: integration tests for getDashboard() against a real PostgreSQL: latest decision per
- *   invoice, budget use, pending approvals, receipt classification (unapproved, covered by a
- *   recurring authorization, bank confirmation) and organization scoping.
+ * Purpose: integration tests for getDashboard() and listOutsidePayments() against a real
+ *   PostgreSQL: latest decision per invoice, budget use, pending approvals, receipt classification
+ *   (unapproved, covered by a recurring authorization, bank confirmation), this month's receipt
+ *   totals, the status filter of the detail and organization scoping.
  * Runs in: Vitest, only when TEST_DATABASE_URL points at a disposable database with all
  *   migrations applied (skipped otherwise, so `npm test` needs no database).
  * Triggered by: `TEST_DATABASE_URL=… npx vitest run src/features/dashboard/server.integration.test.ts`.
@@ -19,7 +20,7 @@ vi.mock("@/lib/db", async () => {
 });
 
 describe.skipIf(!url)("getDashboard (integration)", async () => {
-  const { getDashboard } = await import("./server");
+  const { getDashboard, listOutsidePayments } = await import("./server");
   const prisma = new PrismaClient({ datasourceUrl: url });
 
   const ORG = "org_dash";
@@ -146,15 +147,35 @@ describe.skipIf(!url)("getDashboard (integration)", async () => {
     await receipt("rec_unknown", { supplierId: null, amountMinor: 999, paidOn: "2026-12-15" });
     await receipt("rec_other_org", { organizationId: OTHER, supplierId: null, amountMinor: 1, paidOn: "2027-01-10" });
 
-    const dashboard = await getDashboard(ORG, NOW);
-    const byId = Object.fromEntries(dashboard.receipts.map((r) => [r.invoiceId, r]));
+    // Detalle: todos los recibos de la organización, clasificados.
+    const detail = await listOutsidePayments(ORG, { status: null }, NOW);
+    const byId = Object.fromEntries(detail.receipts.map((r) => [r.invoiceId, r]));
     expect(Object.keys(byId).sort()).toEqual(["rec_nube", "rec_pap", "rec_soft", "rec_unknown"]);
     expect(byId.rec_nube).toMatchObject({ status: "unapproved", supplierName: "Nube Hosting", paymentMethod: "Visa ****4242" });
     expect(byId.rec_nube.signals.sort()).toEqual(["bank_confirmed", "likely_recurring"]);
     expect(byId.rec_soft.status).toBe("covered_by_authorization");
     expect(byId.rec_pap.status).toBe("approved_in_pacta");
     expect(byId.rec_unknown).toMatchObject({ status: "unapproved", signals: ["supplier_unknown"] });
-    expect(dashboard.unapprovedThisMonth).toEqual({ count: 1, amountByCurrency: { USD: 150_000 } });
+    expect(detail.summary.byStatus.unapproved).toEqual({ count: 2, amountByCurrency: { USD: 150_999 } });
+    expect(detail.truncated).toBe(false);
+
+    const onlyUnapproved = await listOutsidePayments(ORG, { status: "unapproved" }, NOW);
+    expect(onlyUnapproved.receipts.map((r) => r.invoiceId).sort()).toEqual(["rec_nube", "rec_unknown"]);
+    expect(onlyUnapproved.matchingCount).toBe(2);
+
+    // Resumen del mes: el recibo de diciembre queda fuera.
+    const dashboard = await getDashboard(ORG, NOW);
+    const month = dashboard.outsidePayments.month;
+    expect(month.count).toBe(3);
+    expect(month.byStatus).toEqual({
+      unapproved: { count: 1, amountByCurrency: { USD: 150_000 } },
+      covered_by_authorization: { count: 1, amountByCurrency: { USD: 2_000 } },
+      approved_in_pacta: { count: 1, amountByCurrency: { USD: 4_590 } },
+    });
+    expect(month.likelyRecurring).toBe(1);
+    expect(month.bankConfirmed).toBe(1);
+    expect(month.topUnapprovedSuppliers).toEqual([{ supplierId: "sup_nube", name: "Nube Hosting", count: 1, amountByCurrency: { USD: 150_000 } }]);
+    expect(dashboard.outsidePayments).toMatchObject({ truncated: false, allTimeCount: 4 });
 
     // Nube aparece como suscripción sin autorizar; Soft no tiene historial bancario.
     expect(dashboard.subscriptions.available).toBe(true);
@@ -180,6 +201,6 @@ describe.skipIf(!url)("getDashboard (integration)", async () => {
     const dashboard = await getDashboard(OTHER, NOW);
     expect(dashboard.budget).toBeNull();
     expect(dashboard.decisions.autonomyRate).toBeNull();
-    expect(dashboard.receipts).toEqual([]);
+    expect(dashboard.outsidePayments).toMatchObject({ allTimeCount: 0, month: { count: 0 } });
   });
 });

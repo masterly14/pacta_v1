@@ -18,23 +18,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatMinor } from "@/features/contracts/money";
-import type { ReceiptSignal, ReceiptStatus } from "@/features/dashboard/metrics";
+import { formatAmounts, RECEIPT_STATUS } from "@/features/dashboard/components/labels";
 import { getDashboard, type Dashboard } from "@/features/dashboard/server";
 import { ensureWorkspaceFromSession, OrganizationRequiredError } from "@/shared/auth/ensure-workspace";
 import type { ReasonCode } from "@/shared/schemas/payment-decision";
 
 export const metadata: Metadata = { title: "Resumen" };
 
-const RECEIPT_STATUS: Record<ReceiptStatus, { label: string; variant: "destructive" | "secondary" | "default" }> = {
-  unapproved: { label: "sin aprobación", variant: "destructive" },
-  covered_by_authorization: { label: "cubierto por autorización", variant: "secondary" },
-  approved_in_pacta: { label: "aprobado en Pacta", variant: "default" },
-};
-const SIGNAL: Record<ReceiptSignal, string> = {
-  likely_recurring: "probable cargo recurrente",
-  bank_confirmed: "confirmado en banco",
-  supplier_unknown: "proveedor no reconocido",
-};
 const REASON: Record<ReasonCode, string> = {
   SUPPLIER_NOT_AUTHORIZED: "Proveedor sin autorización",
   DUPLICATE_INVOICE: "Factura duplicada",
@@ -93,68 +83,61 @@ async function DashboardData() {
   );
 }
 
-const formatAmounts = (byCurrency: Record<string, number>) => {
-  const entries = Object.entries(byCurrency);
-  return entries.length === 0 ? "—" : entries.map(([currency, minor]) => formatMinor(minor, currency)).join(" · ");
-};
-
 function OutsidePayments({ dashboard }: { dashboard: Dashboard }) {
-  const { receipts, unapprovedThisMonth } = dashboard;
+  const { month, truncated, allTimeCount } = dashboard.outsidePayments;
+  const unapproved = month.byStatus.unapproved;
   return (
     <Card>
       <CardHeader>
         <CardTitle>Pagos realizados fuera de Pacta</CardTitle>
         <CardDescription>
-          Recibos llegados por correo de pagos que ya ocurrieron, a menudo cargos automáticos a tarjeta. No se evalúan
-          para pago, así que nunca se pagan dos veces. Detectado desde recibos por correo; verifique con su banco.
+          Recibos llegados por correo de pagos que ya ocurrieron en {dashboard.month}, a menudo cargos automáticos a
+          tarjeta. No se evalúan para pago, así que nunca se pagan dos veces. Verifique con su banco.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-6">
-          <Stat label={`Sin aprobación (${dashboard.month})`} value={String(unapprovedThisMonth.count)} tone={unapprovedThisMonth.count > 0 ? "alert" : "normal"} />
-          <Stat label="Monto sin aprobación" value={formatAmounts(unapprovedThisMonth.amountByCurrency)} tone={unapprovedThisMonth.count > 0 ? "alert" : "normal"} />
-          <Stat label="Recibos registrados" value={String(receipts.length)} />
+      <CardContent className="flex flex-col gap-5">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <Stat label="Sin aprobación" value={String(unapproved.count)} tone={unapproved.count > 0 ? "alert" : "normal"} />
+          <Stat label="Monto sin aprobación" value={formatAmounts(unapproved.amountByCurrency)} tone={unapproved.count > 0 ? "alert" : "normal"} />
+          <Stat label="Probables cargos recurrentes" value={String(month.likelyRecurring)} />
+          <Stat label="Confirmados en banco" value={String(month.bankConfirmed)} />
         </div>
-        {receipts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aún no llegan recibos de pagos realizados.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead>Monto</TableHead>
-                  <TableHead>Pagado</TableHead>
-                  <TableHead>Medio</TableHead>
-                  <TableHead>Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {receipts.map((r) => (
-                  <TableRow key={r.invoiceId} className={r.status === "unapproved" ? "bg-destructive/5" : undefined}>
-                    <TableCell>
-                      <Link href={`/platform/invoices/${r.invoiceId}`} className="font-medium underline-offset-4 hover:underline">
-                        {r.supplierName ?? r.extractedName ?? "—"}
-                      </Link>
-                      {r.invoiceNumber && <div className="text-xs text-muted-foreground">{r.invoiceNumber}</div>}
-                    </TableCell>
-                    <TableCell>{r.amountMinor === null || r.currency === null ? "—" : formatMinor(r.amountMinor, r.currency)}</TableCell>
-                    <TableCell className="text-sm">{r.paidOn ?? <span className="text-muted-foreground">recibido {r.receivedOn}</span>}</TableCell>
-                    <TableCell className="text-sm">{r.paymentMethod ?? "—"}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant={RECEIPT_STATUS[r.status].variant}>{RECEIPT_STATUS[r.status].label}</Badge>
-                        {r.signals.map((signal) => (
-                          <Badge key={signal} variant="outline">{SIGNAL[signal]}</Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Recibos del mes por estado ({month.count})</span>
+            <ul className="flex flex-col gap-1.5">
+              {(["unapproved", "covered_by_authorization", "approved_in_pacta"] as const).map((status) => (
+                <li key={status} className="flex items-center justify-between gap-3 text-sm">
+                  <Badge variant={RECEIPT_STATUS[status].variant}>{RECEIPT_STATUS[status].label}</Badge>
+                  <span>
+                    {month.byStatus[status].count} · {formatAmounts(month.byStatus[status].amountByCurrency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
-        )}
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Proveedores con más pagos sin aprobación</span>
+            {month.topUnapprovedSuppliers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Ninguno este mes.</p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {month.topUnapprovedSuppliers.map((s) => (
+                  <li key={s.supplierId ?? "unknown"} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate">{s.name}</span>
+                    <span className="shrink-0">
+                      {s.count} · {formatAmounts(s.amountByCurrency)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        {truncated && <p className="text-xs text-muted-foreground">Hay demasiados recibos este mes: los totales cubren los más recientes.</p>}
+        <Link href="/platform/outside-payments" className="text-sm font-medium underline-offset-4 hover:underline">
+          Ver detalle de los {allTimeCount} recibos →
+        </Link>
       </CardContent>
     </Card>
   );
