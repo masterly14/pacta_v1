@@ -22,6 +22,7 @@ export const FISCAL_REASON: Record<FiscalReasonCode, string> = {
   DEADLINE_PASSED: "Plazo vencido",
   DEADLINE_AT_RISK: "Plazo en riesgo",
   FUNDS_INSUFFICIENT: "Fondos insuficientes",
+  PROVISION_EXCEEDED: "Supera la provisión",
 };
 
 export const FISCAL_OUTCOME: Record<FiscalOutcome, { label: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -52,4 +53,5 @@ export const FISCAL_RULE: Record<string, string> = {
   fondos_suficientes: "Fondos para la línea",
   fondos_corrida: "Fondos para la corrida",
   tope_corrida: "Tope de la plantilla",
+  provision_suficiente: "Dentro de la provisión",
 };

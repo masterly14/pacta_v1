@@ -1,13 +1,14 @@
 /**
  * Purpose: deterministic engine for fiscal obligations (platform-core §7.2 and §7.2.1).
- *   Each tax line of a run goes through eleven rules in fixed order, then two run rules
- *   (total vs. free funds and vs. the template cap). Also computes the T-7 / T-3 alerts.
+ *   Each tax line of a run goes through eleven rules in fixed order, then three run rules
+ *   (total vs. free funds, vs. the template cap and vs. the organization's provision).
+ *   Also computes the provision plan and the T-7 / T-3 alerts.
  *   Pacta never calculates taxes: it compares the accounting draft with the confirmed
  *   settlement and the organization's control rules. `approved` = simulated payment.
  * Runs in: server and tests (pure, no I/O, no AI, no clock: `asOf` comes from the caller).
  * Triggered by: tests today; later the obligations cron and the demo clock.
  * Receives → Returns: decideFiscalRun(FiscalRunInput) → { lines: FiscalLineDecision[], held };
- *   fiscalAlerts(FiscalAlertInput) → FiscalAlert[].
+ *   fiscalProvision(...) → FiscalProvision; fiscalAlerts(FiscalAlertInput) → FiscalAlert[].
  * Talks to: @/features/obligations/fiscal/schemas (types), @/features/contracts/money#formatMinor.
  */
 import { formatMinor } from "@/features/contracts/money";
@@ -338,6 +339,8 @@ export function decideFiscalRun(input: FiscalRunInput): FiscalRunResult {
   const held = approvable.length > 0 && total > free;
   const overCap = approvable.length > 0 && total > input.template.runCapMinor;
 
+  const provision = fiscalProvision(input);
+
   for (const line of approvable) {
     line.outcomes.push(
       held
@@ -346,10 +349,60 @@ export function decideFiscalRun(input: FiscalRunInput): FiscalRunResult {
       overCap
         ? fail("tope_corrida", "OBLIGATION_NOT_AUTHORIZED", `El total aprobable ${formatMinor(total, currency)} supera el tope de la plantilla ${formatMinor(input.template.runCapMinor, currency)}.`, [templateRef(input.template)])
         : pass("tope_corrida", "Total dentro del tope de la plantilla.", [templateRef(input.template)]),
+      provisionRule(input, provision, total),
     );
   }
 
   return { lines: lines.map((line) => toDecision(line.lineInput, line.outcomes)), held };
+}
+
+// La provisión de la organización solo puede escalar: un total por encima de lo reservado
+// pide una persona. Nunca habilita un pago ni fija su monto.
+function provisionRule(input: FiscalRunInput, provision: FiscalProvision, total: number): RuleOutcome {
+  const ruleId = "provision_suficiente";
+  const currency = input.snapshot.currency;
+  if (provision.provisionBps === null) {
+    return pass(ruleId, "La organización no definió una provisión para impuestos.");
+  }
+  if (provision.reserveMinor === null) {
+    return unknown(ruleId, "INSUFFICIENT_DATA", "Hay regla de provisión pero la contabilidad no reporta ingresos.");
+  }
+  if (total > provision.reserveMinor) {
+    return fail(
+      ruleId,
+      "PROVISION_EXCEEDED",
+      `El total aprobable ${formatMinor(total, currency)} supera la provisión de ${provision.provisionBps / 100} % de los ingresos (${formatMinor(provision.reserveMinor, currency)}).`,
+      [templateRef(input.template), snapshotRef(input.snapshot)],
+    );
+  }
+  return pass(ruleId, `Dentro de la provisión de ${formatMinor(provision.reserveMinor, currency)}.`, [templateRef(input.template), snapshotRef(input.snapshot)]);
+}
+
+// ---------------------------------------------------------------------------
+// Provisión: cuánto reservar según la regla de la organización (plan de caja)
+// ---------------------------------------------------------------------------
+
+export type FiscalProvision = {
+  incomeMinor: number | null; // ingresos del último mes cerrado según la contabilidad
+  provisionBps: number | null; // regla de la organización; null = sin regla
+  reserveMinor: number | null; // ingresos × provisión; null si falta cualquiera de los dos
+  totalDraftMinor: number | null; // borradores vigilados y no pagados; null si alguno falta
+  gapMinor: number | null; // lo que el total supera a la reserva (0 si alcanza)
+};
+
+export function fiscalProvision({ template, snapshot, run }: Omit<FiscalRunInput, "settlements" | "asOf">): FiscalProvision {
+  const watched = new Set(template.taxes.map((tax) => tax.fiscalType));
+  const paid = new Set(run.paidPeriods.map((p) => periodKey(p.fiscalType, p.periodStart)));
+  const items = snapshot.items.filter((item) => watched.has(item.fiscalType) && !paid.has(periodKey(item.fiscalType, item.periodStart)));
+  const totalDraftMinor = items.some((item) => item.draftAmountMinor === null)
+    ? null
+    : items.reduce((sum, item) => sum + (item.draftAmountMinor as number), 0);
+  const incomeMinor = snapshot.income?.amountMinor ?? null;
+  const provisionBps = template.provisionBps;
+  // Enteros: ingresos × bps / 10000, redondeado hacia abajo (la reserva nunca se infla).
+  const reserveMinor = incomeMinor === null || provisionBps === null ? null : Math.floor((incomeMinor * provisionBps) / 10_000);
+  const gapMinor = reserveMinor === null || totalDraftMinor === null ? null : Math.max(totalDraftMinor - reserveMinor, 0);
+  return { incomeMinor, provisionBps, reserveMinor, totalDraftMinor, gapMinor };
 }
 
 // ---------------------------------------------------------------------------

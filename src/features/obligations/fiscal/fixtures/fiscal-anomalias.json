@@ -20,7 +20,8 @@
       { "fiscalType": "parafiscal", "authorizedPaymentReference": "PILA-****7781" }
     ],
     "varianceToleranceBps": 1000,
-    "runCapMinor": 3000000000,
+    "provisionBps": 3000,
+    "runCapMinor": 2000000000,
     "evidenceMaxAgeDays": 7,
     "earlyAlertDays": 7,
     "urgentAlertDays": 3,
@@ -34,6 +35,7 @@
     "dataOrigin": "fixture",
     "currency": "COP",
     "capturedAt": "2026-11-05T12:00:00Z",
+    "income": { "periodStart": "2026-10-01", "periodEnd": "2026-10-31", "amountMinor": 5200000000 },
     "items": [
       {
         "fiscalType": "vat",

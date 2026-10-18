@@ -185,7 +185,9 @@ Campos: `signalId`, `organizationId`, `gmailInboundMessageId`, `kind` (`novedad_
 
 **Reglas de la corrida fiscal:** si la suma de las líneas aprobables supera los fondos libres, esas líneas quedan `bloqueada` (`FUNDS_INSUFFICIENT`, corrida retenida); si supera el tope de la plantilla, escalan (`OBLIGATION_NOT_AUTHORIZED`).
 
-**Qué fija la organización (reglas de control, no tributarias):** al activar la plantilla "Impuestos" una persona autorizada define qué impuestos vigilar, la referencia de pago autorizada de cada uno, la tolerancia de variación, el tope de la corrida y los días de aviso (T-7, T-3).
+**Provisión de la organización (plan de caja, no cálculo tributario):** la plantilla puede fijar `provisionBps`, p. ej. "reservar 30 % de los ingresos para impuestos". La contabilidad simulada reporta los ingresos del último mes cerrado. Pacta calcula la reserva (ingresos × provisión, entero hacia abajo) y la muestra junto al total de borradores. Regla de corrida `provision_suficiente`: si el total aprobable supera la reserva → `PROVISION_EXCEEDED` (escala); con provisión y sin ingresos → `INSUFFICIENT_DATA`. La provisión **nunca** fija el monto a pagar ni habilita un pago. `PROVISION_EXCEEDED` es un código nuevo que no está en el PR #58.
+
+**Qué fija la organización (reglas de control, no tributarias):** al activar la plantilla "Impuestos" una persona autorizada define qué impuestos vigilar, la referencia de pago autorizada de cada uno, la provisión (% de ingresos), la tolerancia de variación, el tope de la corrida y los días de aviso (T-7, T-3).
 
 **Avisos (no son decisiones):** en T-7 y T-3 Pacta avisa con el monto del borrador, el vencimiento y la brecha de fondos, p. ej.: *"IVA sep–oct ≈ COP 6.680.000 según tu contabilidad, vence el 2026-11-10. Fondos libres COP 4.000.000: faltan COP 2.680.000"*. En T-3 con brecha se marca `DEADLINE_AT_RISK`.
 
@@ -332,4 +334,4 @@ Rentas cortas, contratistas, cuentas por pagar con orden de compra, integración
 ## 16. Registro
 
 - 2026-10-17: documento creado tras acordar el alcance de tres casos (nómina, fiscal/parafiscal e Inbox). Rentas cortas, contratistas y orden de compra quedan fuera. Sin código ni migraciones todavía.
-- 2026-10-18: §7.2.1 "Fuente contable (simulada)": el monto fiscal sale del borrador de la contabilidad (fixture), se cruza con la liquidación confirmada y Pacta solo compara y avisa. Enums en inglés (como el código). Motor fiscal puro empezado en `feature/b-fiscal-accounting`, independiente del PR #58.
+- 2026-10-18: §7.2.1 "Fuente contable (simulada)": el monto fiscal sale del borrador de la contabilidad (fixture), se cruza con la liquidación confirmada y Pacta solo compara y avisa. Enums en inglés (como el código). Motor fiscal puro empezado en `feature/b-fiscal-accounting`, independiente del PR #58. Se añade la provisión de la organización (% de ingresos) como plan de caja que solo escala, y un recorrido guiado de demo en `/platform/obligations/fiscal` (conectar → reglas → propuesta → confirmar → evaluar → resultado), solo en el navegador. Ojo para OB-02: los montos COP en unidades menores superan int4 a partir de ~COP 21,4 M; las columnas deben ser `bigint`.
