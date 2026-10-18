@@ -45,7 +45,8 @@ model Organization {
   inboundChannelMessages InboundChannelMessage[]
 
   // Vertical A
-  contracts Contract[]
+  contracts            Contract[]
+  contractFlowVersions ContractFlowVersion[]
 
   @@map("organizations")
 }
@@ -553,9 +554,46 @@ model Contract {
   organization Organization @relation(fields: [organizationId], references: [id])
   supplier     Supplier     @relation(fields: [supplierId], references: [id])
 
+  flowVersions ContractFlowVersion[]
+
   @@index([organizationId, supplierId, status])
   @@index([organizationId, createdAt])
   @@map("contracts")
+}
+
+enum ContractFlowStatus {
+  draft
+  active
+  superseded
+}
+
+/// Versión del flujo (grafo de nodos y aristas) que describe cómo se paga un contrato.
+/// Un borrador se edita; al activarse queda congelado. Evidencia, nunca autorización.
+/// Las columnas planas de Contract son un resumen de la versión activa (monto fijo o tope).
+/// @db-guarantee UNIQUE INDEX contract_flow_versions_one_active: una sola versión active por contrato.
+/// @db-guarantee UNIQUE INDEX contract_flow_versions_one_draft: un solo borrador por contrato.
+/// @db-guarantee TRIGGER contract_flow_versions_frozen: una versión no draft no cambia su grafo,
+///   hash ni versión (solo active → superseded) y no se borra.
+model ContractFlowVersion {
+  id             String             @id @default(cuid())
+  organizationId String             @map("organization_id")
+  contractId     String             @map("contract_id")
+  version        Int
+  schemaVersion  Int                @default(1) @map("schema_version")
+  graph          Json
+  graphSha256    String             @map("graph_sha256")
+  status         ContractFlowStatus @default(draft)
+  createdBy      String             @map("created_by")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  activatedBy    String?            @map("activated_by")
+  activatedAt    DateTime?          @map("activated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contract     Contract     @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, version])
+  @@index([organizationId, contractId, status])
+  @@map("contract_flow_versions")
 }
 
 // ---------------------------------------------------------------------------
