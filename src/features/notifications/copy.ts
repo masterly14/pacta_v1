@@ -28,6 +28,20 @@ export const REASON_LABEL: Record<ReasonCode, string> = {
   AUTO_APPROVAL_RULES_PASSED: "Cumple todas las reglas de aprobación automática",
   BENEFICIARY_CHANGED: "Cambió la cuenta del beneficiario",
   CURRENCY_NOT_SUPPORTED: "Moneda no soportada",
+  EMPLOYEE_TERMINATED: "Empleado desvinculado",
+  EMPLOYEE_NOT_FOUND: "Empleado no encontrado",
+  PAYROLL_OMISSION: "Nómina incompleta",
+  VARIANCE_EXCEEDED: "Variación sobre la tolerancia",
+  BENEFIT_MISMATCH: "Beneficio no coincide",
+  DUPLICATE_LINE: "Línea duplicada",
+  FUNDS_INSUFFICIENT: "Fondos insuficientes",
+  OBLIGATION_NOT_AUTHORIZED: "Obligación sin autorizar",
+  SETTLEMENT_UNCONFIRMED: "Liquidación sin confirmar",
+  SETTLEMENT_AMOUNT_MISMATCH: "Monto distinto de la liquidación",
+  DEADLINE_PASSED: "Plazo vencido",
+  DEADLINE_AT_RISK: "Plazo en riesgo",
+  STALE_EVIDENCE: "Evidencia desactualizada",
+  SIGNAL_PENDING_REVIEW: "Señal pendiente de revisión",
 };
 
 // El motivo genérico solo aporta cuando es el único; si hay causas concretas, se omite.
