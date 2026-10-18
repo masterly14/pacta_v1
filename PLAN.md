@@ -15,6 +15,10 @@ Construir un agente que revise las cuentas de una empresa ficticia y decida **`a
 
 `approved` significa **aprobación simulada de una factura**, no un pago ejecutado. El producto nunca mueve dinero.
 
+> **Pivote proactivo (2026-10-17).** El producto deja de ser solo reactivo a facturas. El **Core** pasa a ser un sistema que conoce las obligaciones recurrentes de la empresa, reúne evidencia por su cuenta y valida cada pago antes de soltarlo. Alcance acordado: **nómina**, **obligaciones fiscales y parafiscales** e **Inbox** (correo genérico, único componente real). Definición completa: [`docs/plans/platform-core.md`](docs/plans/platform-core.md); resumen en §5.1. Rentas cortas, contratistas y órdenes de compra quedan fuera.
+>
+> **Nomenclatura vigente en el código:** los valores almacenados están en español (`aprobada | bloqueada | requiere_aprobacion`, `cumple | incumple | desconocido`, códigos de motivo como `PROVEEDOR_NO_AUTORIZADO`). Donde este documento escribe `approved`, `blocked` o `requires_approval`, el valor del código es el español.
+
 ## 2. Problema y propuesta de valor
 
 Una empresa constituida en EE. UU. con proveedores y contratistas internacionales recibe facturas por distintos canales. Su equipo financiero revisa documentos, compara contratos, consulta antecedentes, valida presupuestos y solicita aprobaciones manuales.
@@ -22,6 +26,10 @@ Una empresa constituida en EE. UU. con proveedores y contratistas internacionale
 **Propuesta:** un inbox de facturas que concentra el contexto financiero, procesa documentos con IA y automatiza decisiones **solo cuando existe autorización explícita y se cumplen las políticas**. El historial bancario ayuda a detectar recurrencias, **pero nunca concede autorización por sí mismo**.
 
 **Historia de la demo:** llega por email una factura de una suscripción; el agente detecta pagos históricos, no encuentra autorización y escala; una persona autoriza la recurrencia con límites definidos; una próxima factura válida se aprueba de forma automática; una factura duplicada o alterada se bloquea o escala conforme a la política.
+
+**Propuesta ampliada (Core proactivo):** Pacta no espera a que llegue una factura. Conoce las obligaciones recurrentes que no van por débito automático (nómina, impuestos y aportes), reúne la evidencia, aplica las mismas políticas determinísticas y **frena** lo anómalo: empleado desvinculado, cuenta cambiada, monto fuera de rango, liquidación que no cuadra, fondos insuficientes. Lo limpio y autorizado se aprueba (simulado) sin intervención humana. Frente a un débito automático, que paga a ciegas, Pacta es piloto automático con frenos.
+
+**Historia de la demo proactiva:** el reloj de demo llega al cierre de mes y Pacta genera sola la corrida de nómina; aprueba las líneas limpias, bloquea al desvinculado y escala la cuenta cambiada; un correo real de RR. HH. sobre un retiro reevalúa la corrida antes de ejecutarla; un vencimiento fiscal avisa con anticipación y solo se aprueba cuando el pago coincide con la liquidación que una persona confirmó.
 
 ## 3. Alcance y prioridades
 
@@ -39,6 +47,17 @@ Una empresa constituida en EE. UU. con proveedores y contratistas internacionale
 - [ ] Dashboard con inbox, detalle, estado, evidencia y explicación por factura.
 - [ ] Auditoría persistente y pruebas de casos adversariales.
 
+### P0 proactivo — Core de obligaciones (ver `docs/plans/platform-core.md` §11)
+
+- [ ] Contratos `ObligationContext` e `InboxSignal` aprobados por ambos, con fixtures válidos e inválidos (OB-01).
+- [ ] Obligaciones recurrentes versionadas, activadas por una persona autorizada, y ocurrencias idempotentes por periodo (OB-02, OB-04).
+- [ ] Motor determinístico para **nómina** con oracle de escenarios `nomina-limpia` y `nomina-anomalias` (OB-03).
+- [ ] Reloj inyectable y reloj de demo; cron idempotente (OB-04).
+- [ ] Ejecución simulada con revalidación previa y avisos por Slack/WhatsApp (OB-04).
+- [ ] Inbox genérico: clasifica correos y extrae `InboxSignal` propuestas, verificables por una persona (OB-06, OB-07).
+- [ ] Obligaciones **fiscales y parafiscales**: alertas previas al vencimiento y pago solo contra una liquidación confirmada (OB-08, OB-09).
+- [ ] Dashboard de obligaciones: corridas, líneas, evidencia, razones y selector de escenario (OB-05).
+
 ### P1 — Solo después de completar P0
 
 - [ ] Landing mínima de presentación (una pantalla, sin bloquear el MVP).
@@ -47,7 +66,7 @@ Una empresa constituida en EE. UU. con proveedores y contratistas internacionale
 
 ### Fuera de alcance de la hackathon
 
-WhatsApp, Slack, integración con bancos, extractos bancarios PDF, dinero real, apertura de cuentas, verificación de identidad empresarial, fraude/compliance, pgvector, memoria vectorial, orquestación multiagente y una landing elaborada. No integrarlos antes de terminar P0. **La app no es el rediseño de la aplicación oficial de Blinka.**
+Rentas cortas, contratistas, órdenes de compra, integración real con sistemas de RR. HH. o entes tributarios, cálculo legal de prestaciones o impuestos, integración con bancos, Slack y WhatsApp **como vía de aprobación** (existen solo como canales de aviso en `src/features/notifications/`; los botones registran evidencia y no aprueban), extractos bancarios PDF, dinero real, apertura de cuentas, verificación de identidad empresarial, fraude/compliance, pgvector, memoria vectorial, orquestación multiagente y una landing elaborada. No integrarlos antes de terminar P0. **La app no es el rediseño de la aplicación oficial de Blinka.**
 
 ## 4. Stack acordado
 
@@ -111,6 +130,24 @@ EMAIL (Resend) / CARGA MANUAL
 - El contexto contractual o histórico **no es un permiso** para pagar. Una autorización debe ser una entidad separada.
 
 **Procesamiento de email:** verificar firma, guardar el evento y reconocer duplicados antes de procesar. El endpoint no debe depender de mantener una ejecución HTTP abierta durante una aprobación humana. Para P0 puede usar un mecanismo sencillo de procesamiento reintentable basado en estados persistidos; introducir una cola/workflow durable solo si las pruebas lo requieren. Conservar carga manual para demostrar el flujo incluso si el proveedor de email falla.
+
+### 5.1 Extensión proactiva: Core de obligaciones
+
+Detalle en [`docs/plans/platform-core.md`](docs/plans/platform-core.md). Resumen:
+
+```text
+Reloj (cron / reloj de demo) → Ocurrencia de una obligación activa (plantilla autorizada)
+   → Evidencia: fixtures (nómina, calendario fiscal) + INBOX real (señales propuestas)
+   → Motor determinístico (reglas por línea y de corrida) → aprobada | requiere_aprobacion | bloqueada
+   → Aprobación humana con reevaluación → revalidación → ejecución simulada → aviso → auditoría
+```
+
+- **Mismo motor, nuevo origen.** `InvoiceContext` y el nuevo `ObligationContext` son dos productores de hechos para el mismo motor, políticas, aprobaciones, notificaciones y auditoría. `PaymentDecision` se generaliza con un `subject` (`factura | linea_nomina | pago_fiscal`) de forma compatible hacia atrás.
+- **Confianza asimétrica.** Una señal no verificada (correo, chat) solo puede aumentar la cautela; nunca habilita un pago.
+- **Plantilla ≠ autorización.** Una obligación recurrente opera en automático solo tras la activación explícita de una persona autorizada, con tolerancia y topes.
+- **`asOf` explícito y evidencia congelada.** El motor recibe la fecha; cada decisión referencia instantáneas con hash; la ejecución simulada revalida.
+- **Fixture-first.** Los datos de negocio entran por adaptadores (`ObligationSource`); lo único real es el Inbox de Gmail. Sin workflow durable: estados persistidos en Postgres y un cron idempotente.
+- **Propiedad.** A: `src/features/inbox/` e `inbox_signals`. B: `src/features/obligations/`, reglas en `decisions/engine/obligations/` y tablas de obligaciones. Contratos, migraciones y cron: compartidos.
 
 ## 6. Contratos compartidos entre verticales
 
@@ -384,6 +421,10 @@ Mantener un conjunto de al menos 20 facturas/eventos ficticios con **resultado e
 
 **Indicadores visibles en la demo:** porcentaje de casos procesados sin humano, número de casos correctos según oracle y **número de aprobaciones indebidas (objetivo 0)**. No prometer seguridad absoluta fuera del conjunto de pruebas.
 
+### 13.1 Casos trampa del Core proactivo
+
+El oracle completo (desvinculado, omisión, cuenta cambiada, variación, prima, duplicados, fondos, evidencia vieja, correo con instrucciones, señal posterior a la aprobación, liquidación sin confirmar, monto fiscal ±1, periodo pagado, vencimiento pasado, concurrencia, reintentos y permisos) está en [`docs/plans/platform-core.md`](docs/plans/platform-core.md) §13. Se define antes de ejecutar el motor y sin depender del LLM.
+
 ## 14. Definition of Done (DoD)
 
 Una funcionalidad se considera completa cuando:
@@ -427,12 +468,21 @@ Una funcionalidad se considera completa cuando:
 - [ ] ¿Qué proveedor/modelo de IA y almacenamiento privado de archivos se configurarán?
 - [ ] ¿Qué conjunto de 20+ facturas/casos trampa mostrará la demo?
 
+**Core proactivo** (lista completa en `docs/plans/platform-core.md` §14):
+
+- [ ] Moneda: las obligaciones del fixture son en COP y P0 aprueba automáticamente solo USD. ¿Monedas soportadas por política, sin conversión?
+- [ ] Generalizar `PaymentDecision` con `subject` y decidir si hay una decisión por línea o por corrida.
+- [ ] Tolerancia de variación por defecto, antigüedad máxima de evidencia y permiso para verificar señales y confirmar liquidaciones.
+- [ ] Dónde vive el reloj de demo y cómo se desactiva fuera de `DEMO_MODE`.
+
 Ninguna decisión pendiente debe resolverse unilateralmente con una implementación de alto impacto. Ante dudas críticas, adoptar la alternativa que **no aprueba automáticamente** y documentar el bloqueo.
 
 ## 17. Documentos y próximos artefactos
 
 - `CLAUDE.md` — reglas de desarrollo y colaboración (**existe**).
 - `PLAN.md` — este plan maestro.
+- `docs/plans/platform-core.md` — definición del Core proactivo (**propuesta a aprobar**).
+- `src/shared/schemas/obligation-context.ts` e `inbox-signal.ts` — esquemas Zod del Core (**por crear y aprobar**).
 - `src/shared/schemas/invoice-context.ts` — esquema Zod (**por crear y aprobar**).
 - `src/shared/schemas/payment-decision.ts` — esquema Zod (**por crear y aprobar**).
 - `docs/plans/developer-a-invoices.md` — plan A (**por crear**).
