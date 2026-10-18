@@ -6,13 +6,15 @@
  * Triggered by: actions.ts (Approve / Reject on /platform/approvals).
  * Receives → Returns: (PolicyActor, ResolveApprovalInput) → { ok, message } | { ok: false, error }.
  * Talks to: db — Organization (row lock), ApprovalRequest, PaymentDecision, PaymentAuthorization,
- *   AuditEvent; decisions (load-facts, engine/decide); policies/permissions#checkCanAuthorize.
+ *   AuditEvent; decisions (load-facts, engine/decide); policies/permissions#checkCanAuthorize;
+ *   notifications/dispatch (after commit).
  */
 import { randomUUID } from "node:crypto";
 import { Prisma, type PaymentDecision as PaymentDecisionRow } from "@prisma/client";
 import { db } from "@/lib/db";
 import { decide } from "@/features/decisions/engine/decide";
 import { loadEngineFacts } from "@/features/decisions/load-facts";
+import { notifyDecision } from "@/features/notifications/dispatch";
 import { checkCanAuthorize, type PolicyActor } from "@/features/policies/permissions";
 import { InvoiceContextSchema } from "@/shared/schemas/invoice-context";
 import {
@@ -131,7 +133,7 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
   const approvalLimitMinor = permission.approvalLimitMinor;
 
   try {
-    return await db.$transaction(async (tx): Promise<ResolveResult> => {
+    const result = await db.$transaction(async (tx): Promise<ResolveResult> => {
       await tx.$queryRaw`SELECT id FROM organizations WHERE id = ${actor.organizationId} FOR UPDATE`;
 
       const request = await tx.approvalRequest.findFirst({
@@ -287,6 +289,18 @@ export async function resolveApprovalRequest(actor: PolicyActor, input: ResolveA
         message: authorizationId === null ? "Factura aprobada (pago simulado)." : "Factura aprobada y autorización recurrente creada.",
       };
     }, TRANSACTION_OPTIONS);
+
+    // Tras el commit: avisar de la decisión humana por los canales configurados (best-effort,
+    // nunca altera el resultado).
+    if (result.ok) {
+      const resolution = await db.paymentDecision.findFirst({
+        where: { organizationId: actor.organizationId, approvalRequestId: input.approvalRequestId },
+        orderBy: { evaluatedAt: "desc" },
+        select: { id: true },
+      });
+      if (resolution !== null) await notifyDecision(resolution.id);
+    }
+    return result;
   } catch (error) {
     // Índice único parcial: la factura ya tiene una aprobación (no se aprueba dos veces).
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

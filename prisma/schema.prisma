@@ -32,15 +32,17 @@ model Organization {
   ignoredItems     IgnoredInboundItem[]
 
   // Vertical B
-  suppliers             Supplier[]
-  paymentPolicies       PaymentPolicy[]
-  paymentAuthorizations PaymentAuthorization[]
-  paymentDecisions      PaymentDecision[]
-  approvalRequests      ApprovalRequest[]
-  bankImportBatches     BankImportBatch[]
-  bankTransactions      BankTransaction[]
-  auditEvents           AuditEvent[]
-  invoices              Invoice[]
+  suppliers              Supplier[]
+  paymentPolicies        PaymentPolicy[]
+  paymentAuthorizations  PaymentAuthorization[]
+  paymentDecisions       PaymentDecision[]
+  approvalRequests       ApprovalRequest[]
+  bankImportBatches      BankImportBatch[]
+  bankTransactions       BankTransaction[]
+  auditEvents            AuditEvent[]
+  invoices               Invoice[]
+  notificationRecipients NotificationRecipient[]
+  inboundChannelMessages InboundChannelMessage[]
 
   // Vertical A
   contracts Contract[]
@@ -627,4 +629,76 @@ model Invoice {
   @@index([organizationId, documentKind, paidOn])
   @@index([gmailInboundMessageId])
   @@map("invoices")
+}
+
+// ---------------------------------------------------------------------------
+// Notificaciones (WhatsApp / Slack). Los valores guardados van en inglés; el texto que reciben
+// las personas va en español (features/notifications/copy.ts y plantillas).
+// ---------------------------------------------------------------------------
+
+enum NotificationChannel {
+  whatsapp
+  slack
+  email
+}
+
+enum NotificationRecipientStatus {
+  active
+  disabled
+}
+
+enum InboundMessageContext {
+  quoted_request // la respuesta cita una solicitud pendiente de la organización
+  single_pending // sin cita explícita; hay exactamente una solicitud pendiente (inferencia)
+  ambiguous // varias solicitudes pendientes y ninguna citada
+  no_open_approvals // no hay solicitudes pendientes
+  request_not_pending // cita una solicitud inexistente, ajena o ya resuelta
+}
+
+/// Destinatario de notificaciones (p. ej. administrador). Su dirección identifica a la organización
+/// de un mensaje entrante; una dirección desconocida o deshabilitada se omite.
+/// @db-guarantee UNIQUE (channel, address): una dirección pertenece a una sola organización.
+/// @db-guarantee CHECK notification_recipients_whatsapp_address_check: WhatsApp = E.164 solo dígitos.
+model NotificationRecipient {
+  id             String                      @id
+  organizationId String                      @map("organization_id")
+  channel        NotificationChannel
+  address        String // WhatsApp: E.164 solo dígitos, sin '+'
+  status         NotificationRecipientStatus @default(active)
+  verifiedAt     DateTime?                   @map("verified_at") @db.Timestamptz(6)
+  createdBy      String                      @map("created_by")
+  createdAt      DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  messages     InboundChannelMessage[]
+
+  @@unique([channel, address])
+  @@index([organizationId])
+  @@map("notification_recipients")
+}
+
+/// Mensaje entrante de un canal de notificación. Evidencia NO confiable: nunca resuelve una
+/// aprobación. `eventKey` único = idempotencia frente a reintentos del proveedor.
+model InboundChannelMessage {
+  id                       String                @id
+  organizationId           String                @map("organization_id")
+  recipientId              String                @map("recipient_id")
+  channel                  NotificationChannel
+  eventKey                 String                @unique @map("event_key")
+  providerMessageId        String                @map("provider_message_id")
+  replyToProviderMessageId String?               @map("reply_to_provider_message_id")
+  text                     String?
+  buttonPayload            String?               @map("button_payload")
+  claimedAction            String?               @map("claimed_action") // pista del botón (pay | reject | details); no autoriza
+  context                  InboundMessageContext
+  approvalRequestId        String?               @map("approval_request_id")
+  receivedAt               DateTime              @map("received_at") @db.Timestamptz(6)
+  createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  recipient    NotificationRecipient @relation(fields: [recipientId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, receivedAt])
+  @@index([approvalRequestId])
+  @@map("inbound_channel_messages")
 }
