@@ -88,7 +88,9 @@ function InvoiceView({ invoice }: { invoice: InvoiceDetail }) {
         <CardHeader>
           <CardTitle>Decisión</CardTitle>
           <CardDescription>
-            {latest === null
+            {invoice.documentKind === "receipt"
+              ? `Recibo de un pago ya realizado${invoice.paidOn ? ` el ${invoice.paidOn}` : ""}${invoice.paymentMethod ? ` · ${invoice.paymentMethod}` : ""}. No se evalúa para pago, así que nunca se paga dos veces.`
+              : latest === null
               ? invoice.extractionStatus === "failed"
                 ? "La lectura con IA falló: no hay decisión y nunca se aprueba por defecto."
                 : "Aún sin decisión."
@@ -102,6 +104,7 @@ function InvoiceView({ invoice }: { invoice: InvoiceDetail }) {
               {invoice.source === "email" && <RetryInvoiceButton invoiceId={invoice.id} />}
             </div>
           )}
+          {invoice.documentKind === "receipt" && <Badge variant="outline" className="w-fit">Pagado (recibo)</Badge>}
           {latest !== null && (
             <>
               <div className="flex flex-wrap items-center gap-2">
