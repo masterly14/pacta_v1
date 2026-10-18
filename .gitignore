@@ -30,7 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Local env overrides (not shared). `.env` is committed for the team.
+# Secrets never go to git (the repo is public). Share them through Vercel or a password manager;
+# `.env.example` lists the variables.
+.env
 .env.local
 .env.*.local
 
